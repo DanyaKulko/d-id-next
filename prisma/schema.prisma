@@ -1,0 +1,100 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum AuthEventType {
+  LOGIN_PASSWORD
+  LOGIN_OTP_SENT
+  LOGIN_OTP_VERIFY
+  LOGOUT
+  PASSWORD_CHANGE
+  ADMIN_USER_CREATE
+  ADMIN_USER_UPDATE
+  ADMIN_USER_DELETE
+}
+
+model User {
+  id           String @id @default(cuid())
+  email        String @unique
+  passwordHash String
+
+  twoFactorEmail Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions        Session[]
+  twoFactorTokens TwoFactorToken[]
+  roles           UserRole[]
+  LoginEvent      LoginEvent[]
+}
+
+model Session {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash String    @unique
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  ip        String?
+  userAgent String?
+
+  @@index([userId, expiresAt])
+}
+
+model TwoFactorToken {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  codeHash   String
+  expiresAt  DateTime
+  consumedAt DateTime?
+
+  attempts    Int @default(0)
+  maxAttempts Int @default(5)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model UserRole {
+  userId String
+  role   Role
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, role])
+  @@index([role])
+}
+
+model LoginEvent {
+  id      String        @id @default(cuid())
+  type    AuthEventType
+  success Boolean
+  reason  String?
+  email   String?
+  userId  String?
+  user    User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  ip        String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([email, createdAt])
+}

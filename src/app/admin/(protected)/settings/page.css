@@ -1,0 +1,260 @@
+/* src/app/admin/settings/page.css */
+
+/* Settings-specific styles */
+.two-column {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+}
+
+.api-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.api-card h3 {
+    margin-top: 0;
+}
+
+.health-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding: 15px;
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+.health-status.healthy {
+    background: #c6f6d5;
+    color: #2f855a;
+}
+
+.health-status.error {
+    background: #fed7d7;
+    color: #c53030;
+}
+
+.health-status .icon {
+    font-size: 24px;
+}
+
+.cron-settings {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.log-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.log-table th {
+    background: #f7fafc;
+    padding: 12px;
+    text-align: left;
+    font-size: 13px;
+    color: #4a5568;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.log-table td {
+    padding: 12px;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 14px;
+}
+
+.log-table tr:hover {
+    background: #f7fafc;
+}
+
+.session-row {
+    cursor: pointer;
+}
+
+.session-row:hover {
+    background: #ebf8ff;
+}
+
+.expandable-content {
+    display: none;
+    background: #f7fafc;
+    padding: 15px;
+    margin-top: 10px;
+    border-radius: 6px;
+}
+
+.expandable-content.expanded {
+    display: block;
+}
+
+.message-block {
+    background: white;
+    padding: 12px;
+    margin-bottom: 10px;
+    border-radius: 6px;
+    border-left: 3px solid #4299e1;
+}
+
+.message-block.user {
+    border-left-color: #48bb78;
+}
+
+.message-block.avatar {
+    border-left-color: #4299e1;
+}
+
+.message-meta {
+    font-size: 12px;
+    color: #718096;
+    margin-bottom: 8px;
+}
+
+.message-text {
+    font-size: 14px;
+    color: #2d3748;
+}
+
+.rag-trace {
+    background: #ebf8ff;
+    padding: 10px;
+    margin-top: 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #2c5282;
+}
+
+.toggle-container {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 20px;
+    background: #f7fafc;
+    border-radius: 8px;
+    margin-top: 15px;
+}
+
+.toggle-switch {
+    position: relative;
+    width: 60px;
+    height: 30px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #cbd5e0;
+    transition: 0.3s;
+    border-radius: 30px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 22px;
+    width: 22px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #48bb78;
+}
+
+input:checked + .slider:before {
+    transform: translateX(30px);
+}
+
+.toggle-label {
+    font-size: 16px;
+    font-weight: 500;
+    color: #2d3748;
+}
+
+.toggle-description {
+    font-size: 13px;
+    color: #718096;
+}
+
+.filters {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.filters select,
+.filters input {
+    padding: 8px 12px;
+    border: 1px solid #cbd5e0;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.pagination {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.pagination button {
+    padding: 8px 12px;
+    border: 1px solid #cbd5e0;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.pagination button:hover {
+    background: #f7fafc;
+}
+
+.pagination button.active {
+    background: #4299e1;
+    color: white;
+    border-color: #4299e1;
+}
+
+.role-technical-settings {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.role-technical-settings h3 {
+    margin-top: 0;
+    color: #2d3748;
+    font-size: 18px;
+}
+
+@media (max-width: 768px) {
+    .two-column {
+        grid-template-columns: 1fr;
+    }
+
+    .cron-settings {
+        grid-template-columns: 1fr;
+    }
+}

@@ -1,0 +1,12 @@
+### GET request to example server
+GET https://api.d-id.com/agents/me
+Content-Type: application/json
+#Authorization: Basic bmVpbF9tYXJhdGhlQHlhaG9vLmNvbQ:AnqHD6695Y1_vfau1ymSh
+Authorization: Basic aW5mby5teWRyaW5rQGdtYWlsLmNvbQ:PNDO4wGy2jHwkGjmvaDct
+
+### GET request to example server
+GET https://api.d-id.com/agents/v2_agt_kIkd4Xm-
+Content-Type: application/json
+Authorization: Basic aW5mby5teWRyaW5rQGdtYWlsLmNvbQ:PNDO4wGy2jHwkGjmvaDct
+
+###
