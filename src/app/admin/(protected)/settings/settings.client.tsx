@@ -1,19 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import {useEffect, useMemo, useState, useTransition} from "react";
+import toast from "react-hot-toast";
 
-type TabId =
-    | "integrations"
-    | "external-sources"
-    | "technical"
-    | "sessions"
-    | "errors-debug"
-    | "admin";
+import {saveExternalSourcesConfigAction, saveIntegrationConfigAction, saveSessionRetentionAction, saveUserUpdateAction} from "@/app/admin/(protected)/actions";
+import {fetchExternalSourcesConfig, fetchIntegrationConfig, fetchUsers, UserRow} from "@/app/admin/(protected)/admin-data";
+
+type TabId = "integrations" | "external-sources" | "sessions" | "errors-debug" | "admin";
 
 const tabTitles: Record<TabId, string> = {
     integrations: "Integrations",
     "external-sources": "External Sources",
-    technical: "Technical Settings",
     sessions: "Session Records",
     "errors-debug": "Error Log & Debug",
     admin: "Administrator",
@@ -27,21 +24,6 @@ function setBreadcrumb(title: string) {
     if (h1) h1.textContent = title;
 }
 
-type UserRow = {
-    id: number;
-    login: string;
-    email: string;
-    createdDate: string;
-    lastLogin: string;
-    status: "active" | "inactive";
-};
-
-const initialUsers: UserRow[] = [
-    { id: 1, login: "user1", email: "user1@example.com", createdDate: "2025-01-15", lastLogin: "2025-01-22", status: "active" },
-    { id: 2, login: "user2", email: "user2@example.com", createdDate: "2025-01-18", lastLogin: "2025-01-21", status: "active" },
-    { id: 3, login: "testuser", email: "test@example.com", createdDate: "2025-01-20", lastLogin: "Never", status: "inactive" },
-];
-
 export default function SettingsClient() {
     const [activeTab, setActiveTab] = useState<TabId>("integrations");
 
@@ -52,9 +34,23 @@ export default function SettingsClient() {
 
     // auth required toggle
     const [authRequired, setAuthRequired] = useState(true);
+    const [users, setUsers] = useState<UserRow[]>([]);
+    const [integrationConfig, setIntegrationConfig] = useState({ apiKey: "sk_did_" });
+    const [externalSourcesConfig, setExternalSourcesConfig] = useState({
+        textLink: "https://roliki.ua/s/json_template_s.txt",
+        textCron: "0 2 * * *",
+        textAccessKey: "",
+        videoLink: "https://roliki.ua/s/video-transcripts-neil.txt",
+        videoCron: "0 3 * * *",
+        videoAccessKey: "",
+    });
+    const [isSaving, startSaving] = useTransition();
 
-    // users (mock)
-    const [users, setUsers] = useState<UserRow[]>(initialUsers);
+    useEffect(() => {
+        fetchUsers().then(setUsers);
+        fetchIntegrationConfig().then(setIntegrationConfig);
+        fetchExternalSourcesConfig().then(setExternalSourcesConfig);
+    }, []);
 
     const switchTab = (tab: TabId) => {
         setActiveTab(tab);
@@ -103,8 +99,16 @@ export default function SettingsClient() {
 
         setUsers((u) => [...u, newUser]);
 
-        window.alert(
-            `User "${login}" created successfully!\n\nLogin: ${login}\nPassword: ${password}\nEmail: ${email}\n\nThe user will need to verify their email for 2FA.`
+        const formData = new FormData();
+        formData.set("action", "create");
+        formData.set("login", login);
+        formData.set("email", email);
+        formData.set("password", password);
+
+        startSaving(() =>
+            saveUserUpdateAction(formData)
+                .then(() => toast.success(`User "${login}" created`))
+                .catch(() => toast.error("Failed to log user creation"))
         );
     };
 
@@ -127,7 +131,17 @@ export default function SettingsClient() {
             )
         );
 
-        window.alert("User updated successfully!");
+        const formData = new FormData();
+        formData.set("action", "update");
+        formData.set("userId", String(id));
+        formData.set("login", newLogin ?? user.login);
+        formData.set("email", newEmail ?? user.email);
+
+        startSaving(() =>
+            saveUserUpdateAction(formData)
+                .then(() => toast.success("User updated"))
+                .catch(() => toast.error("Failed to log user update"))
+        );
     };
 
     const deleteUser = (id: number) => {
@@ -140,7 +154,16 @@ export default function SettingsClient() {
         if (!ok) return;
 
         setUsers((prev) => prev.filter((u) => u.id !== id));
-        window.alert("User deleted successfully!");
+
+        const formData = new FormData();
+        formData.set("action", "delete");
+        formData.set("userId", String(id));
+
+        startSaving(() =>
+            saveUserUpdateAction(formData)
+                .then(() => toast.success("User deleted"))
+                .catch(() => toast.error("Failed to log user removal"))
+        );
     };
 
     const usersRows = useMemo(
@@ -172,9 +195,6 @@ export default function SettingsClient() {
                 <button type="button" className={`tab ${activeTab === "external-sources" ? "active" : ""}`} onClick={() => switchTab("external-sources")}>
                     📰 External Sources
                 </button>
-                <button type="button" className={`tab ${activeTab === "technical" ? "active" : ""}`} onClick={() => switchTab("technical")}>
-                    ⚙️ Technical Settings
-                </button>
                 <button type="button" className={`tab ${activeTab === "sessions" ? "active" : ""}`} onClick={() => switchTab("sessions")}>
                     📋 Session Records
                 </button>
@@ -190,7 +210,26 @@ export default function SettingsClient() {
             <div id="integrations" className={`tab-content ${activeTab === "integrations" ? "active" : ""}`}>
                 <div className="section">
                     <div className="two-column">
-                        <div className="api-card">
+                            <form
+                                className="api-card"
+                                onSubmit={(event) => {
+                                    event.preventDefault();
+                                    const formData = new FormData(event.currentTarget);
+                                    if (!formData.get("apiKey")) {
+                                        toast.error("API Key is required");
+                                        return;
+                                    }
+
+                                    startSaving(() =>
+                                        saveIntegrationConfigAction(formData)
+                                            .then(() => {
+                                                toast.success("Integration saved");
+                                                checkConnection("D-ID API");
+                                            })
+                                            .catch(() => toast.error("Failed to save integration"))
+                                    );
+                                }}
+                            >
                             <h3>D-ID API</h3>
 
                             <div className="health-status healthy">
@@ -200,23 +239,44 @@ export default function SettingsClient() {
 
                             <div className="input-group">
                                 <label>API Key</label>
-                                <input type="password" defaultValue="sk_did_" placeholder="Enter API Key" />
+                                <input
+                                    name="apiKey"
+                                    type="password"
+                                    defaultValue={integrationConfig.apiKey}
+                                    placeholder="Enter API Key"
+                                />
                             </div>
 
-                            <button type="button" className="btn btn-primary btn-small" onClick={() => checkConnection("D-ID API")}>
-                                🔍 Check Connection
-                            </button>{" "}
-                            {/*<button type="button" className="btn btn-secondary btn-small">*/}
-                            {/*    💾 Save*/}
-                            {/*</button>*/}
-                        </div>
+                            <button type="submit" className="btn btn-primary btn-small" disabled={isSaving}>
+                                {isSaving ? "Saving..." : "🔍 Check Connection"}
+                            </button>
+                        </form>
                     </div>
                 </div>
             </div>
 
             {/* External Sources */}
             <div id="external-sources" className={`tab-content ${activeTab === "external-sources" ? "active" : ""}`}>
-                <div className="section">
+                <form
+                    className="section"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        const formData = new FormData(event.currentTarget);
+                        const textLink = formData.get("textLink") as string;
+                        const videoLink = formData.get("videoLink") as string;
+
+                        if (!textLink || !videoLink) {
+                            toast.error("Please provide both text and video links");
+                            return;
+                        }
+
+                        startSaving(() =>
+                            saveExternalSourcesConfigAction(formData)
+                                .then(() => toast.success("External sources saved"))
+                                .catch(() => toast.error("Failed to save sources"))
+                        );
+                    }}
+                >
                     <div className="info-box">
                         ℹ️ The system automatically retrieves new materials from the blog according to the CRON schedule and converts them into vector data for the knowledge base.
                     </div>
@@ -226,18 +286,23 @@ export default function SettingsClient() {
                     <div className="cron-settings">
                         <div className="input-group">
                             <label>JSON API Link</label>
-                            <input type="url" defaultValue="https://roliki.ua/s/json_template_s.txt" placeholder="https://example.com/api/blog/posts.json" />
+                            <input
+                                name="textLink"
+                                type="url"
+                                defaultValue={externalSourcesConfig.textLink}
+                                placeholder="https://example.com/api/blog/posts.json"
+                            />
                         </div>
 
                         <div className="input-group">
                             <label>Access Key</label>
-                            <input type="text" placeholder="API Key" />
+                            <input name="textAccessKey" type="text" defaultValue={externalSourcesConfig.textAccessKey} placeholder="API Key" />
                         </div>
                     </div>
 
                     <div className="input-group">
                         <label>CRON Settings (Update Frequency)</label>
-                        <input type="text" defaultValue="0 2 * * *" placeholder="0 2 * * * (every day at 2:00 AM)" />
+                        <input name="textCron" type="text" defaultValue={externalSourcesConfig.textCron} placeholder="0 2 * * * (every day at 2:00 AM)" />
                     </div>
 
                     <h2 className="section-title">Video Transcription (JSON)</h2>
@@ -245,43 +310,36 @@ export default function SettingsClient() {
                     <div className="cron-settings">
                         <div className="input-group">
                             <label>JSON API Link</label>
-                            <input type="url" defaultValue="https://roliki.ua/s/video-transcripts-neil.txt" placeholder="https://example.com/api/video-transcripts.json" />
+                            <input
+                                name="videoLink"
+                                type="url"
+                                defaultValue={externalSourcesConfig.videoLink}
+                                placeholder="https://example.com/api/video-transcripts.json"
+                            />
                         </div>
 
                         <div className="input-group">
                             <label>Access Key</label>
-                            <input type="text" placeholder="API Key" />
+                            <input name="videoAccessKey" type="text" defaultValue={externalSourcesConfig.videoAccessKey} placeholder="API Key" />
                         </div>
                     </div>
 
                     <div className="input-group">
                         <label>CRON Settings (Update Frequency)</label>
-                        <input type="text" defaultValue="0 3 * * *" placeholder="0 3 * * * (every day at 3:00 AM)" />
+                        <input name="videoCron" type="text" defaultValue={externalSourcesConfig.videoCron} placeholder="0 3 * * * (every day at 3:00 AM)" />
                     </div>
 
                     <div style={{ marginTop: 30 }}>
-                        <button type="button" className="btn btn-primary">
-                            💾 Save Settings
+                        <button type="submit" className="btn btn-primary" disabled={isSaving}>
+                            {isSaving ? "Saving..." : "💾 Save Settings"}
                         </button>{" "}
                         <button type="button" className="btn btn-secondary">
                             🔄 Test Connection
                         </button>
                     </div>
-                </div>
+                </form>
             </div>
 
-            {/* Technical Settings */}
-            <div id="technical" className={`tab-content ${activeTab === "technical" ? "active" : ""}`}>
-                <div className="section">
-                    <div className="info-box">ℹ️ Configure technical parameters for each role</div>
-
-                    <RoleTechCard title="🎭 Basic Neil" video="basic_neil_v1" voice="voice_neil_basic" />
-                    <RoleTechCard title="✈️ Tourism Neil" video="tourism_neil_v1" voice="voice_neil_tourism" />
-                    <RoleTechCard title="⚽ Sports Neil" video="sports_neil_v1" voice="voice_neil_sports" />
-                    <RoleTechCard title="🏛️ Politics Neil" video="politics_neil_v1" voice="voice_neil_politics" />
-                    <RoleTechCard title="🚀 Space Neil" video="space_neil_v1" voice="voice_neil_space" />
-                </div>
-            </div>
 
             {/* Session Records */}
             <div id="sessions" className={`tab-content ${activeTab === "sessions" ? "active" : ""}`}>
@@ -373,6 +431,25 @@ export default function SettingsClient() {
                         <button type="button">3</button>
                         <button type="button">→</button>
                     </div>
+
+                    <form
+                        className="filters"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            const formData = new FormData(event.currentTarget);
+                            startSaving(() =>
+                                saveSessionRetentionAction(formData)
+                                    .then(() => toast.success("Session preferences saved"))
+                                    .catch(() => toast.error("Failed to save session preferences"))
+                            );
+                        }}
+                    >
+                        <label htmlFor="retentionDays">Retention (days)</label>
+                        <input id="retentionDays" name="retentionDays" type="number" min={1} defaultValue={30} />
+                        <button type="submit" className="btn btn-primary btn-small" disabled={isSaving}>
+                            {isSaving ? "Saving..." : "💾 Save Preferences"}
+                        </button>
+                    </form>
                 </div>
             </div>
 
@@ -504,7 +581,11 @@ export default function SettingsClient() {
 
                         <div className="info-box">ℹ️ Email is used for password recovery. Make sure it&apos;s valid and accessible.</div>
 
-                        <button type="button" className="btn btn-primary">
+                        <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() => toast.success("Administrator credentials saved (mock)")}
+                        >
                             💾 Save Changes
                         </button>{" "}
                         <button type="button" className="btn btn-secondary">
@@ -517,34 +598,3 @@ export default function SettingsClient() {
     );
 }
 
-function RoleTechCard(props: { title: string; video: string; voice: string }) {
-    return (
-        <div className="role-technical-settings">
-            <h3>{props.title}</h3>
-
-            <div className="form-grid">
-                <div className="input-group">
-                    <label>Avatar Video ID</label>
-                    <input type="text" defaultValue={props.video} placeholder="video_12345" />
-                </div>
-
-                <div className="input-group">
-                    <label>Voice ID</label>
-                    <input type="text" defaultValue={props.voice} placeholder="voice_id" />
-                </div>
-
-                <div className="input-group">
-                    <label>Background Control</label>
-                    <select defaultValue="enabled">
-                        <option value="disabled">Disabled</option>
-                        <option value="enabled">Enabled (Green Screen)</option>
-                    </select>
-                </div>
-            </div>
-
-            <button type="button" className="btn btn-primary btn-small">
-                💾 Save
-            </button>
-        </div>
-    );
-}

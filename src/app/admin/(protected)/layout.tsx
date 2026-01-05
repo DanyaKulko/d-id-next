@@ -3,7 +3,8 @@ import {getCurrentUser} from "@/lib/auth/require";
 import {hasRole} from "@/lib/auth/rbac";
 import {UserProvider} from "@/lib/auth/user-context";
 import AdminNavbar from "@/app/admin/(protected)/_components/AdminNavbar";
-import './layout.css'
+import "./admin-shared.css";
+import "./layout.css";
 
 export default async function AdminLayout({children}: { children: React.ReactNode }) {
     const session = await getCurrentUser();

@@ -1,6 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import {useCallback, useEffect, useMemo, useState, useTransition} from "react";
+import toast from "react-hot-toast";
+
+import {saveManualTrainingAction, saveSafetyInstructionsAction} from "@/app/admin/(protected)/actions";
+import {fetchKnowledgeArchive, fetchManualTrainingTemplate, fetchSafetyInstructions, KnowledgeItem} from "@/app/admin/(protected)/admin-data";
+import {useAzureSTT} from "@/app/(client)/[avatarSlug]/_hooks/useAzureSTT";
 
 type TabId = "archive" | "prerendered" | "safety" | "manual";
 
@@ -10,22 +15,6 @@ const tabTitles: Record<TabId, string> = {
     safety: "Safety",
     manual: "Manual Training",
 };
-
-type KnowledgeStatus = "processing" | "error" | "active";
-
-type KnowledgeItem = {
-    id: string;
-    title: string;
-    sourceLabel: string;
-    created: string;
-    status: KnowledgeStatus;
-};
-
-const initialKnowledge: KnowledgeItem[] = [
-    { id: "k1", title: "Knowledge #1", sourceLabel: "Text blog", created: "01.22.2025", status: "processing" },
-    { id: "k2", title: "Knowledge #2", sourceLabel: "Manual training", created: "01.22.2025", status: "error" },
-    { id: "k3", title: "Knowledge #3", sourceLabel: "Manual training", created: "01.22.2025", status: "active" },
-];
 
 function setBreadcrumb(level2: string) {
     const el = document.getElementById("current-section");
@@ -38,8 +27,25 @@ function setBreadcrumb(level2: string) {
 export default function LearningClient() {
     const [activeTab, setActiveTab] = useState<TabId>("archive");
     const [search, setSearch] = useState("");
-    const [knowledge] = useState<KnowledgeItem[]>(initialKnowledge);
-    const [voiceRecording, setVoiceRecording] = useState(false);
+    const [knowledge, setKnowledge] = useState<KnowledgeItem[]>([]);
+    const [safetyRules, setSafetyRules] = useState("");
+    const [manualText, setManualText] = useState("");
+    const [isSaving, startSaving] = useTransition();
+
+    const handleDictationFinal = useCallback((text: string) => {
+        setManualText((prev) => (prev ? `${prev.trim()} ${text}` : text));
+        toast.success("Dictation captured");
+    }, []);
+
+    const {listening, startListening, stopListening, interimTranscript} = useAzureSTT(handleDictationFinal);
+
+    useEffect(() => {
+        fetchKnowledgeArchive().then(setKnowledge);
+        fetchSafetyInstructions().then(setSafetyRules);
+        fetchManualTrainingTemplate().then((template) => {
+            setManualText(template);
+        });
+    }, []);
 
     const filteredKnowledge = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -207,7 +213,24 @@ export default function LearningClient() {
 
             {/* Safety */}
             <div id="safety" className={`tab-content ${activeTab === "safety" ? "active" : ""}`}>
-                <div className="section">
+                <form
+                    className="section"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        const formData = new FormData(event.currentTarget);
+                        const rules = (formData.get("safetyRules") as string) ?? "";
+                        if (!rules.trim()) {
+                            toast.error("Safety rules cannot be empty");
+                            return;
+                        }
+
+                        startSaving(() =>
+                            saveSafetyInstructionsAction(formData)
+                                .then(() => toast.success("Safety instructions saved"))
+                                .catch(() => toast.error("Failed to save safety"))
+                        );
+                    }}
+                >
                     <h2 className="section-title-with-tooltip" style={{ position: "relative" }}>
                         Safety
                         <span className="section-tooltip-icon">?</span>
@@ -220,30 +243,42 @@ export default function LearningClient() {
                     <div className="info-box">ℹ️ Safety instructions common to all roles</div>
 
                     <div className="input-group">
-                        <label>Content Safety and Filtering Rules</label>
+                        <label htmlFor="safetyRules">Content Safety and Filtering Rules</label>
                         <textarea
-                            defaultValue={`Do not discuss:
-- Political topics in aggressive form
-- Personal information of third parties
-- Financial advice as actionable recommendations
-
-Always:
-- Maintain a respectful tone
-- Avoid categorical judgments
-- Reference sources for factual claims`}
+                            id="safetyRules"
+                            name="safetyRules"
+                            defaultValue={safetyRules}
                             placeholder="Enter safety instructions for all avatar roles..."
                         />
                     </div>
 
-                    <button type="button" className="btn btn-primary">
-                        💾 Save Settings
+                    <button type="submit" className="btn btn-primary" disabled={isSaving}>
+                        {isSaving ? "Saving..." : "💾 Save Settings"}
                     </button>
-                </div>
+                </form>
             </div>
 
             {/* Manual Training */}
             <div id="manual" className={`tab-content ${activeTab === "manual" ? "active" : ""}`}>
-                <div className="section">
+                <form
+                    className="section"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        if (!manualText.trim()) {
+                            toast.error("Manual training text is required");
+                            return;
+                        }
+
+                        const formData = new FormData(event.currentTarget);
+                        formData.set("manualLearning", manualText);
+
+                        startSaving(() =>
+                            saveManualTrainingAction(formData)
+                                .then(() => toast.success("Manual training saved"))
+                                .catch(() => toast.error("Failed to save training"))
+                        );
+                    }}
+                >
                     <h2 className="section-title-with-tooltip" style={{ position: "relative" }}>
                         Manual Training
                         <span className="section-tooltip-icon">?</span>
@@ -254,45 +289,55 @@ Always:
                     </h2>
 
                     <div className="info-box">
-                        💡 Use this field to manually add new knowledge. You can type text or use voice input via Whisper STT OpenAI.
+                        💡 Use this field to manually add new knowledge. You can type text or use voice input via Azure STT.
                     </div>
 
                     <div className="input-group">
-                        <label>Enter Training Text</label>
+                        <label htmlFor="manualLearning">Enter Training Text</label>
                         <div className="voice-input-wrapper">
               <textarea
                   id="manualLearning"
+                  name="manualLearning"
+                  value={manualText}
+                  onChange={(event) => setManualText(event.target.value)}
                   placeholder="Enter text to train the avatar... For example: 'In 1995 Neil visited Egypt and was impressed by the pyramids of Giza...'"
               />
                             <button
                                 type="button"
-                                className={`voice-btn ${voiceRecording ? "recording" : ""}`}
+                                className={`voice-btn ${listening ? "recording" : ""}`}
                                 id="voiceBtn"
-                                title="Voice Input (Whisper STT)"
-                                onClick={() => setVoiceRecording((v) => !v)}
+                                title="Voice Input (Azure STT)"
+                                onClick={() => {
+                                    if (listening) {
+                                        stopListening();
+                                        toast.success("Dictation stopped");
+                                    } else {
+                                        startListening("en-US");
+                                    }
+                                }}
                             >
-                                🎤
+                                {listening ? "⏹" : "🎤"}
                             </button>
                         </div>
+                        {interimTranscript && <div className="info-box" style={{ marginTop: 8 }}>🎙️ {interimTranscript}</div>}
                     </div>
 
                     <div className="btn-group">
-                        <button type="button" className="btn btn-primary">
-                            💾 Save Knowledge
+                        <button type="submit" className="btn btn-primary" disabled={isSaving}>
+                            {isSaving ? "Saving..." : "💾 Save Knowledge"}
                         </button>
                         <button
                             type="button"
                             className="btn btn-secondary"
                             onClick={() => {
-                                const el = document.getElementById("manualLearning") as HTMLTextAreaElement | null;
-                                if (el) el.value = "";
-                                setVoiceRecording(false);
+                                setManualText("");
+                                stopListening();
                             }}
                         >
                             🔄 Clear Field
                         </button>
                     </div>
-                </div>
+                </form>
             </div>
         </>
     );
