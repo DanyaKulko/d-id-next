@@ -1,21 +1,42 @@
 "use client";
 
-import {useMemo, useState} from "react";
+import {FormEvent, useEffect, useMemo, useState, useTransition} from "react";
 
-type RoleId = "basic" | "tourism" | "sports" | "politics" | "space";
-
-const roleNames: Record<RoleId, string> = {
-    basic: "Basic Neil",
-    tourism: "Tourism Neil",
-    sports: "Sports Neil",
-    politics: "Politics Neil",
-    space: "Space Neil",
-};
+import {saveRoleSettingsAction} from "@/app/admin/(protected)/actions";
+import {fetchRoleList, fetchRoleSettings, RoleId, RoleSettings} from "@/app/admin/(protected)/admin-data";
 
 export default function RolesClient() {
     const [activeRole, setActiveRole] = useState<RoleId>("basic");
+    const [rolesMeta, setRolesMeta] = useState<Record<RoleId, string>>({
+        basic: "Basic Neil",
+        tourism: "Tourism Neil",
+        sports: "Sports Neil",
+        politics: "Politics Neil",
+        space: "Space Neil",
+    });
+    const [roleSettings, setRoleSettings] = useState<RoleSettings | null>(null);
+    const [isSaving, startSaving] = useTransition();
 
-    const breadcrumbRole = useMemo(() => roleNames[activeRole], [activeRole]);
+    useEffect(() => {
+        fetchRoleList().then((roles) => {
+            setRolesMeta((prev) => ({...prev, ...Object.fromEntries(roles.map((role) => [role.id, role.displayName]))} as Record<RoleId, string>));
+        });
+    }, []);
+
+    useEffect(() => {
+        fetchRoleSettings(activeRole).then(setRoleSettings);
+    }, [activeRole]);
+
+    const handleSave = (event: FormEvent<HTMLFormElement>, roleId: RoleId, defaults: RoleSettings | null) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        formData.set("roleId", roleId);
+        formData.set("backgrounds", JSON.stringify(defaults?.backgrounds ?? []));
+
+        startSaving(() => saveRoleSettingsAction(formData));
+    };
+
+    const breadcrumbRole = useMemo(() => rolesMeta[activeRole], [activeRole, rolesMeta]);
 
     return (
         <>
@@ -26,7 +47,7 @@ export default function RolesClient() {
                     className={`role-tab ${activeRole === "basic" ? "active" : ""}`}
                     onClick={() => setActiveRole("basic")}
                 >
-                    <span>🎭</span> Basic Neil
+                    <span>🎭</span> {rolesMeta.basic}
                 </button>
 
                 <button
@@ -34,7 +55,7 @@ export default function RolesClient() {
                     className={`role-tab ${activeRole === "tourism" ? "active" : ""}`}
                     onClick={() => setActiveRole("tourism")}
                 >
-                    <span>✈️</span> Tourism Neil
+                    <span>✈️</span> {rolesMeta.tourism}
                 </button>
 
                 <button
@@ -42,7 +63,7 @@ export default function RolesClient() {
                     className={`role-tab ${activeRole === "sports" ? "active" : ""}`}
                     onClick={() => setActiveRole("sports")}
                 >
-                    <span>⚽</span> Sports Neil
+                    <span>⚽</span> {rolesMeta.sports}
                 </button>
 
                 <button
@@ -50,7 +71,7 @@ export default function RolesClient() {
                     className={`role-tab ${activeRole === "politics" ? "active" : ""}`}
                     onClick={() => setActiveRole("politics")}
                 >
-                    <span>🏛️</span> Politics Neil
+                    <span>🏛️</span> {rolesMeta.politics}
                 </button>
 
                 <button
@@ -58,7 +79,7 @@ export default function RolesClient() {
                     className={`role-tab ${activeRole === "space" ? "active" : ""}`}
                     onClick={() => setActiveRole("space")}
                 >
-                    <span>🚀</span> Space Neil
+                    <span>🚀</span> {rolesMeta.space}
                 </button>
 
                 <button
@@ -82,11 +103,19 @@ export default function RolesClient() {
 
             {/* Contents */}
             <div id="basic" className={`role-content ${activeRole === "basic" ? "active" : ""}`}>
-                <RoleContentBasic/>
+                <RoleContentBasic
+                    defaults={roleSettings}
+                    onSubmit={(event) => handleSave(event, "basic", roleSettings)}
+                    isSaving={isSaving}
+                />
             </div>
 
             <div id="tourism" className={`role-content ${activeRole === "tourism" ? "active" : ""}`}>
-                <RoleContentTourism/>
+                <RoleContentTourism
+                    defaults={roleSettings}
+                    onSubmit={(event) => handleSave(event, "tourism", roleSettings)}
+                    isSaving={isSaving}
+                />
             </div>
 
             {/* Заглушки, структура аналогична */}
@@ -148,9 +177,15 @@ function SectionTooltipTitle(props: { title: string; text: string }) {
     );
 }
 
-function RoleContentBasic() {
+type RoleContentProps = {
+    defaults: RoleSettings | null;
+    onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+    isSaving: boolean;
+};
+
+function RoleContentBasic({defaults, onSubmit, isSaving}: RoleContentProps) {
     return (
-        <div className="section">
+        <form className="section" onSubmit={onSubmit}>
             <h2 className="section-title">Display Settings</h2>
 
             <div className="form-grid">
@@ -159,7 +194,7 @@ function RoleContentBasic() {
                         title="Role Name (Frontend Display)"
                         text="The name of the role displayed to users on the frontend site and used for navigation and role selection; this name is only for visual display and user understanding and does not affect the intelligence, behavior, or logic of the avatar."
                     />
-                    <input type="text" defaultValue="Basic Neil" placeholder="Enter role name"/>
+                    <input name="displayName" type="text" defaultValue={defaults?.displayName ?? ""} placeholder="Enter role name"/>
                 </div>
 
                 <div className="input-group form-full">
@@ -168,7 +203,10 @@ function RoleContentBasic() {
                         text="A short text description of the role shown to users on the frontend that helps them understand what topics and questions can be addressed to this role; used exclusively for the interface and does not affect the avatar's responses or behavior."
                     />
                     <textarea
-                        defaultValue="The main version of Neil. A universal personality for general questions about life, career, and experience."/>
+                        name="description"
+                        defaultValue={defaults?.description ?? ""}
+                        placeholder="Enter description"
+                    />
                 </div>
             </div>
 
@@ -179,7 +217,7 @@ function RoleContentBasic() {
                     title="Agent Name"
                     text="The internal name the avatar uses for self-identification; this name participates in the working logic, influences response formation, and determines how the avatar perceives its own identity within the system."
                 />
-                <input type="text" defaultValue="Neil" placeholder="Enter agent name"/>
+                <input name="agentName" type="text" defaultValue={defaults?.agentName ?? ""} placeholder="Enter agent name"/>
             </div>
 
             <div className="input-group">
@@ -188,7 +226,10 @@ function RoleContentBasic() {
                     text="A detailed description of the role defining the character, communication style, topic areas for responses, acceptable and unacceptable assistance formats, and the overall behavioral model of the avatar when interacting with users."
                 />
                 <textarea
-                    defaultValue="You are Neil, a space enthusiast, traveler, and analyst. You share your experiences, answer questions about life, career, and hobbies. Your style is friendly but professional."/>
+                    name="persona"
+                    defaultValue={defaults?.persona ?? ""}
+                    placeholder="Enter persona details"
+                />
             </div>
 
             <div className="input-group">
@@ -197,7 +238,10 @@ function RoleContentBasic() {
                     text="The main system instruction that determines how the avatar thinks, which knowledge sources it uses, how it formulates responses, and in what format it delivers them; this is one of the key fields directly affecting the quality, stability, and predictability of responses."
                 />
                 <textarea
-                    defaultValue="You are Neil, a knowledgeable and friendly AI avatar. Answer questions based on Neil's personal experiences, blog posts, and knowledge base. Maintain a conversational yet informative tone."/>
+                    name="systemPrompt"
+                    defaultValue={defaults?.systemPrompt ?? ""}
+                    placeholder="Enter system prompt"
+                />
             </div>
 
             <div className="input-group">
@@ -205,7 +249,7 @@ function RoleContentBasic() {
                     title="Personality Style"
                     text="A set of preset communication styles that slightly adjust the tone and manner of the avatar's responses (e.g., more formal or more friendly), without changing the knowledge content and reasoning logic."
                 />
-                <select defaultValue="friendly">
+                <select name="personalityStyle" defaultValue={defaults?.personalityStyle ?? "friendly"}>
                     <option value="friendly">Friendly and Professional</option>
                     <option value="fun">Fun and Engaging</option>
                     <option value="warm">Warm and Supportive</option>
@@ -226,44 +270,20 @@ function RoleContentBasic() {
             </div>
 
             <div className="backgrounds-grid">
-                <div className="background-card forest">
-                    <div className="background-preview">🌲 Forest</div>
-                    <div className="background-title">Background #1: Forest</div>
-                    <div className="background-actions">
-                        <button type="button" className="btn btn-secondary">
-                            ✏️ Edit
-                        </button>
-                        <button type="button" className="btn btn-danger">
-                            🗑️ Delete
-                        </button>
+                {defaults?.backgrounds.map((background) => (
+                    <div key={background.id} className={`background-card ${background.theme}`}>
+                        <div className="background-preview">{background.theme === "forest" ? "🌲 Forest" : background.theme === "studio" ? "🎬 Studio" : "🏠 Home"}</div>
+                        <div className="background-title">{background.title}</div>
+                        <div className="background-actions">
+                            <button type="button" className="btn btn-secondary">
+                                ✏️ Edit
+                            </button>
+                            <button type="button" className="btn btn-danger">
+                                🗑️ Delete
+                            </button>
+                        </div>
                     </div>
-                </div>
-
-                <div className="background-card studio">
-                    <div className="background-preview">🎬 Studio</div>
-                    <div className="background-title">Background #2: Studio</div>
-                    <div className="background-actions">
-                        <button type="button" className="btn btn-secondary">
-                            ✏️ Edit
-                        </button>
-                        <button type="button" className="btn btn-danger">
-                            🗑️ Delete
-                        </button>
-                    </div>
-                </div>
-
-                <div className="background-card home">
-                    <div className="background-preview">🏠 Home</div>
-                    <div className="background-title">Background #3: Home</div>
-                    <div className="background-actions">
-                        <button type="button" className="btn btn-secondary">
-                            ✏️ Edit
-                        </button>
-                        <button type="button" className="btn btn-danger">
-                            🗑️ Delete
-                        </button>
-                    </div>
-                </div>
+                ))}
 
                 <div
                     className="add-background-card"
@@ -288,10 +308,10 @@ function RoleContentBasic() {
             </div>
 
             <div className="save-section">
-                <button type="button" className="btn btn-primary">
+                <button type="submit" className="btn btn-primary" disabled={isSaving}>
                     💾 Save Changes
                 </button>
-                <button type="button" className="btn btn-secondary">
+                <button type="reset" className="btn btn-secondary" disabled={isSaving}>
                     🔄 Reset
                 </button>
             </div>
@@ -320,13 +340,13 @@ function RoleContentBasic() {
                     🗑️ Delete This Role
                 </button>
             </div>
-        </div>
+        </form>
     );
 }
 
-function RoleContentTourism() {
+function RoleContentTourism({defaults, onSubmit, isSaving}: RoleContentProps) {
     return (
-        <div className="section">
+        <form className="section" onSubmit={onSubmit}>
             <h2 className="section-title">Display Settings</h2>
 
             <div className="form-grid">
@@ -335,7 +355,7 @@ function RoleContentTourism() {
                         title="Role Name (Frontend Display)"
                         text="The name of the role displayed to users on the frontend site and used for navigation and role selection; this name is only for visual display and user understanding and does not affect the intelligence, behavior, or logic of the avatar."
                     />
-                    <input type="text" defaultValue="Tourism Neil" placeholder="Enter role name"/>
+                    <input name="displayName" type="text" defaultValue={defaults?.displayName ?? ""} placeholder="Enter role name"/>
                 </div>
 
                 <div className="input-group form-full">
@@ -344,7 +364,10 @@ function RoleContentTourism() {
                         text="A short text description of the role shown to users on the frontend that helps them understand what topics and questions can be addressed to this role; used exclusively for the interface and does not affect the avatar's responses or behavior."
                     />
                     <textarea
-                        defaultValue="Neil's tourism-focused personality. Expert in travel destinations, cultural insights, and travel tips."/>
+                        name="description"
+                        defaultValue={defaults?.description ?? ""}
+                        placeholder="Enter description"
+                    />
                 </div>
             </div>
 
@@ -355,7 +378,7 @@ function RoleContentTourism() {
                     title="Agent Name"
                     text="The internal name the avatar uses for self-identification; this name participates in the working logic, influences response formation, and determines how the avatar perceives its own identity within the system."
                 />
-                <input type="text" defaultValue="Neil" placeholder="Enter agent name"/>
+                <input name="agentName" type="text" defaultValue={defaults?.agentName ?? ""} placeholder="Enter agent name"/>
             </div>
 
             <div className="input-group">
@@ -364,7 +387,10 @@ function RoleContentTourism() {
                     text="A detailed description of the role defining the character, communication style, topic areas for responses, acceptable and unacceptable assistance formats, and the overall behavioral model of the avatar when interacting with users."
                 />
                 <textarea
-                    defaultValue="You are Tourism Neil, an experienced traveler and cultural explorer. Share travel insights, destination recommendations, and cultural knowledge."/>
+                    name="persona"
+                    defaultValue={defaults?.persona ?? ""}
+                    placeholder="Enter persona details"
+                />
             </div>
 
             <div className="input-group">
@@ -373,7 +399,10 @@ function RoleContentTourism() {
                     text="The main system instruction that determines how the avatar thinks, which knowledge sources it uses, how it formulates responses, and in what format it delivers them; this is one of the key fields directly affecting the quality, stability, and predictability of responses."
                 />
                 <textarea
-                    defaultValue="You are Tourism Neil. Answer questions about travel destinations, cultural experiences, and tourism tips. Be enthusiastic and inspiring."/>
+                    name="systemPrompt"
+                    defaultValue={defaults?.systemPrompt ?? ""}
+                    placeholder="Enter system prompt"
+                />
             </div>
 
             <div className="input-group">
@@ -381,7 +410,7 @@ function RoleContentTourism() {
                     title="Personality Style"
                     text="A set of preset communication styles that slightly adjust the tone and manner of the avatar's responses (e.g., more formal or more friendly), without changing the knowledge content and reasoning logic."
                 />
-                <select defaultValue="friendly">
+                <select name="personalityStyle" defaultValue={defaults?.personalityStyle ?? "friendly"}>
                     <option value="friendly">Friendly and Professional</option>
                     <option value="fun">Fun and Engaging</option>
                     <option value="warm">Warm and Supportive</option>
@@ -422,10 +451,10 @@ function RoleContentTourism() {
             </div>
 
             <div className="save-section">
-                <button type="button" className="btn btn-primary">
+                <button type="submit" className="btn btn-primary" disabled={isSaving}>
                     💾 Save Changes
                 </button>
-                <button type="button" className="btn btn-secondary">
+                <button type="reset" className="btn btn-secondary" disabled={isSaving}>
                     🔄 Reset
                 </button>
             </div>
@@ -440,7 +469,7 @@ function RoleContentTourism() {
                     🗑️ Delete This Role
                 </button>
             </div>
-        </div>
+        </form>
     );
 }
 
