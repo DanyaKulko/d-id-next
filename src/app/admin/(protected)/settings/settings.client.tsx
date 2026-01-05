@@ -1,6 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import {useEffect, useMemo, useState, useTransition} from "react";
+
+import {saveExternalSourcesConfigAction, saveIntegrationConfigAction, saveTechnicalSettingsAction} from "@/app/admin/(protected)/actions";
+import {fetchExternalSourcesConfig, fetchIntegrationConfig, fetchTechnicalSettings, fetchUsers, TechnicalSetting, UserRow} from "@/app/admin/(protected)/admin-data";
 
 type TabId =
     | "integrations"
@@ -27,21 +30,6 @@ function setBreadcrumb(title: string) {
     if (h1) h1.textContent = title;
 }
 
-type UserRow = {
-    id: number;
-    login: string;
-    email: string;
-    createdDate: string;
-    lastLogin: string;
-    status: "active" | "inactive";
-};
-
-const initialUsers: UserRow[] = [
-    { id: 1, login: "user1", email: "user1@example.com", createdDate: "2025-01-15", lastLogin: "2025-01-22", status: "active" },
-    { id: 2, login: "user2", email: "user2@example.com", createdDate: "2025-01-18", lastLogin: "2025-01-21", status: "active" },
-    { id: 3, login: "testuser", email: "test@example.com", createdDate: "2025-01-20", lastLogin: "Never", status: "inactive" },
-];
-
 export default function SettingsClient() {
     const [activeTab, setActiveTab] = useState<TabId>("integrations");
 
@@ -52,9 +40,25 @@ export default function SettingsClient() {
 
     // auth required toggle
     const [authRequired, setAuthRequired] = useState(true);
+    const [users, setUsers] = useState<UserRow[]>([]);
+    const [integrationConfig, setIntegrationConfig] = useState({ apiKey: "sk_did_" });
+    const [externalSourcesConfig, setExternalSourcesConfig] = useState({
+        textLink: "https://roliki.ua/s/json_template_s.txt",
+        textCron: "0 2 * * *",
+        textAccessKey: "",
+        videoLink: "https://roliki.ua/s/video-transcripts-neil.txt",
+        videoCron: "0 3 * * *",
+        videoAccessKey: "",
+    });
+    const [technicalSettings, setTechnicalSettings] = useState<TechnicalSetting[]>([]);
+    const [isSaving, startSaving] = useTransition();
 
-    // users (mock)
-    const [users, setUsers] = useState<UserRow[]>(initialUsers);
+    useEffect(() => {
+        fetchUsers().then(setUsers);
+        fetchIntegrationConfig().then(setIntegrationConfig);
+        fetchExternalSourcesConfig().then(setExternalSourcesConfig);
+        fetchTechnicalSettings().then(setTechnicalSettings);
+    }, []);
 
     const switchTab = (tab: TabId) => {
         setActiveTab(tab);
@@ -190,7 +194,15 @@ export default function SettingsClient() {
             <div id="integrations" className={`tab-content ${activeTab === "integrations" ? "active" : ""}`}>
                 <div className="section">
                     <div className="two-column">
-                        <div className="api-card">
+                        <form
+                            className="api-card"
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                const formData = new FormData(event.currentTarget);
+                                startSaving(() => saveIntegrationConfigAction(formData));
+                                checkConnection("D-ID API");
+                            }}
+                        >
                             <h3>D-ID API</h3>
 
                             <div className="health-status healthy">
@@ -200,23 +212,32 @@ export default function SettingsClient() {
 
                             <div className="input-group">
                                 <label>API Key</label>
-                                <input type="password" defaultValue="sk_did_" placeholder="Enter API Key" />
+                                <input
+                                    name="apiKey"
+                                    type="password"
+                                    defaultValue={integrationConfig.apiKey}
+                                    placeholder="Enter API Key"
+                                />
                             </div>
 
-                            <button type="button" className="btn btn-primary btn-small" onClick={() => checkConnection("D-ID API")}>
+                            <button type="submit" className="btn btn-primary btn-small" disabled={isSaving}>
                                 🔍 Check Connection
-                            </button>{" "}
-                            {/*<button type="button" className="btn btn-secondary btn-small">*/}
-                            {/*    💾 Save*/}
-                            {/*</button>*/}
-                        </div>
+                            </button>
+                        </form>
                     </div>
                 </div>
             </div>
 
             {/* External Sources */}
             <div id="external-sources" className={`tab-content ${activeTab === "external-sources" ? "active" : ""}`}>
-                <div className="section">
+                <form
+                    className="section"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        const formData = new FormData(event.currentTarget);
+                        startSaving(() => saveExternalSourcesConfigAction(formData));
+                    }}
+                >
                     <div className="info-box">
                         ℹ️ The system automatically retrieves new materials from the blog according to the CRON schedule and converts them into vector data for the knowledge base.
                     </div>
@@ -226,18 +247,23 @@ export default function SettingsClient() {
                     <div className="cron-settings">
                         <div className="input-group">
                             <label>JSON API Link</label>
-                            <input type="url" defaultValue="https://roliki.ua/s/json_template_s.txt" placeholder="https://example.com/api/blog/posts.json" />
+                            <input
+                                name="textLink"
+                                type="url"
+                                defaultValue={externalSourcesConfig.textLink}
+                                placeholder="https://example.com/api/blog/posts.json"
+                            />
                         </div>
 
                         <div className="input-group">
                             <label>Access Key</label>
-                            <input type="text" placeholder="API Key" />
+                            <input name="textAccessKey" type="text" defaultValue={externalSourcesConfig.textAccessKey} placeholder="API Key" />
                         </div>
                     </div>
 
                     <div className="input-group">
                         <label>CRON Settings (Update Frequency)</label>
-                        <input type="text" defaultValue="0 2 * * *" placeholder="0 2 * * * (every day at 2:00 AM)" />
+                        <input name="textCron" type="text" defaultValue={externalSourcesConfig.textCron} placeholder="0 2 * * * (every day at 2:00 AM)" />
                     </div>
 
                     <h2 className="section-title">Video Transcription (JSON)</h2>
@@ -245,29 +271,34 @@ export default function SettingsClient() {
                     <div className="cron-settings">
                         <div className="input-group">
                             <label>JSON API Link</label>
-                            <input type="url" defaultValue="https://roliki.ua/s/video-transcripts-neil.txt" placeholder="https://example.com/api/video-transcripts.json" />
+                            <input
+                                name="videoLink"
+                                type="url"
+                                defaultValue={externalSourcesConfig.videoLink}
+                                placeholder="https://example.com/api/video-transcripts.json"
+                            />
                         </div>
 
                         <div className="input-group">
                             <label>Access Key</label>
-                            <input type="text" placeholder="API Key" />
+                            <input name="videoAccessKey" type="text" defaultValue={externalSourcesConfig.videoAccessKey} placeholder="API Key" />
                         </div>
                     </div>
 
                     <div className="input-group">
                         <label>CRON Settings (Update Frequency)</label>
-                        <input type="text" defaultValue="0 3 * * *" placeholder="0 3 * * * (every day at 3:00 AM)" />
+                        <input name="videoCron" type="text" defaultValue={externalSourcesConfig.videoCron} placeholder="0 3 * * * (every day at 3:00 AM)" />
                     </div>
 
                     <div style={{ marginTop: 30 }}>
-                        <button type="button" className="btn btn-primary">
+                        <button type="submit" className="btn btn-primary" disabled={isSaving}>
                             💾 Save Settings
                         </button>{" "}
                         <button type="button" className="btn btn-secondary">
                             🔄 Test Connection
                         </button>
                     </div>
-                </div>
+                </form>
             </div>
 
             {/* Technical Settings */}
@@ -275,11 +306,23 @@ export default function SettingsClient() {
                 <div className="section">
                     <div className="info-box">ℹ️ Configure technical parameters for each role</div>
 
-                    <RoleTechCard title="🎭 Basic Neil" video="basic_neil_v1" voice="voice_neil_basic" />
-                    <RoleTechCard title="✈️ Tourism Neil" video="tourism_neil_v1" voice="voice_neil_tourism" />
-                    <RoleTechCard title="⚽ Sports Neil" video="sports_neil_v1" voice="voice_neil_sports" />
-                    <RoleTechCard title="🏛️ Politics Neil" video="politics_neil_v1" voice="voice_neil_politics" />
-                    <RoleTechCard title="🚀 Space Neil" video="space_neil_v1" voice="voice_neil_space" />
+                    <form
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            const formData = new FormData(event.currentTarget);
+                            formData.set("technicalSettings", JSON.stringify(technicalSettings));
+                            startSaving(() => saveTechnicalSettingsAction(formData));
+                        }}
+                    >
+                        {technicalSettings.map((setting) => (
+                            <RoleTechCard key={setting.title} title={setting.title} video={setting.video} voice={setting.voice} />
+                        ))}
+                        <div className="save-section">
+                            <button type="submit" className="btn btn-primary" disabled={isSaving}>
+                                💾 Save Settings
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
 

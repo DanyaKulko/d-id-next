@@ -1,6 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import {useEffect, useMemo, useState, useTransition} from "react";
+
+import {saveManualTrainingAction, saveSafetyInstructionsAction} from "@/app/admin/(protected)/actions";
+import {fetchKnowledgeArchive, fetchManualTrainingTemplate, fetchSafetyInstructions, KnowledgeItem} from "@/app/admin/(protected)/admin-data";
 
 type TabId = "archive" | "prerendered" | "safety" | "manual";
 
@@ -10,22 +13,6 @@ const tabTitles: Record<TabId, string> = {
     safety: "Safety",
     manual: "Manual Training",
 };
-
-type KnowledgeStatus = "processing" | "error" | "active";
-
-type KnowledgeItem = {
-    id: string;
-    title: string;
-    sourceLabel: string;
-    created: string;
-    status: KnowledgeStatus;
-};
-
-const initialKnowledge: KnowledgeItem[] = [
-    { id: "k1", title: "Knowledge #1", sourceLabel: "Text blog", created: "01.22.2025", status: "processing" },
-    { id: "k2", title: "Knowledge #2", sourceLabel: "Manual training", created: "01.22.2025", status: "error" },
-    { id: "k3", title: "Knowledge #3", sourceLabel: "Manual training", created: "01.22.2025", status: "active" },
-];
 
 function setBreadcrumb(level2: string) {
     const el = document.getElementById("current-section");
@@ -38,8 +25,17 @@ function setBreadcrumb(level2: string) {
 export default function LearningClient() {
     const [activeTab, setActiveTab] = useState<TabId>("archive");
     const [search, setSearch] = useState("");
-    const [knowledge] = useState<KnowledgeItem[]>(initialKnowledge);
+    const [knowledge, setKnowledge] = useState<KnowledgeItem[]>([]);
     const [voiceRecording, setVoiceRecording] = useState(false);
+    const [safetyRules, setSafetyRules] = useState("");
+    const [manualTemplate, setManualTemplate] = useState("");
+    const [isSaving, startSaving] = useTransition();
+
+    useEffect(() => {
+        fetchKnowledgeArchive().then(setKnowledge);
+        fetchSafetyInstructions().then(setSafetyRules);
+        fetchManualTrainingTemplate().then(setManualTemplate);
+    }, []);
 
     const filteredKnowledge = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -207,7 +203,14 @@ export default function LearningClient() {
 
             {/* Safety */}
             <div id="safety" className={`tab-content ${activeTab === "safety" ? "active" : ""}`}>
-                <div className="section">
+                <form
+                    className="section"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        const formData = new FormData(event.currentTarget);
+                        startSaving(() => saveSafetyInstructionsAction(formData));
+                    }}
+                >
                     <h2 className="section-title-with-tooltip" style={{ position: "relative" }}>
                         Safety
                         <span className="section-tooltip-icon">?</span>
@@ -222,28 +225,28 @@ export default function LearningClient() {
                     <div className="input-group">
                         <label>Content Safety and Filtering Rules</label>
                         <textarea
-                            defaultValue={`Do not discuss:
-- Political topics in aggressive form
-- Personal information of third parties
-- Financial advice as actionable recommendations
-
-Always:
-- Maintain a respectful tone
-- Avoid categorical judgments
-- Reference sources for factual claims`}
+                            name="safetyRules"
+                            defaultValue={safetyRules}
                             placeholder="Enter safety instructions for all avatar roles..."
                         />
                     </div>
 
-                    <button type="button" className="btn btn-primary">
+                    <button type="submit" className="btn btn-primary" disabled={isSaving}>
                         💾 Save Settings
                     </button>
-                </div>
+                </form>
             </div>
 
             {/* Manual Training */}
             <div id="manual" className={`tab-content ${activeTab === "manual" ? "active" : ""}`}>
-                <div className="section">
+                <form
+                    className="section"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        const formData = new FormData(event.currentTarget);
+                        startSaving(() => saveManualTrainingAction(formData));
+                    }}
+                >
                     <h2 className="section-title-with-tooltip" style={{ position: "relative" }}>
                         Manual Training
                         <span className="section-tooltip-icon">?</span>
@@ -262,6 +265,8 @@ Always:
                         <div className="voice-input-wrapper">
               <textarea
                   id="manualLearning"
+                  name="manualLearning"
+                  defaultValue={manualTemplate}
                   placeholder="Enter text to train the avatar... For example: 'In 1995 Neil visited Egypt and was impressed by the pyramids of Giza...'"
               />
                             <button
@@ -277,7 +282,7 @@ Always:
                     </div>
 
                     <div className="btn-group">
-                        <button type="button" className="btn btn-primary">
+                        <button type="submit" className="btn btn-primary" disabled={isSaving}>
                             💾 Save Knowledge
                         </button>
                         <button
@@ -292,7 +297,7 @@ Always:
                             🔄 Clear Field
                         </button>
                     </div>
-                </div>
+                </form>
             </div>
         </>
     );
