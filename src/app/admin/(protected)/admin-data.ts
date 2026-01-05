@@ -32,6 +32,12 @@ export type TechnicalSetting = {
     voice: string;
 };
 
+export type MainAdminSettings = {
+    voiceId: string;
+    backgroundsEnabled: boolean;
+    backgroundUploadLimitMb: number;
+};
+
 export type KnowledgeItem = {
     id: string;
     title: string;
@@ -120,6 +126,12 @@ const knowledgePresets: KnowledgeItem[] = [
     { id: "k3", title: "Knowledge #3", sourceLabel: "Manual training", created: "01.22.2025", status: "active" },
 ];
 
+const mainSettingsPreset: MainAdminSettings = {
+    voiceId: "voice_neil_basic",
+    backgroundsEnabled: true,
+    backgroundUploadLimitMb: 25,
+};
+
 const wait = (ms = 150) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function fetchRoleList() {
@@ -140,6 +152,11 @@ export async function fetchUsers(): Promise<UserRow[]> {
 export async function fetchTechnicalSettings(): Promise<TechnicalSetting[]> {
     await wait();
     return technicalPresets;
+}
+
+export async function fetchMainAdminSettings(): Promise<MainAdminSettings> {
+    await wait();
+    return mainSettingsPreset;
 }
 
 export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {

@@ -1,9 +1,11 @@
 "use client";
 
-import {useEffect, useMemo, useState, useTransition} from "react";
+import {useCallback, useEffect, useMemo, useState, useTransition} from "react";
+import toast from "react-hot-toast";
 
 import {saveManualTrainingAction, saveSafetyInstructionsAction} from "@/app/admin/(protected)/actions";
 import {fetchKnowledgeArchive, fetchManualTrainingTemplate, fetchSafetyInstructions, KnowledgeItem} from "@/app/admin/(protected)/admin-data";
+import {useAzureSTT} from "@/app/(client)/[avatarSlug]/_hooks/useAzureSTT";
 
 type TabId = "archive" | "prerendered" | "safety" | "manual";
 
@@ -26,15 +28,23 @@ export default function LearningClient() {
     const [activeTab, setActiveTab] = useState<TabId>("archive");
     const [search, setSearch] = useState("");
     const [knowledge, setKnowledge] = useState<KnowledgeItem[]>([]);
-    const [voiceRecording, setVoiceRecording] = useState(false);
     const [safetyRules, setSafetyRules] = useState("");
-    const [manualTemplate, setManualTemplate] = useState("");
+    const [manualText, setManualText] = useState("");
     const [isSaving, startSaving] = useTransition();
+
+    const handleDictationFinal = useCallback((text: string) => {
+        setManualText((prev) => (prev ? `${prev.trim()} ${text}` : text));
+        toast.success("Dictation captured");
+    }, []);
+
+    const {listening, startListening, stopListening, interimTranscript} = useAzureSTT(handleDictationFinal);
 
     useEffect(() => {
         fetchKnowledgeArchive().then(setKnowledge);
         fetchSafetyInstructions().then(setSafetyRules);
-        fetchManualTrainingTemplate().then(setManualTemplate);
+        fetchManualTrainingTemplate().then((template) => {
+            setManualText(template);
+        });
     }, []);
 
     const filteredKnowledge = useMemo(() => {
@@ -208,7 +218,17 @@ export default function LearningClient() {
                     onSubmit={(event) => {
                         event.preventDefault();
                         const formData = new FormData(event.currentTarget);
-                        startSaving(() => saveSafetyInstructionsAction(formData));
+                        const rules = (formData.get("safetyRules") as string) ?? "";
+                        if (!rules.trim()) {
+                            toast.error("Safety rules cannot be empty");
+                            return;
+                        }
+
+                        startSaving(() =>
+                            saveSafetyInstructionsAction(formData)
+                                .then(() => toast.success("Safety instructions saved"))
+                                .catch(() => toast.error("Failed to save safety"))
+                        );
                     }}
                 >
                     <h2 className="section-title-with-tooltip" style={{ position: "relative" }}>
@@ -223,8 +243,9 @@ export default function LearningClient() {
                     <div className="info-box">ℹ️ Safety instructions common to all roles</div>
 
                     <div className="input-group">
-                        <label>Content Safety and Filtering Rules</label>
+                        <label htmlFor="safetyRules">Content Safety and Filtering Rules</label>
                         <textarea
+                            id="safetyRules"
                             name="safetyRules"
                             defaultValue={safetyRules}
                             placeholder="Enter safety instructions for all avatar roles..."
@@ -232,7 +253,7 @@ export default function LearningClient() {
                     </div>
 
                     <button type="submit" className="btn btn-primary" disabled={isSaving}>
-                        💾 Save Settings
+                        {isSaving ? "Saving..." : "💾 Save Settings"}
                     </button>
                 </form>
             </div>
@@ -243,8 +264,19 @@ export default function LearningClient() {
                     className="section"
                     onSubmit={(event) => {
                         event.preventDefault();
+                        if (!manualText.trim()) {
+                            toast.error("Manual training text is required");
+                            return;
+                        }
+
                         const formData = new FormData(event.currentTarget);
-                        startSaving(() => saveManualTrainingAction(formData));
+                        formData.set("manualLearning", manualText);
+
+                        startSaving(() =>
+                            saveManualTrainingAction(formData)
+                                .then(() => toast.success("Manual training saved"))
+                                .catch(() => toast.error("Failed to save training"))
+                        );
                     }}
                 >
                     <h2 className="section-title-with-tooltip" style={{ position: "relative" }}>
@@ -257,41 +289,49 @@ export default function LearningClient() {
                     </h2>
 
                     <div className="info-box">
-                        💡 Use this field to manually add new knowledge. You can type text or use voice input via Whisper STT OpenAI.
+                        💡 Use this field to manually add new knowledge. You can type text or use voice input via Azure STT.
                     </div>
 
                     <div className="input-group">
-                        <label>Enter Training Text</label>
+                        <label htmlFor="manualLearning">Enter Training Text</label>
                         <div className="voice-input-wrapper">
               <textarea
                   id="manualLearning"
                   name="manualLearning"
-                  defaultValue={manualTemplate}
+                  value={manualText}
+                  onChange={(event) => setManualText(event.target.value)}
                   placeholder="Enter text to train the avatar... For example: 'In 1995 Neil visited Egypt and was impressed by the pyramids of Giza...'"
               />
                             <button
                                 type="button"
-                                className={`voice-btn ${voiceRecording ? "recording" : ""}`}
+                                className={`voice-btn ${listening ? "recording" : ""}`}
                                 id="voiceBtn"
-                                title="Voice Input (Whisper STT)"
-                                onClick={() => setVoiceRecording((v) => !v)}
+                                title="Voice Input (Azure STT)"
+                                onClick={() => {
+                                    if (listening) {
+                                        stopListening();
+                                        toast.success("Dictation stopped");
+                                    } else {
+                                        startListening("en-US");
+                                    }
+                                }}
                             >
-                                🎤
+                                {listening ? "⏹" : "🎤"}
                             </button>
                         </div>
+                        {interimTranscript && <div className="info-box" style={{ marginTop: 8 }}>🎙️ {interimTranscript}</div>}
                     </div>
 
                     <div className="btn-group">
                         <button type="submit" className="btn btn-primary" disabled={isSaving}>
-                            💾 Save Knowledge
+                            {isSaving ? "Saving..." : "💾 Save Knowledge"}
                         </button>
                         <button
                             type="button"
                             className="btn btn-secondary"
                             onClick={() => {
-                                const el = document.getElementById("manualLearning") as HTMLTextAreaElement | null;
-                                if (el) el.value = "";
-                                setVoiceRecording(false);
+                                setManualText("");
+                                stopListening();
                             }}
                         >
                             🔄 Clear Field

@@ -1,22 +1,16 @@
 "use client";
 
 import {useEffect, useMemo, useState, useTransition} from "react";
+import toast from "react-hot-toast";
 
-import {saveExternalSourcesConfigAction, saveIntegrationConfigAction, saveTechnicalSettingsAction} from "@/app/admin/(protected)/actions";
-import {fetchExternalSourcesConfig, fetchIntegrationConfig, fetchTechnicalSettings, fetchUsers, TechnicalSetting, UserRow} from "@/app/admin/(protected)/admin-data";
+import {saveExternalSourcesConfigAction, saveIntegrationConfigAction, saveSessionRetentionAction, saveUserUpdateAction} from "@/app/admin/(protected)/actions";
+import {fetchExternalSourcesConfig, fetchIntegrationConfig, fetchUsers, UserRow} from "@/app/admin/(protected)/admin-data";
 
-type TabId =
-    | "integrations"
-    | "external-sources"
-    | "technical"
-    | "sessions"
-    | "errors-debug"
-    | "admin";
+type TabId = "integrations" | "external-sources" | "sessions" | "errors-debug" | "admin";
 
 const tabTitles: Record<TabId, string> = {
     integrations: "Integrations",
     "external-sources": "External Sources",
-    technical: "Technical Settings",
     sessions: "Session Records",
     "errors-debug": "Error Log & Debug",
     admin: "Administrator",
@@ -50,14 +44,12 @@ export default function SettingsClient() {
         videoCron: "0 3 * * *",
         videoAccessKey: "",
     });
-    const [technicalSettings, setTechnicalSettings] = useState<TechnicalSetting[]>([]);
     const [isSaving, startSaving] = useTransition();
 
     useEffect(() => {
         fetchUsers().then(setUsers);
         fetchIntegrationConfig().then(setIntegrationConfig);
         fetchExternalSourcesConfig().then(setExternalSourcesConfig);
-        fetchTechnicalSettings().then(setTechnicalSettings);
     }, []);
 
     const switchTab = (tab: TabId) => {
@@ -107,8 +99,16 @@ export default function SettingsClient() {
 
         setUsers((u) => [...u, newUser]);
 
-        window.alert(
-            `User "${login}" created successfully!\n\nLogin: ${login}\nPassword: ${password}\nEmail: ${email}\n\nThe user will need to verify their email for 2FA.`
+        const formData = new FormData();
+        formData.set("action", "create");
+        formData.set("login", login);
+        formData.set("email", email);
+        formData.set("password", password);
+
+        startSaving(() =>
+            saveUserUpdateAction(formData)
+                .then(() => toast.success(`User "${login}" created`))
+                .catch(() => toast.error("Failed to log user creation"))
         );
     };
 
@@ -131,7 +131,17 @@ export default function SettingsClient() {
             )
         );
 
-        window.alert("User updated successfully!");
+        const formData = new FormData();
+        formData.set("action", "update");
+        formData.set("userId", String(id));
+        formData.set("login", newLogin ?? user.login);
+        formData.set("email", newEmail ?? user.email);
+
+        startSaving(() =>
+            saveUserUpdateAction(formData)
+                .then(() => toast.success("User updated"))
+                .catch(() => toast.error("Failed to log user update"))
+        );
     };
 
     const deleteUser = (id: number) => {
@@ -144,7 +154,16 @@ export default function SettingsClient() {
         if (!ok) return;
 
         setUsers((prev) => prev.filter((u) => u.id !== id));
-        window.alert("User deleted successfully!");
+
+        const formData = new FormData();
+        formData.set("action", "delete");
+        formData.set("userId", String(id));
+
+        startSaving(() =>
+            saveUserUpdateAction(formData)
+                .then(() => toast.success("User deleted"))
+                .catch(() => toast.error("Failed to log user removal"))
+        );
     };
 
     const usersRows = useMemo(
@@ -176,9 +195,6 @@ export default function SettingsClient() {
                 <button type="button" className={`tab ${activeTab === "external-sources" ? "active" : ""}`} onClick={() => switchTab("external-sources")}>
                     📰 External Sources
                 </button>
-                <button type="button" className={`tab ${activeTab === "technical" ? "active" : ""}`} onClick={() => switchTab("technical")}>
-                    ⚙️ Technical Settings
-                </button>
                 <button type="button" className={`tab ${activeTab === "sessions" ? "active" : ""}`} onClick={() => switchTab("sessions")}>
                     📋 Session Records
                 </button>
@@ -194,15 +210,26 @@ export default function SettingsClient() {
             <div id="integrations" className={`tab-content ${activeTab === "integrations" ? "active" : ""}`}>
                 <div className="section">
                     <div className="two-column">
-                        <form
-                            className="api-card"
-                            onSubmit={(event) => {
-                                event.preventDefault();
-                                const formData = new FormData(event.currentTarget);
-                                startSaving(() => saveIntegrationConfigAction(formData));
-                                checkConnection("D-ID API");
-                            }}
-                        >
+                            <form
+                                className="api-card"
+                                onSubmit={(event) => {
+                                    event.preventDefault();
+                                    const formData = new FormData(event.currentTarget);
+                                    if (!formData.get("apiKey")) {
+                                        toast.error("API Key is required");
+                                        return;
+                                    }
+
+                                    startSaving(() =>
+                                        saveIntegrationConfigAction(formData)
+                                            .then(() => {
+                                                toast.success("Integration saved");
+                                                checkConnection("D-ID API");
+                                            })
+                                            .catch(() => toast.error("Failed to save integration"))
+                                    );
+                                }}
+                            >
                             <h3>D-ID API</h3>
 
                             <div className="health-status healthy">
@@ -221,7 +248,7 @@ export default function SettingsClient() {
                             </div>
 
                             <button type="submit" className="btn btn-primary btn-small" disabled={isSaving}>
-                                🔍 Check Connection
+                                {isSaving ? "Saving..." : "🔍 Check Connection"}
                             </button>
                         </form>
                     </div>
@@ -235,7 +262,19 @@ export default function SettingsClient() {
                     onSubmit={(event) => {
                         event.preventDefault();
                         const formData = new FormData(event.currentTarget);
-                        startSaving(() => saveExternalSourcesConfigAction(formData));
+                        const textLink = formData.get("textLink") as string;
+                        const videoLink = formData.get("videoLink") as string;
+
+                        if (!textLink || !videoLink) {
+                            toast.error("Please provide both text and video links");
+                            return;
+                        }
+
+                        startSaving(() =>
+                            saveExternalSourcesConfigAction(formData)
+                                .then(() => toast.success("External sources saved"))
+                                .catch(() => toast.error("Failed to save sources"))
+                        );
                     }}
                 >
                     <div className="info-box">
@@ -292,7 +331,7 @@ export default function SettingsClient() {
 
                     <div style={{ marginTop: 30 }}>
                         <button type="submit" className="btn btn-primary" disabled={isSaving}>
-                            💾 Save Settings
+                            {isSaving ? "Saving..." : "💾 Save Settings"}
                         </button>{" "}
                         <button type="button" className="btn btn-secondary">
                             🔄 Test Connection
@@ -301,30 +340,6 @@ export default function SettingsClient() {
                 </form>
             </div>
 
-            {/* Technical Settings */}
-            <div id="technical" className={`tab-content ${activeTab === "technical" ? "active" : ""}`}>
-                <div className="section">
-                    <div className="info-box">ℹ️ Configure technical parameters for each role</div>
-
-                    <form
-                        onSubmit={(event) => {
-                            event.preventDefault();
-                            const formData = new FormData(event.currentTarget);
-                            formData.set("technicalSettings", JSON.stringify(technicalSettings));
-                            startSaving(() => saveTechnicalSettingsAction(formData));
-                        }}
-                    >
-                        {technicalSettings.map((setting) => (
-                            <RoleTechCard key={setting.title} title={setting.title} video={setting.video} voice={setting.voice} />
-                        ))}
-                        <div className="save-section">
-                            <button type="submit" className="btn btn-primary" disabled={isSaving}>
-                                💾 Save Settings
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
 
             {/* Session Records */}
             <div id="sessions" className={`tab-content ${activeTab === "sessions" ? "active" : ""}`}>
@@ -416,6 +431,25 @@ export default function SettingsClient() {
                         <button type="button">3</button>
                         <button type="button">→</button>
                     </div>
+
+                    <form
+                        className="filters"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            const formData = new FormData(event.currentTarget);
+                            startSaving(() =>
+                                saveSessionRetentionAction(formData)
+                                    .then(() => toast.success("Session preferences saved"))
+                                    .catch(() => toast.error("Failed to save session preferences"))
+                            );
+                        }}
+                    >
+                        <label htmlFor="retentionDays">Retention (days)</label>
+                        <input id="retentionDays" name="retentionDays" type="number" min={1} defaultValue={30} />
+                        <button type="submit" className="btn btn-primary btn-small" disabled={isSaving}>
+                            {isSaving ? "Saving..." : "💾 Save Preferences"}
+                        </button>
+                    </form>
                 </div>
             </div>
 
@@ -547,7 +581,11 @@ export default function SettingsClient() {
 
                         <div className="info-box">ℹ️ Email is used for password recovery. Make sure it&apos;s valid and accessible.</div>
 
-                        <button type="button" className="btn btn-primary">
+                        <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() => toast.success("Administrator credentials saved (mock)")}
+                        >
                             💾 Save Changes
                         </button>{" "}
                         <button type="button" className="btn btn-secondary">
@@ -560,34 +598,3 @@ export default function SettingsClient() {
     );
 }
 
-function RoleTechCard(props: { title: string; video: string; voice: string }) {
-    return (
-        <div className="role-technical-settings">
-            <h3>{props.title}</h3>
-
-            <div className="form-grid">
-                <div className="input-group">
-                    <label>Avatar Video ID</label>
-                    <input type="text" defaultValue={props.video} placeholder="video_12345" />
-                </div>
-
-                <div className="input-group">
-                    <label>Voice ID</label>
-                    <input type="text" defaultValue={props.voice} placeholder="voice_id" />
-                </div>
-
-                <div className="input-group">
-                    <label>Background Control</label>
-                    <select defaultValue="enabled">
-                        <option value="disabled">Disabled</option>
-                        <option value="enabled">Enabled (Green Screen)</option>
-                    </select>
-                </div>
-            </div>
-
-            <button type="button" className="btn btn-primary btn-small">
-                💾 Save
-            </button>
-        </div>
-    );
-}
