@@ -1,3 +1,5 @@
+'use server';
+
 export type RoleId = "basic" | "tourism" | "sports" | "politics" | "space";
 
 export type BackgroundItem = {
@@ -182,9 +184,17 @@ export async function fetchManualTrainingTemplate(): Promise<string> {
     return "In 1995 Neil visited Egypt and was impressed by the pyramids of Giza...";
 }
 
+const maskCentered = (str: string, unmaskedChars = 4) => {
+    if (str.length <= unmaskedChars) return "*".repeat(str.length);
+    const maskedLength = str.length - unmaskedChars;
+    const start = str.slice(0, Math.ceil(unmaskedChars / 2));
+    const end = str.slice(str.length - Math.floor(unmaskedChars / 2));
+    return start + "*".repeat(maskedLength) + end;
+}
+
 export async function fetchIntegrationConfig() {
     await wait();
-    return { apiKey: "sk_did_" };
+    return { apiKey: maskCentered(process.env.DID_API_KEY!, 8) };
 }
 
 export async function fetchExternalSourcesConfig() {

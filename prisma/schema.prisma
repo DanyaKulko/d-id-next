@@ -98,3 +98,57 @@ model LoginEvent {
   @@index([userId, createdAt])
   @@index([email, createdAt])
 }
+
+model Agent {
+  id              String  @id @default(cuid())
+  agentId         String  @unique
+  displayName     String
+  description     String?
+  name            String
+  roleDescription String?
+  instructions    String?
+  personality     String?
+
+  voiceID           String
+  backgroundEnabled Boolean @default(false)
+
+  idleVideoUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  avatarBackground   AgentsBackgrounds? @relation(fields: [avatarBackgroundId], references: [id])
+  avatarBackgroundId String?
+
+  @@map("agents")
+}
+
+model AgentsBackgrounds {
+  id        String   @id @default(cuid())
+  name      String
+  url       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agents Agent[]
+
+  @@map("agents_backgrounds")
+}
+
+enum KnowledgeDocumentStatus {
+  PROCESSING
+  READY
+  FAILED
+}
+
+model KnowledgeDocuments {
+  id          String                  @id @default(cuid())
+  source      String
+  documentUrl String?
+  status      KnowledgeDocumentStatus @default(PROCESSING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("knowledge_bases")
+}

@@ -1,17 +1,17 @@
 "use client";
 
-import {ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState, useTransition} from "react";
+import {type ChangeEvent, type FormEvent, useEffect, useMemo, useRef, useState, useTransition} from "react";
 import toast from "react-hot-toast";
 
 import {saveMainSettingsAction, saveRoleSettingsAction} from "@/app/admin/(protected)/actions";
 import {
-    BackgroundItem,
+    type BackgroundItem,
     fetchMainAdminSettings,
     fetchRoleList,
     fetchRoleSettings,
-    MainAdminSettings,
-    RoleId,
-    RoleSettings,
+    type MainAdminSettings,
+    type RoleId,
+    type RoleSettings,
 } from "@/app/admin/(protected)/admin-data";
 
 export default function RolesClient() {
@@ -25,17 +25,8 @@ export default function RolesClient() {
     });
     const [roleSettings, setRoleSettings] = useState<RoleSettings | null>(null);
     const [backgrounds, setBackgrounds] = useState<BackgroundItem[]>([]);
-    const [mainSettings, setMainSettings] = useState<MainAdminSettings | null>(null);
     const [isSaving, startSaving] = useTransition();
-    const [isSavingMain, startSavingMain] = useTransition();
     const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-    useEffect(() => {
-        fetchRoleList().then((roles) => {
-            setRolesMeta((prev) => ({...prev, ...Object.fromEntries(roles.map((role) => [role.id, role.displayName]))} as Record<RoleId, string>));
-        });
-        fetchMainAdminSettings().then(setMainSettings);
-    }, []);
 
     useEffect(() => {
         fetchRoleSettings(activeRole).then((settings) => {
@@ -54,33 +45,11 @@ export default function RolesClient() {
         formData.set("roleId", roleId);
         formData.set("backgrounds", JSON.stringify(backgrounds));
 
-        startSaving(() =>
-            saveRoleSettingsAction(formData)
+        startSaving(async () => {
+            await saveRoleSettingsAction(formData)
                 .then(() => toast.success("Role settings saved"))
                 .catch(() => toast.error("Failed to save role settings"))
-        );
-    };
-
-    const handleMainSettingsSave = (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        const formData = new FormData(event.currentTarget);
-        if (!formData.get("voiceId")) {
-            toast.error("Voice ID is required");
-            return;
-        }
-
-        formData.set("backgroundsEnabled", formData.get("backgroundsEnabled") ? "true" : "false");
-        formData.set("backgroundUploadLimitMb", String(mainSettings?.backgroundUploadLimitMb ?? ""));
-
-        startSavingMain(() =>
-            saveMainSettingsAction(formData)
-                .then(() => toast.success("Main settings saved"))
-                .catch(() => toast.error("Failed to save main settings"))
-        );
-    };
-
-    const updateMainSettings = (patch: Partial<MainAdminSettings>) => {
-        setMainSettings((prev) => (prev ? {...prev, ...patch} : prev));
+        });
     };
 
     const removeBackground = (id: string) => {
@@ -118,54 +87,12 @@ export default function RolesClient() {
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
-                style={{ display: "none" }}
+                style={{display: "none"}}
                 onChange={handleBackgroundFile}
             />
 
-            {mainSettings && (
-                <section className="section">
-                    <h2 className="section-title">Main Admin Settings</h2>
-                    <form className="form-grid" onSubmit={handleMainSettingsSave}>
-                        <div className="input-group">
-                            <label htmlFor="voiceId">Voice ID</label>
-                            <input
-                                id="voiceId"
-                                name="voiceId"
-                                type="text"
-                                value={mainSettings.voiceId}
-                                placeholder="voice_neil_basic"
-                                onChange={(event) => updateMainSettings({ voiceId: event.target.value })}
-                            />
-                        </div>
-
-                        <div className="input-group">
-                            <label htmlFor="backgroundsEnabled">Enable Backgrounds</label>
-                            <div className="toggle-row">
-                                <input
-                                    id="backgroundsEnabled"
-                                    name="backgroundsEnabled"
-                                    type="checkbox"
-                                    checked={mainSettings.backgroundsEnabled}
-                                    onChange={(event) => updateMainSettings({ backgroundsEnabled: event.target.checked })}
-                                />
-                                <span>Allow background selection on the main page</span>
-                            </div>
-                            <div className="info-box" style={{ marginTop: 10 }}>
-                                Max upload size: {mainSettings.backgroundUploadLimitMb} MB
-                            </div>
-                        </div>
-
-                        <div className="save-section" style={{ gridColumn: "1 / -1" }}>
-                            <button type="submit" className="btn btn-primary" disabled={isSavingMain}>
-                                {isSavingMain ? "Saving..." : "💾 Save Main Settings"}
-                            </button>
-                        </div>
-                    </form>
-                </section>
-            )}
-
             {/* Role Tabs */}
-            <div className="role-tabs" aria-label="Role tabs">
+            <div className="role-tabs">
                 <button
                     type="button"
                     className={`role-tab ${activeRole === "basic" ? "active" : ""}`}
@@ -281,14 +208,14 @@ function BreadcrumbSync({title}: { title: string }) {
 
 function TooltipLabel(props: { title: string; text: string }) {
     return (
-        <label className="with-tooltip">
+        <label className="with-tooltip" htmlFor={'#'}>
             {props.title}
             <span className="tooltip-icon" aria-hidden="true">
-        ?
-      </span>
+                ?
+            </span>
             <span className="tooltip-text" role="tooltip">
-        {props.text}
-      </span>
+                {props.text}
+            </span>
         </label>
     );
 }
@@ -316,7 +243,14 @@ type RoleContentProps = {
     isSaving: boolean;
 };
 
-function RoleContentBasic({defaults, backgrounds, onBackgroundUpload, onBackgroundRemove, onSubmit, isSaving}: RoleContentProps) {
+function RoleContentBasic({
+                              defaults,
+                              backgrounds,
+                              onBackgroundUpload,
+                              onBackgroundRemove,
+                              onSubmit,
+                              isSaving
+                          }: RoleContentProps) {
     return (
         <form className="section" onSubmit={onSubmit}>
             <h2 className="section-title">Display Settings</h2>
@@ -327,7 +261,8 @@ function RoleContentBasic({defaults, backgrounds, onBackgroundUpload, onBackgrou
                         title="Role Name (Frontend Display)"
                         text="The name of the role displayed to users on the frontend site and used for navigation and role selection; this name is only for visual display and user understanding and does not affect the intelligence, behavior, or logic of the avatar."
                     />
-                    <input name="displayName" type="text" defaultValue={defaults?.displayName ?? ""} placeholder="Enter role name"/>
+                    <input name="displayName" type="text" defaultValue={defaults?.displayName ?? ""}
+                           placeholder="Enter role name"/>
                 </div>
 
                 <div className="input-group form-full">
@@ -350,7 +285,8 @@ function RoleContentBasic({defaults, backgrounds, onBackgroundUpload, onBackgrou
                     title="Agent Name"
                     text="The internal name the avatar uses for self-identification; this name participates in the working logic, influences response formation, and determines how the avatar perceives its own identity within the system."
                 />
-                <input name="agentName" type="text" defaultValue={defaults?.agentName ?? ""} placeholder="Enter agent name"/>
+                <input name="agentName" type="text" defaultValue={defaults?.agentName ?? ""}
+                       placeholder="Enter agent name"/>
             </div>
 
             <div className="input-group">
@@ -376,7 +312,17 @@ function RoleContentBasic({defaults, backgrounds, onBackgroundUpload, onBackgrou
                     placeholder="Enter system prompt"
                 />
             </div>
-
+            <div className="input-group">
+                <label htmlFor="voiceId">Voice ID</label>
+                <input
+                    id="voiceId"
+                    name="voiceId"
+                    type="text"
+                    // value={mainSettings.voiceId}
+                    placeholder="voice_neil_basic"
+                    // onChange={(event) => updateMainSettings({voiceId: event.target.value})}
+                />
+            </div>
             <div className="input-group">
                 <TooltipLabel
                     title="Personality Style"
@@ -401,26 +347,46 @@ function RoleContentBasic({defaults, backgrounds, onBackgroundUpload, onBackgrou
                 ℹ️ Upload background images for Green Screen mode. Users will be able to switch backgrounds on the
                 frontend.
             </div>
-
+            <div className="input-group">
+                <label htmlFor="backgroundsEnabled">Enable Backgrounds</label>
+                <div className="toggle-row">
+                    <input
+                        id="backgroundsEnabled"
+                        name="backgroundsEnabled"
+                        type="checkbox"
+                        // checked={mainSettings.backgroundsEnabled}
+                        // onChange={(event) => updateMainSettings({backgroundsEnabled: event.target.checked})}
+                    />
+                    <span>Allow background selection on the main page</span>
+                </div>
+                {/*<div className="info-box" style={{marginTop: 10}}>*/}
+                    {/*Max upload size: {mainSettings.backgroundUploadLimitMb} MB*/}
+                {/*</div>*/}
+            </div>
             <div className="backgrounds-grid">
                 {backgrounds.map((background) => (
                     <div key={background.id} className={`background-card ${background.theme}`}>
-                        <div className="background-preview">{background.theme === "forest" ? "🌲 Forest" : background.theme === "studio" ? "🎬 Studio" : background.theme === "space" ? "🚀 Space" : "🏠 Home"}</div>
+                        <div
+                            className="background-preview">{background.theme === "forest" ? "🌲 Forest" : background.theme === "studio" ? "🎬 Studio" : background.theme === "space" ? "🚀 Space" : "🏠 Home"}</div>
                         <div className="background-title">{background.title}</div>
                         <div className="background-actions">
                             <button type="button" className="btn btn-secondary" onClick={onBackgroundUpload}>
                                 ✏️ Replace
                             </button>
-                            <button type="button" className="btn btn-danger" onClick={() => onBackgroundRemove(background.id)}>
+                            <button type="button" className="btn btn-danger"
+                                    onClick={() => onBackgroundRemove(background.id)}>
                                 🗑️ Delete
                             </button>
                         </div>
                     </div>
                 ))}
 
-                <div className="add-background-card" role="button" tabIndex={0} onClick={onBackgroundUpload} onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") (e.currentTarget as HTMLDivElement).click();
-                }}>
+
+                {/** biome-ignore lint/a11y/useSemanticElements: 1 */}
+                <div className="add-background-card" role="button" tabIndex={0} onClick={onBackgroundUpload}
+                     onKeyDown={(e) => {
+                         if (e.key === "Enter" || e.key === " ") (e.currentTarget as HTMLDivElement).click();
+                     }}>
                     <div className="add-background-content">
                         <div className="icon">➕</div>
                         <div>
@@ -467,7 +433,14 @@ function RoleContentBasic({defaults, backgrounds, onBackgroundUpload, onBackgrou
     );
 }
 
-function RoleContentTourism({defaults, backgrounds, onBackgroundUpload, onBackgroundRemove, onSubmit, isSaving}: RoleContentProps) {
+function RoleContentTourism({
+                                defaults,
+                                backgrounds,
+                                onBackgroundUpload,
+                                onBackgroundRemove,
+                                onSubmit,
+                                isSaving
+                            }: RoleContentProps) {
     return (
         <form className="section" onSubmit={onSubmit}>
             <h2 className="section-title">Display Settings</h2>
@@ -478,7 +451,8 @@ function RoleContentTourism({defaults, backgrounds, onBackgroundUpload, onBackgr
                         title="Role Name (Frontend Display)"
                         text="The name of the role displayed to users on the frontend site and used for navigation and role selection; this name is only for visual display and user understanding and does not affect the intelligence, behavior, or logic of the avatar."
                     />
-                    <input name="displayName" type="text" defaultValue={defaults?.displayName ?? ""} placeholder="Enter role name"/>
+                    <input name="displayName" type="text" defaultValue={defaults?.displayName ?? ""}
+                           placeholder="Enter role name"/>
                 </div>
 
                 <div className="input-group form-full">
@@ -501,7 +475,8 @@ function RoleContentTourism({defaults, backgrounds, onBackgroundUpload, onBackgr
                     title="Agent Name"
                     text="The internal name the avatar uses for self-identification; this name participates in the working logic, influences response formation, and determines how the avatar perceives its own identity within the system."
                 />
-                <input name="agentName" type="text" defaultValue={defaults?.agentName ?? ""} placeholder="Enter agent name"/>
+                <input name="agentName" type="text" defaultValue={defaults?.agentName ?? ""}
+                       placeholder="Enter agent name"/>
             </div>
 
             <div className="input-group">
@@ -553,22 +528,26 @@ function RoleContentTourism({defaults, backgrounds, onBackgroundUpload, onBackgr
             <div className="backgrounds-grid">
                 {backgrounds.map((background) => (
                     <div key={background.id} className={`background-card ${background.theme}`}>
-                        <div className="background-preview">{background.theme === "forest" ? "🌲 Forest" : background.theme === "studio" ? "🎬 Studio" : background.theme === "space" ? "🚀 Space" : "🏠 Home"}</div>
+                        <div
+                            className="background-preview">{background.theme === "forest" ? "🌲 Forest" : background.theme === "studio" ? "🎬 Studio" : background.theme === "space" ? "🚀 Space" : "🏠 Home"}</div>
                         <div className="background-title">{background.title}</div>
                         <div className="background-actions">
                             <button type="button" className="btn btn-secondary" onClick={onBackgroundUpload}>
                                 ✏️ Replace
                             </button>
-                            <button type="button" className="btn btn-danger" onClick={() => onBackgroundRemove(background.id)}>
+                            <button type="button" className="btn btn-danger"
+                                    onClick={() => onBackgroundRemove(background.id)}>
                                 🗑️ Delete
                             </button>
                         </div>
                     </div>
                 ))}
 
-                <div className="add-background-card" role="button" tabIndex={0} onClick={onBackgroundUpload} onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") (e.currentTarget as HTMLDivElement).click();
-                }}>
+                {/** biome-ignore lint/a11y/useSemanticElements: 1 */}
+                <div className="add-background-card" role="button" tabIndex={0} onClick={onBackgroundUpload}
+                     onKeyDown={(e) => {
+                         if (e.key === "Enter" || e.key === " ") (e.currentTarget as HTMLDivElement).click();
+                     }}>
                     <div className="add-background-content">
                         <div className="icon">➕</div>
                         <div>

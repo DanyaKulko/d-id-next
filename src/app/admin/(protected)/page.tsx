@@ -1,6 +1,5 @@
 import RolesClient from "./roles.client";
 import "./page.css";
-// import "./tooltips.css";
 
 export default function RolesPage() {
     return (

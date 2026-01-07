@@ -52,7 +52,7 @@ export async function saveUserUpdateAction(formData: FormData) {
     const payload = toObject(formData);
     console.log("[admin] saveUserUpdate", payload);
     revalidatePath("/admin/settings");
-    return { ok: true };
+    return { ok: true, login: payload.login };
 }
 
 export async function saveSessionRetentionAction(formData: FormData) {

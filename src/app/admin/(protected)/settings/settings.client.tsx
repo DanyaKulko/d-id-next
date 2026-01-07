@@ -3,8 +3,18 @@
 import {useEffect, useMemo, useState, useTransition} from "react";
 import toast from "react-hot-toast";
 
-import {saveExternalSourcesConfigAction, saveIntegrationConfigAction, saveSessionRetentionAction, saveUserUpdateAction} from "@/app/admin/(protected)/actions";
-import {fetchExternalSourcesConfig, fetchIntegrationConfig, fetchUsers, UserRow} from "@/app/admin/(protected)/admin-data";
+import {
+    saveExternalSourcesConfigAction,
+    saveIntegrationConfigAction,
+    saveSessionRetentionAction,
+    saveUserUpdateAction
+} from "@/app/admin/(protected)/actions";
+import {
+    fetchExternalSourcesConfig,
+    fetchIntegrationConfig,
+    fetchUsers,
+    type UserRow
+} from "@/app/admin/(protected)/admin-data";
 
 type TabId = "integrations" | "external-sources" | "sessions" | "errors-debug" | "admin";
 
@@ -35,7 +45,7 @@ export default function SettingsClient() {
     // auth required toggle
     const [authRequired, setAuthRequired] = useState(true);
     const [users, setUsers] = useState<UserRow[]>([]);
-    const [integrationConfig, setIntegrationConfig] = useState({ apiKey: "sk_did_" });
+    const [integrationConfig, setIntegrationConfig] = useState({apiKey: "..."});
     const [externalSourcesConfig, setExternalSourcesConfig] = useState({
         textLink: "https://roliki.ua/s/json_template_s.txt",
         textCron: "0 2 * * *",
@@ -49,6 +59,7 @@ export default function SettingsClient() {
     useEffect(() => {
         fetchUsers().then(setUsers);
         fetchIntegrationConfig().then(setIntegrationConfig);
+        console.log('123')
         fetchExternalSourcesConfig().then(setExternalSourcesConfig);
     }, []);
 
@@ -58,7 +69,7 @@ export default function SettingsClient() {
     };
 
     const toggleSession = (id: string) => {
-        setExpandedSessions((s) => ({ ...s, [id]: !s[id] }));
+        setExpandedSessions((s) => ({...s, [id]: !s[id]}));
     };
 
     const checkConnection = (apiName: string) => {
@@ -105,11 +116,11 @@ export default function SettingsClient() {
         formData.set("email", email);
         formData.set("password", password);
 
-        startSaving(() =>
-            saveUserUpdateAction(formData)
+        startSaving(async () => {
+            await saveUserUpdateAction(formData)
                 .then(() => toast.success(`User "${login}" created`))
                 .catch(() => toast.error("Failed to log user creation"))
-        );
+        });
     };
 
     const editUser = (id: number) => {
@@ -137,11 +148,11 @@ export default function SettingsClient() {
         formData.set("login", newLogin ?? user.login);
         formData.set("email", newEmail ?? user.email);
 
-        startSaving(() =>
-            saveUserUpdateAction(formData)
+        startSaving(async () => {
+            await saveUserUpdateAction(formData)
                 .then(() => toast.success("User updated"))
                 .catch(() => toast.error("Failed to log user update"))
-        );
+        });
     };
 
     const deleteUser = (id: number) => {
@@ -159,49 +170,51 @@ export default function SettingsClient() {
         formData.set("action", "delete");
         formData.set("userId", String(id));
 
-        startSaving(() =>
-            saveUserUpdateAction(formData)
+        startSaving(async () => {
+            await saveUserUpdateAction(formData)
                 .then(() => toast.success("User deleted"))
                 .catch(() => toast.error("Failed to log user removal"))
-        );
+        });
     };
 
-    const usersRows = useMemo(
-        () =>
-            users.map((u) => (
-                <tr key={u.id}>
-                    <td>{u.email}</td>
-                    <td>{u.createdDate}</td>
-                    <td>{u.lastLogin}</td>
-                    <td>
-                        <button type="button" className="btn btn-secondary btn-small" onClick={() => editUser(u.id)}>
-                            ✏️ Edit
-                        </button>{" "}
-                        <button type="button" className="btn btn-danger btn-small" onClick={() => deleteUser(u.id)}>
-                            🗑️ Delete
-                        </button>
-                    </td>
-                </tr>
-            )),
-        [users]
-    );
+    const usersRows = users.map((u) => (
+        <tr key={u.id}>
+            <td>{u.email}</td>
+            <td>{u.createdDate}</td>
+            <td>{u.lastLogin}</td>
+            <td>
+                <button type="button" className="btn btn-secondary btn-small" onClick={() => editUser(u.id)}>
+                    ✏️ Edit
+                </button>
+                {" "}
+                <button type="button" className="btn btn-danger btn-small" onClick={() => deleteUser(u.id)}>
+                    🗑️ Delete
+                </button>
+            </td>
+        </tr>
+    ))
 
     return (
         <>
             <div className="tabs">
-                <button type="button" className={`tab ${activeTab === "integrations" ? "active" : ""}`} onClick={() => switchTab("integrations")}>
+                <button type="button" className={`tab ${activeTab === "integrations" ? "active" : ""}`}
+                        onClick={() => switchTab("integrations")}>
                     🔗 Integrations
                 </button>
-                <button type="button" className={`tab ${activeTab === "external-sources" ? "active" : ""}`} onClick={() => switchTab("external-sources")}>
+                <button type="button" className={`tab ${activeTab === "external-sources" ? "active" : ""}`}
+                        onClick={() => switchTab("external-sources")}>
                     📰 External Sources
                 </button>
-                <button type="button" className={`tab ${activeTab === "sessions" ? "active" : ""}`} onClick={() => switchTab("sessions")}>
+                <button type="button" className={`tab ${activeTab === "sessions" ? "active" : ""}`}
+                        onClick={() => switchTab("sessions")}>
                     📋 Session Records
                 </button>
-                <button type="button" className={`tab ${activeTab === "errors-debug" ? "active" : ""}`} onClick={() => switchTab("errors-debug")}>
+                <button type="button" className={`tab ${activeTab === "errors-debug" ? "active" : ""}`}
+                        onClick={() => switchTab("errors-debug")}>
                     ⚠️ Error Log
                 </button>
-                <button type="button" className={`tab ${activeTab === "admin" ? "active" : ""}`} onClick={() => switchTab("admin")}>
+                <button type="button" className={`tab ${activeTab === "admin" ? "active" : ""}`}
+                        onClick={() => switchTab("admin")}>
                     👨‍💼 Administrator
                 </button>
             </div>
@@ -210,26 +223,9 @@ export default function SettingsClient() {
             <div id="integrations" className={`tab-content ${activeTab === "integrations" ? "active" : ""}`}>
                 <div className="section">
                     <div className="two-column">
-                            <form
-                                className="api-card"
-                                onSubmit={(event) => {
-                                    event.preventDefault();
-                                    const formData = new FormData(event.currentTarget);
-                                    if (!formData.get("apiKey")) {
-                                        toast.error("API Key is required");
-                                        return;
-                                    }
-
-                                    startSaving(() =>
-                                        saveIntegrationConfigAction(formData)
-                                            .then(() => {
-                                                toast.success("Integration saved");
-                                                checkConnection("D-ID API");
-                                            })
-                                            .catch(() => toast.error("Failed to save integration"))
-                                    );
-                                }}
-                            >
+                        <form
+                            className="api-card"
+                        >
                             <h3>D-ID API</h3>
 
                             <div className="health-status healthy">
@@ -238,11 +234,13 @@ export default function SettingsClient() {
                             </div>
 
                             <div className="input-group">
-                                <label>API Key</label>
+                                <label htmlFor={'apiKey'}>API Key</label>
                                 <input
+                                    id="apiKey"
                                     name="apiKey"
-                                    type="password"
-                                    defaultValue={integrationConfig.apiKey}
+                                    type="text"
+                                    value={integrationConfig.apiKey}
+                                    disabled={true}
                                     placeholder="Enter API Key"
                                 />
                             </div>
@@ -270,23 +268,25 @@ export default function SettingsClient() {
                             return;
                         }
 
-                        startSaving(() =>
-                            saveExternalSourcesConfigAction(formData)
+                        startSaving(async () => {
+                            await saveExternalSourcesConfigAction(formData)
                                 .then(() => toast.success("External sources saved"))
                                 .catch(() => toast.error("Failed to save sources"))
-                        );
+                        });
                     }}
                 >
                     <div className="info-box">
-                        ℹ️ The system automatically retrieves new materials from the blog according to the CRON schedule and converts them into vector data for the knowledge base.
+                        ℹ️ The system automatically retrieves new materials from the blog according to the CRON schedule
+                        and converts them into vector data for the knowledge base.
                     </div>
 
                     <h2 className="section-title">Text Articles (JSON)</h2>
 
                     <div className="cron-settings">
                         <div className="input-group">
-                            <label>JSON API Link</label>
+                            <label htmlFor={'textLink'}>JSON API Link</label>
                             <input
+                                id="textLink"
                                 name="textLink"
                                 type="url"
                                 defaultValue={externalSourcesConfig.textLink}
@@ -295,22 +295,25 @@ export default function SettingsClient() {
                         </div>
 
                         <div className="input-group">
-                            <label>Access Key</label>
-                            <input name="textAccessKey" type="text" defaultValue={externalSourcesConfig.textAccessKey} placeholder="API Key" />
+                            <label htmlFor={'textAccessKey'}>Access Key</label>
+                            <input id="textAccessKey" name="textAccessKey" type="text"
+                                   defaultValue={externalSourcesConfig.textAccessKey} placeholder="API Key"/>
                         </div>
                     </div>
 
                     <div className="input-group">
-                        <label>CRON Settings (Update Frequency)</label>
-                        <input name="textCron" type="text" defaultValue={externalSourcesConfig.textCron} placeholder="0 2 * * * (every day at 2:00 AM)" />
+                        <label htmlFor={'textCron'}>CRON Settings (Update Frequency)</label>
+                        <input id="textCron" name="textCron" type="text" defaultValue={externalSourcesConfig.textCron}
+                               placeholder="0 2 * * * (every day at 2:00 AM)"/>
                     </div>
 
                     <h2 className="section-title">Video Transcription (JSON)</h2>
 
                     <div className="cron-settings">
                         <div className="input-group">
-                            <label>JSON API Link</label>
+                            <label htmlFor={'videoLink'}>JSON API Link</label>
                             <input
+                                id="videoLink"
                                 name="videoLink"
                                 type="url"
                                 defaultValue={externalSourcesConfig.videoLink}
@@ -319,20 +322,24 @@ export default function SettingsClient() {
                         </div>
 
                         <div className="input-group">
-                            <label>Access Key</label>
-                            <input name="videoAccessKey" type="text" defaultValue={externalSourcesConfig.videoAccessKey} placeholder="API Key" />
+                            <label htmlFor={'videoAccessKey'}>Access Key</label>
+                            <input id="videoAccessKey" name="videoAccessKey" type="text"
+                                   defaultValue={externalSourcesConfig.videoAccessKey} placeholder="API Key"/>
                         </div>
                     </div>
 
                     <div className="input-group">
-                        <label>CRON Settings (Update Frequency)</label>
-                        <input name="videoCron" type="text" defaultValue={externalSourcesConfig.videoCron} placeholder="0 3 * * * (every day at 3:00 AM)" />
+                        <label htmlFor={'videoCron'}>CRON Settings (Update Frequency)</label>
+                        <input id="videoCron" name="videoCron" type="text"
+                               defaultValue={externalSourcesConfig.videoCron}
+                               placeholder="0 3 * * * (every day at 3:00 AM)"/>
                     </div>
 
-                    <div style={{ marginTop: 30 }}>
+                    <div style={{marginTop: 30}}>
                         <button type="submit" className="btn btn-primary" disabled={isSaving}>
                             {isSaving ? "Saving..." : "💾 Save Settings"}
-                        </button>{" "}
+                        </button>
+                        {" "}
                         <button type="button" className="btn btn-secondary">
                             🔄 Test Connection
                         </button>
@@ -345,7 +352,8 @@ export default function SettingsClient() {
             <div id="sessions" className={`tab-content ${activeTab === "sessions" ? "active" : ""}`}>
                 <div className="section">
                     <div className="info-box">
-                        ℹ️ Complete dialogues for response quality analysis. Click on a session to view detailed information.
+                        ℹ️ Complete dialogues for response quality analysis. Click on a session to view detailed
+                        information.
                     </div>
 
                     <div className="filters">
@@ -365,8 +373,8 @@ export default function SettingsClient() {
                             <option value="uk">Ukrainian</option>
                         </select>
 
-                        <input type="date" placeholder="From" />
-                        <input type="date" placeholder="To" />
+                        <input type="date" placeholder="From"/>
+                        <input type="date" placeholder="To"/>
 
                         <button type="button" className="btn btn-secondary btn-small">
                             🔍 Apply Filters
@@ -404,15 +412,19 @@ export default function SettingsClient() {
                                         </div>
                                         <div className="message-text">Have you been to Grand Canyon?</div>
                                         <div className="rag-trace">
-                                            🎤 <strong>Audio:</strong> audio_input_001.mp3 | <strong>STT:</strong> &quot;Have you been to Grand Canyon?&quot;
+                                            🎤 <strong>Audio:</strong> audio_input_001.mp3
+                                            | <strong>STT:</strong> &quot;Have you been to Grand Canyon?&quot;
                                         </div>
                                     </div>
 
                                     <div className="message-block avatar">
                                         <div className="message-meta">
-                                            <strong>🤖 Avatar</strong> | 14:30:21 | Latency: 2800ms | Source: <span className="badge internal">Internal</span>
+                                            <strong>🤖 Avatar</strong> | 14:30:21 | Latency: 2800ms | Source: <span
+                                            className="badge internal">Internal</span>
                                         </div>
-                                        <div className="message-text">Yes, I visited the Grand Canyon in 1991. It was absolutely breathtaking...</div>
+                                        <div className="message-text">Yes, I visited the Grand Canyon in 1991. It was
+                                            absolutely breathtaking...
+                                        </div>
                                         <div className="rag-trace">
                                             🔍 <strong>RAG:</strong> chunk_travel_gc_1991 (0.94) | LLM: ChatGPT-4
                                         </div>
@@ -437,15 +449,15 @@ export default function SettingsClient() {
                         onSubmit={(event) => {
                             event.preventDefault();
                             const formData = new FormData(event.currentTarget);
-                            startSaving(() =>
-                                saveSessionRetentionAction(formData)
+                            startSaving(async () => {
+                                await saveSessionRetentionAction(formData)
                                     .then(() => toast.success("Session preferences saved"))
                                     .catch(() => toast.error("Failed to save session preferences"))
-                            );
+                            });
                         }}
                     >
                         <label htmlFor="retentionDays">Retention (days)</label>
-                        <input id="retentionDays" name="retentionDays" type="number" min={1} defaultValue={30} />
+                        <input id="retentionDays" name="retentionDays" type="number" min={1} defaultValue={30}/>
                         <button type="submit" className="btn btn-primary btn-small" disabled={isSaving}>
                             {isSaving ? "Saving..." : "💾 Save Preferences"}
                         </button>
@@ -513,29 +525,32 @@ export default function SettingsClient() {
                 <div className="section">
                     <h2 className="section-title">User Access Management</h2>
 
-                    <div className="toggle-container" style={{ marginBottom: 30 }}>
+                    <div className="toggle-container" style={{marginBottom: 30}}>
                         <label className="toggle-switch">
-                            <input type="checkbox" checked={authRequired} onChange={(e) => onAuthRequiredToggle(e.target.checked)} />
-                            <span className="slider" />
+                            <input type="checkbox" checked={authRequired}
+                                   onChange={(e) => onAuthRequiredToggle(e.target.checked)}/>
+                            <span className="slider"/>
                         </label>
                         <div>
                             <div className="toggle-label">Require Authentication</div>
                             <div className="toggle-description">
-                                When enabled, users must login with username/password and complete 2FA email verification. Access is valid for
+                                When enabled, users must login with username/password and complete 2FA email
+                                verification. Access is valid for
                                 24 hours. When disabled, anyone can access the avatar without credentials.
                             </div>
                         </div>
                     </div>
 
                     <div className="info-box">
-                        ℹ️ When authentication is enabled, users receive a 2FA code via email for verification. Each session lasts 24 hours.
+                        ℹ️ When authentication is enabled, users receive a 2FA code via email for verification. Each
+                        session lasts 24 hours.
                     </div>
 
-                    <button type="button" className="btn btn-primary" onClick={addNewUser} style={{ marginBottom: 20 }}>
+                    <button type="button" className="btn btn-primary" onClick={addNewUser} style={{marginBottom: 20}}>
                         ➕ Add New User
                     </button>
 
-                    <div style={{ overflowX: "auto" }}>
+                    <div style={{overflowX: "auto"}}>
                         <table className="log-table">
                             <thead>
                             <tr>
@@ -549,37 +564,34 @@ export default function SettingsClient() {
                         </table>
                     </div>
 
-                    <h2 className="section-title" style={{ marginTop: 50 }}>
+                    <h2 className="section-title" style={{marginTop: 50}}>
                         Administrator Credentials
                     </h2>
 
-                    <div style={{ maxWidth: 600 }}>
+                    <div style={{maxWidth: 600}}>
                         <div className="input-group">
-                            <label>Administrator Email</label>
-                            <input type="email" defaultValue="admin@gokhale.cms" placeholder="Enter administrator email" />
+                            <label htmlFor={'email'}>Administrator Email</label>
+                            <input id="email" type="email" defaultValue="admin@gokhale.cms"
+                                   placeholder="Enter administrator email"/>
+                        </div>
+                        <div className="input-group">
+                            <label htmlFor={'curr_password'}>Current Password</label>
+                            <input id="curr_password" type="password" placeholder="Enter current password"/>
                         </div>
 
                         <div className="input-group">
-                            <label>Administrator Login</label>
-                            <input type="text" defaultValue="admin" placeholder="Enter login" />
+                            <label htmlFor={'password'}>New Password</label>
+                            <input id="password" type="password" placeholder="Enter new password"/>
                         </div>
 
                         <div className="input-group">
-                            <label>Current Password</label>
-                            <input type="password" placeholder="Enter current password" />
+                            <label htmlFor={'password2'}>Confirm New Password</label>
+                            <input id="password2" type="password" placeholder="Repeat new password"/>
                         </div>
 
-                        <div className="input-group">
-                            <label>New Password</label>
-                            <input type="password" placeholder="Enter new password" />
+                        <div className="info-box">ℹ️ Email is used for password recovery. Make sure it&apos;s valid and
+                            accessible.
                         </div>
-
-                        <div className="input-group">
-                            <label>Confirm New Password</label>
-                            <input type="password" placeholder="Repeat new password" />
-                        </div>
-
-                        <div className="info-box">ℹ️ Email is used for password recovery. Make sure it&apos;s valid and accessible.</div>
 
                         <button
                             type="button"
@@ -587,7 +599,8 @@ export default function SettingsClient() {
                             onClick={() => toast.success("Administrator credentials saved (mock)")}
                         >
                             💾 Save Changes
-                        </button>{" "}
+                        </button>
+                        {" "}
                         <button type="button" className="btn btn-secondary">
                             ❌ Cancel
                         </button>
