@@ -29,6 +29,7 @@ model User {
   passwordHash String
 
   twoFactorEmail Boolean @default(false)
+  isActive       Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -102,6 +103,7 @@ model LoginEvent {
 model Agent {
   id              String  @id @default(cuid())
   agentId         String  @unique
+  slug            String? @unique
   displayName     String
   description     String?
   name            String
@@ -117,22 +119,25 @@ model Agent {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  avatarBackground   AgentsBackgrounds? @relation(fields: [avatarBackgroundId], references: [id])
-  avatarBackgroundId String?
+  backgrounds AgentBackground[]
 
   @@map("agents")
 }
 
-model AgentsBackgrounds {
-  id        String   @id @default(cuid())
-  name      String
-  url       String
+model AgentBackground {
+  id      String @id @default(cuid())
+  agentId String
+  agent   Agent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  title String
+  theme String
+  url   String
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  agents Agent[]
-
-  @@map("agents_backgrounds")
+  @@index([agentId])
+  @@map("agent_backgrounds")
 }
 
 enum KnowledgeDocumentStatus {
@@ -141,9 +146,15 @@ enum KnowledgeDocumentStatus {
   FAILED
 }
 
+enum ExternalSourceKind {
+  TEXT
+  VIDEO
+}
+
 model KnowledgeDocuments {
   id          String                  @id @default(cuid())
   source      String
+  documentId  String?
   documentUrl String?
   status      KnowledgeDocumentStatus @default(PROCESSING)
 
@@ -151,4 +162,30 @@ model KnowledgeDocuments {
   updatedAt DateTime @updatedAt
 
   @@map("knowledge_bases")
+}
+
+model ExternalSource {
+  id         String             @id @default(cuid())
+  kind       ExternalSourceKind @unique
+  label      String
+  link       String
+  cron       String
+  accessKey  String?
+  documentId String?
+  filePath   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("external_sources")
+}
+
+model AppSetting {
+  key   String @id
+  value String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("app_settings")
 }

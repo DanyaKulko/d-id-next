@@ -19,5 +19,20 @@ services:
     mem_limit: 2g
     mem_reservation: 1g
 
+  external_sources_cron:
+    image: node:20-alpine
+    container_name: d-id_external_sources_cron
+    working_dir: /app
+    command: ["sh", "/app/scripts/cron-entrypoint.sh"]
+    environment:
+      APP_BASE_URL: ${APP_BASE_URL}
+      CRON_SECRET: ${CRON_SECRET}
+      EXTERNAL_SOURCES_CRON: ${EXTERNAL_SOURCES_CRON}
+      EXTERNAL_TEXT_CRON: ${EXTERNAL_TEXT_CRON}
+      EXTERNAL_VIDEO_CRON: ${EXTERNAL_VIDEO_CRON}
+    volumes:
+      - ./:/app
+    restart: unless-stopped
+
 volumes:
     pg_data:

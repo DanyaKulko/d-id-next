@@ -1,61 +1,67 @@
 .na-stage-wrapper {
-    position: relative;
-    width: 100%;
-    /* Настройте высоту/aspect-ratio по вашему макету */
-    /*aspect-ratio: 1 / 1;*/
-    height: 800px;
-    border-radius: 15px;
-    overflow: hidden;
-    /*background: #000;*/
+  position: relative;
+  width: 100%;
+  /* Настройте высоту/aspect-ratio по вашему макету */
+  /*aspect-ratio: 1 / 1;*/
+  height: 800px;
+  border-radius: 15px;
+  overflow: hidden;
+  /*background: #000;*/
 }
 
 /* Общий класс для всех видео слоев */
 .na-avatar-video {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: opacity 0.5s ease-in-out; /* Плавный переход */
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 0.5s ease-in-out; /* Плавный переход */
 }
 
 /* Слой idle (нижний) */
 .na-layer-idle {
-    z-index: 1;
+  z-index: 1;
 }
 
 /* Слой stream (верхний) */
 .na-layer-stream {
-    z-index: 2;
+  z-index: 2;
 }
 
 /* Оверлеи (поверх всего) */
-.error-overlay, .timeout-overlay, .na-video-placeholder {
-    z-index: 10;
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: rgba(0, 0, 0, 0.5);
-    color: white;
-    font-size: 18px;
-    flex-direction: column;
+.error-overlay,
+.timeout-overlay,
+.na-video-placeholder {
+  z-index: 10;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  font-size: 18px;
+  flex-direction: column;
 }
 
 .na-spinner {
-    border: 8px solid rgba(0, 0, 0, 0.1);
-    border-top: 8px solid #3498db;
-    border-radius: 50%;
-    width: 60px;
-    height: 60px;
-    animation: spin 1s linear infinite;
+  border: 8px solid rgba(0, 0, 0, 0.1);
+  border-top: 8px solid #3498db;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  animation: spin 1s linear infinite;
 }
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }

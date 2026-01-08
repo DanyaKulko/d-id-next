@@ -1,164 +1,165 @@
 .na-header-title {
-    flex: 1;
-    text-align: right;
-    padding-left: var(--na-space-lg);
+  flex: 1;
+  text-align: right;
+  padding-left: var(--na-space-lg);
 }
 
 .na-title-display {
-    font-size: 32px;
-    line-height: 1.2;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-    color: var(--na-text-on-light);
-    margin-bottom: var(--na-space-xs);
+  font-size: 32px;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--na-text-on-light);
+  margin-bottom: var(--na-space-xs);
 }
 
 .na-subtitle {
-    font-size: 16px;
-    color: var(--na-text-muted);
+  font-size: 16px;
+  color: var(--na-text-muted);
 }
 
 /* Magic glow */
 .na-glow {
-    position: relative;
-    z-index: 1;
+  position: relative;
+  z-index: 1;
 }
 
 .na-glow::before {
-    content: "";
-    position: absolute;
-    inset: -30%;
-    background: radial-gradient(circle at 20% 0, var(--na-glow-warm), transparent 70%),
+  content: "";
+  position: absolute;
+  inset: -30%;
+  background:
+    radial-gradient(circle at 20% 0, var(--na-glow-warm), transparent 70%),
     radial-gradient(circle at 80% 100%, var(--na-glow-cold), transparent 70%);
-    filter: blur(18px);
-    opacity: 0.7;
-    z-index: -1;
+  filter: blur(18px);
+  opacity: 0.7;
+  z-index: -1;
 }
 
 /* Role Grid */
 .na-roles-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--na-space-md);
-    margin-bottom: var(--na-space-xl);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--na-space-md);
+  margin-bottom: var(--na-space-xl);
 }
 
 /* Cards with Video Background */
 .na-card {
-    text-decoration: none;
-    position: relative;
-    border-radius: var(--na-radius-md);
-    box-shadow: var(--na-shadow-soft);
-    border: 1px solid rgba(255, 222, 179, 0.7);
-    transition: all 0.3s ease;
-    cursor: pointer;
-    overflow: hidden;
-    aspect-ratio: 16 / 9;
+  text-decoration: none;
+  position: relative;
+  border-radius: var(--na-radius-md);
+  box-shadow: var(--na-shadow-soft);
+  border: 1px solid rgba(255, 222, 179, 0.7);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
 }
 
 .na-card--full {
-    grid-column: 1 / -1;
+  grid-column: 1 / -1;
 }
 
 .na-card--half {
-    grid-column: span 1;
+  grid-column: span 1;
 }
 
 .na-card-video {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    z-index: 1;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
 }
 
 .na-card-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(255, 255, 255, 0.5);
-    z-index: 2;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.5);
+  z-index: 2;
 }
 
 .na-card-content {
-    position: relative;
-    z-index: 3;
-    padding: var(--na-space-lg);
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
+  position: relative;
+  z-index: 3;
+  padding: var(--na-space-lg);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
 }
 
 .na-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--na-shadow-cta);
+  transform: translateY(-4px);
+  box-shadow: var(--na-shadow-cta);
 }
 
 .na-card:hover .na-card-overlay {
-    background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.6);
 }
 
 .na-card-title {
-    font-size: 48px;
-    font-weight: 600;
-    margin-bottom: var(--na-space-xs);
-    color: #284664;
+  font-size: 48px;
+  font-weight: 600;
+  margin-bottom: var(--na-space-xs);
+  color: #284664;
 }
 
 .na-card-desc {
-    font-size: 28px;
-    color: #284664;
-    line-height: 1.4;
+  font-size: 28px;
+  color: #284664;
+  line-height: 1.4;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
-    .na-header-content {
-        flex-direction: column;
-        gap: var(--na-space-sm);
-        align-items: flex-start;
-    }
+  .na-header-content {
+    flex-direction: column;
+    gap: var(--na-space-sm);
+    align-items: flex-start;
+  }
 
-    .na-header-title {
-        text-align: left;
-        padding-left: 0;
-    }
+  .na-header-title {
+    text-align: left;
+    padding-left: 0;
+  }
 
-    .na-title-display {
-        font-size: 24px;
-    }
+  .na-title-display {
+    font-size: 24px;
+  }
 
-    .na-subtitle {
-        font-size: 14px;
-    }
+  .na-subtitle {
+    font-size: 14px;
+  }
 
-    .na-roles-grid {
-        grid-template-columns: 1fr;
-    }
+  .na-roles-grid {
+    grid-template-columns: 1fr;
+  }
 
-    .na-card--full,
-    .na-card--half {
-        grid-column: 1;
-    }
+  .na-card--full,
+  .na-card--half {
+    grid-column: 1;
+  }
 
-    .na-card-content {
-        align-items: flex-start;
-        text-align: left;
-        padding: var(--na-space-md);
-    }
+  .na-card-content {
+    align-items: flex-start;
+    text-align: left;
+    padding: var(--na-space-md);
+  }
 
-    .na-card-title {
-        font-size: 28px;
-    }
+  .na-card-title {
+    font-size: 28px;
+  }
 
-    .na-card-desc {
-        font-size: 16px;
-    }
+  .na-card-desc {
+    font-size: 16px;
+  }
 }

@@ -20,9 +20,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${nasalization.variable}`}>
-        {children}
-      </body>
+      <body className={`${nasalization.variable}`}>{children}</body>
     </html>
   );
 }

@@ -1,590 +1,743 @@
 "use client";
 
-import {type ChangeEvent, type FormEvent, useEffect, useMemo, useRef, useState, useTransition} from "react";
+import { useRouter } from "next/navigation";
+import {
+  type ChangeEvent,
+  type FormEvent,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
 import toast from "react-hot-toast";
 
-import {saveMainSettingsAction, saveRoleSettingsAction} from "@/app/admin/(protected)/actions";
 import {
-    type BackgroundItem,
-    fetchMainAdminSettings,
-    fetchRoleList,
-    fetchRoleSettings,
-    type MainAdminSettings,
-    type RoleId,
-    type RoleSettings,
-} from "@/app/admin/(protected)/admin-data";
+  deleteRoleAction,
+  saveRoleSettingsAction,
+} from "@/app/admin/(protected)/actions";
+import type {
+  AgentKey,
+  AgentListItem,
+  AgentSettings,
+  BackgroundItem,
+} from "@/app/admin/(protected)/roles.types";
 
-export default function RolesClient() {
-    const [activeRole, setActiveRole] = useState<RoleId>("basic");
-    const [rolesMeta, setRolesMeta] = useState<Record<RoleId, string>>({
-        basic: "Basic Neil",
-        tourism: "Tourism Neil",
-        sports: "Sports Neil",
-        politics: "Politics Neil",
-        space: "Space Neil",
+type RolesClientProps = {
+  initialAgents: AgentListItem[];
+  initialAgentKey?: string | null;
+  initialAgentSettings?: AgentSettings | null;
+};
+
+const personalityOptions = [
+  { value: "Friendly and Professional", label: "Friendly and Professional" },
+  { value: "Fun and Engaging", label: "Fun and Engaging" },
+  { value: "Warm and Supportive", label: "Warm and Supportive" },
+  { value: "Direct and Concise", label: "Direct and Concise" },
+  { value: "Sophisticated and Formal", label: "Sophisticated and Formal" },
+  { value: "Confident and Persuasive", label: "Confident and Persuasive" },
+];
+
+const personalityAliases: Record<string, string> = {
+  friendly: "Friendly and Professional",
+  fun: "Fun and Engaging",
+  warm: "Warm and Supportive",
+  direct: "Direct and Concise",
+  sophisticated: "Sophisticated and Formal",
+  confident: "Confident and Persuasive",
+};
+
+const normalizePersonalityStyle = (value?: string) => {
+  if (!value) return personalityOptions[0].value;
+  return personalityAliases[value] ?? value;
+};
+
+export default function RolesClient({
+  initialAgents,
+  initialAgentKey,
+  initialAgentSettings,
+}: RolesClientProps) {
+  const router = useRouter();
+  const [agents, setAgents] = useState<AgentListItem[]>(initialAgents);
+  const [activeAgentKey, setActiveAgentKey] = useState<AgentKey>(
+    initialAgentKey ?? initialAgents[0]?.key ?? "",
+  );
+  const [agentSettings, setAgentSettings] = useState<AgentSettings | null>(
+    initialAgentSettings ?? null,
+  );
+  const [backgrounds, setBackgrounds] = useState<BackgroundItem[]>(
+    initialAgentSettings?.backgrounds ?? [],
+  );
+  const [isSaving, startSaving] = useTransition();
+  const [showBackgroundModal, setShowBackgroundModal] = useState(false);
+  const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
+  const [backgroundTitle, setBackgroundTitle] = useState("");
+  const [backgroundTheme, setBackgroundTheme] = useState("");
+  const [deleteAgentCandidate, setDeleteAgentCandidate] =
+    useState<AgentListItem | null>(null);
+  const [showAddAgentModal, setShowAddAgentModal] = useState(false);
+  const [newAgentName, setNewAgentName] = useState("");
+
+  useEffect(() => {
+    setAgents(initialAgents);
+  }, [initialAgents]);
+
+  useEffect(() => {
+    if (initialAgentKey) {
+      setActiveAgentKey(initialAgentKey);
+    }
+  }, [initialAgentKey]);
+
+  useEffect(() => {
+    setAgentSettings(initialAgentSettings ?? null);
+    setBackgrounds(initialAgentSettings?.backgrounds ?? []);
+  }, [initialAgentSettings]);
+
+  const handleSave = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!activeAgentKey) return;
+    const formData = new FormData(event.currentTarget);
+    if (!formData.get("displayName") || !formData.get("agentName")) {
+      toast.error("Please fill out required fields before saving.");
+      return;
+    }
+    formData.set("agentKey", activeAgentKey);
+    formData.set("backgrounds", JSON.stringify(backgrounds));
+
+    const backgroundsToggle =
+      event.currentTarget.querySelector<HTMLInputElement>(
+        'input[name="backgroundsEnabled"]',
+      );
+    if (backgroundsToggle) {
+      formData.set(
+        "backgroundsEnabled",
+        backgroundsToggle.checked ? "on" : "off",
+      );
+    } else if (agentSettings) {
+      formData.set(
+        "backgroundsEnabled",
+        agentSettings.backgroundsEnabled ? "on" : "off",
+      );
+    }
+
+    startSaving(async () => {
+      await saveRoleSettingsAction(formData)
+        .then(() => {
+          const displayName = formData.get("displayName");
+          if (typeof displayName === "string" && displayName.trim()) {
+            setAgents((prev) =>
+              prev.map((agent) =>
+                agent.key === activeAgentKey
+                  ? { ...agent, displayName: displayName.trim() }
+                  : agent,
+              ),
+            );
+          }
+          toast.success("Agent settings saved");
+        })
+        .catch(() => toast.error("Failed to save agent settings"));
     });
-    const [roleSettings, setRoleSettings] = useState<RoleSettings | null>(null);
-    const [backgrounds, setBackgrounds] = useState<BackgroundItem[]>([]);
-    const [isSaving, startSaving] = useTransition();
-    const fileInputRef = useRef<HTMLInputElement | null>(null);
+  };
 
-    useEffect(() => {
-        fetchRoleSettings(activeRole).then((settings) => {
-            setRoleSettings(settings);
-            setBackgrounds(settings.backgrounds);
-        });
-    }, [activeRole]);
+  const removeBackground = async (id: string) => {
+    const snapshot = backgrounds;
+    setBackgrounds((prev) => prev.filter((bg) => bg.id !== id));
 
-    const handleSave = (event: FormEvent<HTMLFormElement>, roleId: RoleId) => {
-        event.preventDefault();
-        const formData = new FormData(event.currentTarget);
-        if (!formData.get("displayName") || !formData.get("agentName")) {
-            toast.error("Please fill out required fields before saving.");
-            return;
-        }
-        formData.set("roleId", roleId);
-        formData.set("backgrounds", JSON.stringify(backgrounds));
+    try {
+      const response = await fetch("/api/admin/backgrounds", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
 
-        startSaving(async () => {
-            await saveRoleSettingsAction(formData)
-                .then(() => toast.success("Role settings saved"))
-                .catch(() => toast.error("Failed to save role settings"))
-        });
-    };
+      if (!response.ok) {
+        throw new Error("Failed to delete background");
+      }
 
-    const removeBackground = (id: string) => {
-        setBackgrounds((prev) => prev.filter((bg) => bg.id !== id));
-        toast.success("Background removed");
-    };
+      toast.success("Background removed");
+    } catch {
+      setBackgrounds(snapshot);
+      toast.error("Failed to remove background");
+    }
+  };
 
-    const handleBackgroundFile = (event: ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-        const title = window.prompt("Enter background title", file.name) || file.name;
-        const themeInput = window.prompt("Enter theme (forest, studio, home, space)", "forest")?.toLowerCase();
-        const theme = themeInput === "studio" || themeInput === "home" || themeInput === "space" ? themeInput : "forest";
+  const openBackgroundModal = () => {
+    setBackgroundFile(null);
+    setBackgroundTitle("");
+    setBackgroundTheme("");
+    setShowBackgroundModal(true);
+  };
 
-        const newBackground: BackgroundItem = {
-            id: `${Date.now()}`,
-            title,
-            theme,
-        };
+  const handleBackgroundFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setBackgroundFile(file);
+    if (!backgroundTitle) {
+      setBackgroundTitle(file.name);
+    }
+  };
 
-        setBackgrounds((prev) => [...prev, newBackground]);
-        toast.success("Background uploaded (mock)");
-        event.target.value = "";
-    };
+  const submitBackgroundUpload = async () => {
+    // TODO: support replacing an existing background instead of always adding a new one.
+    if (!activeAgentKey) return;
+    const file = backgroundFile;
+    if (!file) return;
+    const title = backgroundTitle.trim() || file.name;
+    const theme = backgroundTheme.trim() || "default";
 
-    const triggerBackgroundUpload = () => {
-        fileInputRef.current?.click();
-    };
+    try {
+      const formData = new FormData();
+      formData.set("agentKey", activeAgentKey);
+      formData.set("title", title);
+      formData.set("theme", theme);
+      formData.set("file", file);
 
-    const breadcrumbRole = useMemo(() => rolesMeta[activeRole], [activeRole, rolesMeta]);
+      const response = await fetch("/api/admin/backgrounds", {
+        method: "POST",
+        body: formData,
+      });
 
-    return (
-        <>
-            <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                style={{display: "none"}}
-                onChange={handleBackgroundFile}
-            />
+      if (!response.ok) {
+        toast.error("Failed to upload background");
+        return;
+      }
 
-            {/* Role Tabs */}
-            <div className="role-tabs">
-                <button
-                    type="button"
-                    className={`role-tab ${activeRole === "basic" ? "active" : ""}`}
-                    onClick={() => setActiveRole("basic")}
-                >
-                    <span>🎭</span> {rolesMeta.basic}
-                </button>
+      const newBackground = (await response.json()) as BackgroundItem;
+      setBackgrounds((prev) => [...prev, newBackground]);
+      toast.success("Background uploaded");
+      setShowBackgroundModal(false);
+    } catch {
+      toast.error("Failed to upload background");
+    } finally {
+      setBackgroundFile(null);
+    }
+  };
 
-                <button
-                    type="button"
-                    className={`role-tab ${activeRole === "tourism" ? "active" : ""}`}
-                    onClick={() => setActiveRole("tourism")}
-                >
-                    <span>✈️</span> {rolesMeta.tourism}
-                </button>
+  const handleDeleteRole = () => {
+    const current = agents.find((agent) => agent.key === activeAgentKey);
+    if (!current) return;
+    setDeleteAgentCandidate(current);
+  };
 
-                <button
-                    type="button"
-                    className={`role-tab ${activeRole === "sports" ? "active" : ""}`}
-                    onClick={() => setActiveRole("sports")}
-                >
-                    <span>⚽</span> {rolesMeta.sports}
-                </button>
+  const confirmDeleteRole = async () => {
+    const targetKey = deleteAgentCandidate?.key;
+    if (!targetKey) return;
+    try {
+      const result = await deleteRoleAction(targetKey);
+      if (result?.skipped) {
+        toast("Deletion is disabled (guarded)", { icon: "⚠️" });
+        return;
+      }
+      toast.success("Agent deleted");
+      setDeleteAgentCandidate(null);
+    } catch {
+      toast.error("Failed to delete agent");
+    }
+  };
 
-                <button
-                    type="button"
-                    className={`role-tab ${activeRole === "politics" ? "active" : ""}`}
-                    onClick={() => setActiveRole("politics")}
-                >
-                    <span>🏛️</span> {rolesMeta.politics}
-                </button>
+  const openAddAgentModal = () => {
+    setNewAgentName("");
+    setShowAddAgentModal(true);
+  };
 
-                <button
-                    type="button"
-                    className={`role-tab ${activeRole === "space" ? "active" : ""}`}
-                    onClick={() => setActiveRole("space")}
-                >
-                    <span>🚀</span> {rolesMeta.space}
-                </button>
+  const confirmAddAgent = () => {
+    if (!newAgentName.trim()) {
+      toast.error("Agent name is required");
+      return;
+    }
+    // TODO: implement agent creation (DB + D-ID) once API flow is approved.
+    toast("TODO: Agent creation is not wired yet.", { icon: "🛠️" });
+    setShowAddAgentModal(false);
+  };
 
-                <button
-                    type="button"
-                    className="add-role-tab"
-                    onClick={() => {
-                        const roleName = window.prompt("Enter the name for the new role:", "New Neil Role");
-                        if (roleName?.trim()) {
-                            window.alert(
-                                `New role "${roleName}" would be created here.\n\nThe system would:\n- Create a new role tab\n- Generate default settings\n- Allow you to configure all parameters`
-                            );
-                        }
-                    }}
-                >
-                    <span>➕</span> Add New Role
-                </button>
+  const breadcrumbRole = useMemo(() => {
+    const current = agents.find((agent) => agent.key === activeAgentKey);
+    return current?.displayName ?? "Roles";
+  }, [activeAgentKey, agents]);
+
+  const tabIcons = ["🎭", "✈️", "⚽", "🏛️", "🚀", "🧠", "🎤"];
+
+  return (
+    <>
+      {/* Role Tabs */}
+      <div className="role-tabs">
+        {agents.map((agent, index) => (
+          <button
+            key={agent.key}
+            type="button"
+            className={`role-tab ${activeAgentKey === agent.key ? "active" : ""}`}
+            onClick={() => {
+              if (agent.key === activeAgentKey) return;
+              router.push(`/admin/roles/${agent.key}`);
+            }}
+          >
+            <span>{tabIcons[index % tabIcons.length]}</span> {agent.displayName}
+          </button>
+        ))}
+
+        <button
+          type="button"
+          className="add-role-tab"
+          onClick={openAddAgentModal}
+        >
+          <span>➕</span> Add New Agent
+        </button>
+      </div>
+
+      {/* Breadcrumb sync (1:1 поведение) */}
+      <BreadcrumbSync title={breadcrumbRole} />
+
+      {/* Contents */}
+      {agents.length === 0 ? (
+        <div className="section">
+          <div className="info-box">
+            ℹ️ TODO: Add at least one agent to configure roles.
+          </div>
+        </div>
+      ) : (
+        <div className="role-content active">
+          <RoleContent
+            key={`${activeAgentKey}-${agentSettings ? "ready" : "loading"}`}
+            defaults={agentSettings}
+            backgrounds={backgrounds}
+            onBackgroundUpload={openBackgroundModal}
+            onBackgroundRemove={removeBackground}
+            onSubmit={handleSave}
+            onDelete={handleDeleteRole}
+            isSaving={isSaving}
+          />
+        </div>
+      )}
+
+      {showBackgroundModal && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal-card">
+            <div className="modal-header">
+              <div>
+                <div className="modal-title">Upload Background</div>
+                <div className="modal-subtitle">
+                  Add a new background image for this agent.
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary btn-small"
+                onClick={() => setShowBackgroundModal(false)}
+              >
+                ✕ Close
+              </button>
             </div>
 
-            {/* Breadcrumb sync (1:1 поведение) */}
-            <BreadcrumbSync title={breadcrumbRole}/>
-
-            {/* Contents */}
-            <div id="basic" className={`role-content ${activeRole === "basic" ? "active" : ""}`}>
-                <RoleContentBasic
-                    defaults={roleSettings}
-                    backgrounds={backgrounds}
-                    onBackgroundUpload={triggerBackgroundUpload}
-                    onBackgroundRemove={removeBackground}
-                    onSubmit={(event) => handleSave(event, "basic")}
-                    isSaving={isSaving}
+            <div className="modal-body">
+              <div className="input-group">
+                <label htmlFor="backgroundFile">Image file</label>
+                <input
+                  id="backgroundFile"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleBackgroundFileChange}
                 />
-            </div>
-
-            <div id="tourism" className={`role-content ${activeRole === "tourism" ? "active" : ""}`}>
-                <RoleContentTourism
-                    defaults={roleSettings}
-                    backgrounds={backgrounds}
-                    onBackgroundUpload={triggerBackgroundUpload}
-                    onBackgroundRemove={removeBackground}
-                    onSubmit={(event) => handleSave(event, "tourism")}
-                    isSaving={isSaving}
+              </div>
+              <div className="input-group">
+                <label htmlFor="backgroundTitle">Title</label>
+                <input
+                  id="backgroundTitle"
+                  type="text"
+                  value={backgroundTitle}
+                  onChange={(event) => setBackgroundTitle(event.target.value)}
+                  placeholder="Background title"
                 />
+              </div>
+              <div className="input-group">
+                <label htmlFor="backgroundTheme">Theme</label>
+                <input
+                  id="backgroundTheme"
+                  type="text"
+                  value={backgroundTheme}
+                  onChange={(event) => setBackgroundTheme(event.target.value)}
+                  placeholder="e.g. Sunset lounge"
+                />
+              </div>
             </div>
 
-            {/* Заглушки, структура аналогична */}
-            <div id="sports" className={`role-content ${activeRole === "sports" ? "active" : ""}`}>
-                <RoleContentPlaceholder name="Sports Neil"/>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setShowBackgroundModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={submitBackgroundUpload}
+                disabled={isSaving}
+              >
+                {isSaving ? "Uploading..." : "Upload Background"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteAgentCandidate && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal-card">
+            <div className="modal-header">
+              <div>
+                <div className="modal-title">Delete Agent</div>
+                <div className="modal-subtitle">
+                  This action cannot be undone.
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary btn-small"
+                onClick={() => setDeleteAgentCandidate(null)}
+              >
+                ✕ Close
+              </button>
+            </div>
+            <div className="modal-body">
+              <p>
+                Delete &quot;{deleteAgentCandidate.displayName}&quot; and all
+                related settings?
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setDeleteAgentCandidate(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={confirmDeleteRole}
+                disabled={isSaving}
+              >
+                {isSaving ? "Deleting..." : "Delete Agent"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAddAgentModal && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal-card">
+            <div className="modal-header">
+              <div>
+                <div className="modal-title">Add New Agent</div>
+                <div className="modal-subtitle">
+                  TODO: connect to D-ID creation flow.
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary btn-small"
+                onClick={() => setShowAddAgentModal(false)}
+              >
+                ✕ Close
+              </button>
             </div>
 
-            <div id="politics" className={`role-content ${activeRole === "politics" ? "active" : ""}`}>
-                <RoleContentPlaceholder name="Politics Neil"/>
+            <div className="modal-body">
+              <div className="input-group">
+                <label htmlFor="newAgentName">Agent name</label>
+                <input
+                  id="newAgentName"
+                  type="text"
+                  value={newAgentName}
+                  onChange={(event) => setNewAgentName(event.target.value)}
+                  placeholder="New Neil Agent"
+                />
+              </div>
             </div>
 
-            <div id="space" className={`role-content ${activeRole === "space" ? "active" : ""}`}>
-                <RoleContentPlaceholder name="Space Neil"/>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setShowAddAgentModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={confirmAddAgent}
+                disabled={isSaving}
+              >
+                {isSaving ? "Creating..." : "Create Agent"}
+              </button>
             </div>
-        </>
-    );
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
-function BreadcrumbSync({title}: { title: string }) {
-    // чисто визуально “как в статике”: меняем текст хлебных крошек
-    // без прямого DOM: просто рендерим поверх, но у тебя в page.tsx id="current-role"
-    // поэтому сделаем через эффект:
-    // Можно и без эффекта — просто в page.tsx прокинуть breadcrumbRole.
-    // Чтобы не переписывать page.tsx, делаем effect.
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    useMemo(() => {
-        const el = document.getElementById("current-role");
-        if (el) el.textContent = title;
-    }, [title]);
+function BreadcrumbSync({ title }: { title: string }) {
+  // чисто визуально “как в статике”: меняем текст хлебных крошек
+  // без прямого DOM: просто рендерим поверх, но у тебя в page.tsx id="current-role"
+  // поэтому сделаем через эффект:
+  // Можно и без эффекта — просто в page.tsx прокинуть breadcrumbRole.
+  // Чтобы не переписывать page.tsx, делаем effect.
+  useEffect(() => {
+    const el = document.getElementById("current-role");
+    if (el) el.textContent = title;
+  }, [title]);
 
-    return null;
+  return null;
 }
 
 function TooltipLabel(props: { title: string; text: string }) {
-    return (
-        <label className="with-tooltip" htmlFor={'#'}>
-            {props.title}
-            <span className="tooltip-icon" aria-hidden="true">
-                ?
-            </span>
-            <span className="tooltip-text" role="tooltip">
-                {props.text}
-            </span>
-        </label>
-    );
+  return (
+    <label className="with-tooltip" htmlFor={"#"}>
+      {props.title}
+      <span className="tooltip-icon" aria-hidden="true">
+        ?
+      </span>
+      <span className="tooltip-text" role="tooltip">
+        {props.text}
+      </span>
+    </label>
+  );
 }
 
 function SectionTooltipTitle(props: { title: string; text: string }) {
-    return (
-        <h2 className="section-title-with-tooltip">
-            {props.title}
-            <span className="section-tooltip-icon" aria-hidden="true">
+  return (
+    <h2 className="section-title-with-tooltip">
+      {props.title}
+      <span className="section-tooltip-icon" aria-hidden="true">
         ?
       </span>
-            <span className="section-tooltip-text" role="tooltip">
+      <span className="section-tooltip-text" role="tooltip">
         {props.text}
       </span>
-        </h2>
-    );
+    </h2>
+  );
 }
 
 type RoleContentProps = {
-    defaults: RoleSettings | null;
-    backgrounds: BackgroundItem[];
-    onBackgroundUpload: () => void;
-    onBackgroundRemove: (id: string) => void;
-    onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-    isSaving: boolean;
+  defaults: AgentSettings | null;
+  backgrounds: BackgroundItem[];
+  onBackgroundUpload: () => void;
+  onBackgroundRemove: (id: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onDelete: () => void;
+  isSaving: boolean;
 };
 
-function RoleContentBasic({
-                              defaults,
-                              backgrounds,
-                              onBackgroundUpload,
-                              onBackgroundRemove,
-                              onSubmit,
-                              isSaving
-                          }: RoleContentProps) {
-    return (
-        <form className="section" onSubmit={onSubmit}>
-            <h2 className="section-title">Display Settings</h2>
+function RoleContent({
+  defaults,
+  backgrounds,
+  onBackgroundUpload,
+  onBackgroundRemove,
+  onSubmit,
+  onDelete,
+  isSaving,
+}: RoleContentProps) {
+  return (
+    <form className="section" onSubmit={onSubmit}>
+      <h2 className="section-title">Display Settings</h2>
 
-            <div className="form-grid">
-                <div className="input-group form-full">
-                    <TooltipLabel
-                        title="Role Name (Frontend Display)"
-                        text="The name of the role displayed to users on the frontend site and used for navigation and role selection; this name is only for visual display and user understanding and does not affect the intelligence, behavior, or logic of the avatar."
-                    />
-                    <input name="displayName" type="text" defaultValue={defaults?.displayName ?? ""}
-                           placeholder="Enter role name"/>
-                </div>
-
-                <div className="input-group form-full">
-                    <TooltipLabel
-                        title="Brief Description"
-                        text="A short text description of the role shown to users on the frontend that helps them understand what topics and questions can be addressed to this role; used exclusively for the interface and does not affect the avatar's responses or behavior."
-                    />
-                    <textarea
-                        name="description"
-                        defaultValue={defaults?.description ?? ""}
-                        placeholder="Enter description"
-                    />
-                </div>
-            </div>
-
-            <h2 className="section-title">Personalization</h2>
-
-            <div className="input-group">
-                <TooltipLabel
-                    title="Agent Name"
-                    text="The internal name the avatar uses for self-identification; this name participates in the working logic, influences response formation, and determines how the avatar perceives its own identity within the system."
-                />
-                <input name="agentName" type="text" defaultValue={defaults?.agentName ?? ""}
-                       placeholder="Enter agent name"/>
-            </div>
-
-            <div className="input-group">
-                <TooltipLabel
-                    title="Persona / Role Description"
-                    text="A detailed description of the role defining the character, communication style, topic areas for responses, acceptable and unacceptable assistance formats, and the overall behavioral model of the avatar when interacting with users."
-                />
-                <textarea
-                    name="persona"
-                    defaultValue={defaults?.persona ?? ""}
-                    placeholder="Enter persona details"
-                />
-            </div>
-
-            <div className="input-group">
-                <TooltipLabel
-                    title="System Prompt / Instructions"
-                    text="The main system instruction that determines how the avatar thinks, which knowledge sources it uses, how it formulates responses, and in what format it delivers them; this is one of the key fields directly affecting the quality, stability, and predictability of responses."
-                />
-                <textarea
-                    name="systemPrompt"
-                    defaultValue={defaults?.systemPrompt ?? ""}
-                    placeholder="Enter system prompt"
-                />
-            </div>
-            <div className="input-group">
-                <label htmlFor="voiceId">Voice ID</label>
-                <input
-                    id="voiceId"
-                    name="voiceId"
-                    type="text"
-                    // value={mainSettings.voiceId}
-                    placeholder="voice_neil_basic"
-                    // onChange={(event) => updateMainSettings({voiceId: event.target.value})}
-                />
-            </div>
-            <div className="input-group">
-                <TooltipLabel
-                    title="Personality Style"
-                    text="A set of preset communication styles that slightly adjust the tone and manner of the avatar's responses (e.g., more formal or more friendly), without changing the knowledge content and reasoning logic."
-                />
-                <select name="personalityStyle" defaultValue={defaults?.personalityStyle ?? "friendly"}>
-                    <option value="friendly">Friendly and Professional</option>
-                    <option value="fun">Fun and Engaging</option>
-                    <option value="warm">Warm and Supportive</option>
-                    <option value="direct">Direct and Concise</option>
-                    <option value="sophisticated">Sophisticated and Formal</option>
-                    <option value="confident">Confident and Persuasive</option>
-                </select>
-            </div>
-
-            <SectionTooltipTitle
-                title="Backgrounds"
-                text="A set of background images used for avatars with transparent (green screen) video that can be selected by users on the frontend; backgrounds can be added and removed, and they only affect the visual design, not the avatar's behavior."
-            />
-
-            <div className="info-box">
-                ℹ️ Upload background images for Green Screen mode. Users will be able to switch backgrounds on the
-                frontend.
-            </div>
-            <div className="input-group">
-                <label htmlFor="backgroundsEnabled">Enable Backgrounds</label>
-                <div className="toggle-row">
-                    <input
-                        id="backgroundsEnabled"
-                        name="backgroundsEnabled"
-                        type="checkbox"
-                        // checked={mainSettings.backgroundsEnabled}
-                        // onChange={(event) => updateMainSettings({backgroundsEnabled: event.target.checked})}
-                    />
-                    <span>Allow background selection on the main page</span>
-                </div>
-                {/*<div className="info-box" style={{marginTop: 10}}>*/}
-                    {/*Max upload size: {mainSettings.backgroundUploadLimitMb} MB*/}
-                {/*</div>*/}
-            </div>
-            <div className="backgrounds-grid">
-                {backgrounds.map((background) => (
-                    <div key={background.id} className={`background-card ${background.theme}`}>
-                        <div
-                            className="background-preview">{background.theme === "forest" ? "🌲 Forest" : background.theme === "studio" ? "🎬 Studio" : background.theme === "space" ? "🚀 Space" : "🏠 Home"}</div>
-                        <div className="background-title">{background.title}</div>
-                        <div className="background-actions">
-                            <button type="button" className="btn btn-secondary" onClick={onBackgroundUpload}>
-                                ✏️ Replace
-                            </button>
-                            <button type="button" className="btn btn-danger"
-                                    onClick={() => onBackgroundRemove(background.id)}>
-                                🗑️ Delete
-                            </button>
-                        </div>
-                    </div>
-                ))}
-
-
-                {/** biome-ignore lint/a11y/useSemanticElements: 1 */}
-                <div className="add-background-card" role="button" tabIndex={0} onClick={onBackgroundUpload}
-                     onKeyDown={(e) => {
-                         if (e.key === "Enter" || e.key === " ") (e.currentTarget as HTMLDivElement).click();
-                     }}>
-                    <div className="add-background-content">
-                        <div className="icon">➕</div>
-                        <div>
-                            <strong>Add New Background</strong>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="save-section">
-                <button type="submit" className="btn btn-primary" disabled={isSaving}>
-                    {isSaving ? "Saving..." : "💾 Save Changes"}
-                </button>
-                <button type="reset" className="btn btn-secondary" disabled={isSaving}>
-                    🔄 Reset
-                </button>
-            </div>
-
-            <div className="delete-role-section">
-                <h3>⚠️ Danger Zone</h3>
-                <p>
-                    Deleting this role will permanently remove all its settings, configurations, and data. This action
-                    cannot be undone.
-                </p>
-                <button
-                    type="button"
-                    className="btn btn-danger"
-                    onClick={() => {
-                        const c1 = window.confirm(
-                            "Are you sure you want to delete this role?\n\nThis action cannot be undone. All settings, configurations, and data for this role will be permanently removed."
-                        );
-                        if (!c1) return;
-                        const c2 = window.confirm("Final confirmation: Delete this role permanently?");
-                        if (!c2) return;
-                        window.alert(
-                            "Role would be deleted here.\n\nThe system would:\n- Remove the role tab\n- Delete all associated settings\n- Archive the configuration for potential recovery"
-                        );
-                    }}
-                >
-                    🗑️ Delete This Role
-                </button>
-            </div>
-        </form>
-    );
-}
-
-function RoleContentTourism({
-                                defaults,
-                                backgrounds,
-                                onBackgroundUpload,
-                                onBackgroundRemove,
-                                onSubmit,
-                                isSaving
-                            }: RoleContentProps) {
-    return (
-        <form className="section" onSubmit={onSubmit}>
-            <h2 className="section-title">Display Settings</h2>
-
-            <div className="form-grid">
-                <div className="input-group form-full">
-                    <TooltipLabel
-                        title="Role Name (Frontend Display)"
-                        text="The name of the role displayed to users on the frontend site and used for navigation and role selection; this name is only for visual display and user understanding and does not affect the intelligence, behavior, or logic of the avatar."
-                    />
-                    <input name="displayName" type="text" defaultValue={defaults?.displayName ?? ""}
-                           placeholder="Enter role name"/>
-                </div>
-
-                <div className="input-group form-full">
-                    <TooltipLabel
-                        title="Brief Description"
-                        text="A short text description of the role shown to users on the frontend that helps them understand what topics and questions can be addressed to this role; used exclusively for the interface and does not affect the avatar's responses or behavior."
-                    />
-                    <textarea
-                        name="description"
-                        defaultValue={defaults?.description ?? ""}
-                        placeholder="Enter description"
-                    />
-                </div>
-            </div>
-
-            <h2 className="section-title">Personalization</h2>
-
-            <div className="input-group">
-                <TooltipLabel
-                    title="Agent Name"
-                    text="The internal name the avatar uses for self-identification; this name participates in the working logic, influences response formation, and determines how the avatar perceives its own identity within the system."
-                />
-                <input name="agentName" type="text" defaultValue={defaults?.agentName ?? ""}
-                       placeholder="Enter agent name"/>
-            </div>
-
-            <div className="input-group">
-                <TooltipLabel
-                    title="Persona / Role Description"
-                    text="A detailed description of the role defining the character, communication style, topic areas for responses, acceptable and unacceptable assistance formats, and the overall behavioral model of the avatar when interacting with users."
-                />
-                <textarea
-                    name="persona"
-                    defaultValue={defaults?.persona ?? ""}
-                    placeholder="Enter persona details"
-                />
-            </div>
-
-            <div className="input-group">
-                <TooltipLabel
-                    title="System Prompt / Instructions"
-                    text="The main system instruction that determines how the avatar thinks, which knowledge sources it uses, how it formulates responses, and in what format it delivers them; this is one of the key fields directly affecting the quality, stability, and predictability of responses."
-                />
-                <textarea
-                    name="systemPrompt"
-                    defaultValue={defaults?.systemPrompt ?? ""}
-                    placeholder="Enter system prompt"
-                />
-            </div>
-
-            <div className="input-group">
-                <TooltipLabel
-                    title="Personality Style"
-                    text="A set of preset communication styles that slightly adjust the tone and manner of the avatar's responses (e.g., more formal or more friendly), without changing the knowledge content and reasoning logic."
-                />
-                <select name="personalityStyle" defaultValue={defaults?.personalityStyle ?? "friendly"}>
-                    <option value="friendly">Friendly and Professional</option>
-                    <option value="fun">Fun and Engaging</option>
-                    <option value="warm">Warm and Supportive</option>
-                </select>
-            </div>
-
-            <SectionTooltipTitle
-                title="Backgrounds"
-                text="A set of background images used for avatars with transparent (green screen) video that can be selected by users on the frontend; backgrounds can be added and removed, and they only affect the visual design, not the avatar's behavior."
-            />
-
-            <div className="info-box">
-                ℹ️ Upload background images for Green Screen mode. Users will be able to switch backgrounds on the
-                frontend.
-            </div>
-
-            <div className="backgrounds-grid">
-                {backgrounds.map((background) => (
-                    <div key={background.id} className={`background-card ${background.theme}`}>
-                        <div
-                            className="background-preview">{background.theme === "forest" ? "🌲 Forest" : background.theme === "studio" ? "🎬 Studio" : background.theme === "space" ? "🚀 Space" : "🏠 Home"}</div>
-                        <div className="background-title">{background.title}</div>
-                        <div className="background-actions">
-                            <button type="button" className="btn btn-secondary" onClick={onBackgroundUpload}>
-                                ✏️ Replace
-                            </button>
-                            <button type="button" className="btn btn-danger"
-                                    onClick={() => onBackgroundRemove(background.id)}>
-                                🗑️ Delete
-                            </button>
-                        </div>
-                    </div>
-                ))}
-
-                {/** biome-ignore lint/a11y/useSemanticElements: 1 */}
-                <div className="add-background-card" role="button" tabIndex={0} onClick={onBackgroundUpload}
-                     onKeyDown={(e) => {
-                         if (e.key === "Enter" || e.key === " ") (e.currentTarget as HTMLDivElement).click();
-                     }}>
-                    <div className="add-background-content">
-                        <div className="icon">➕</div>
-                        <div>
-                            <strong>Add New Background</strong>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="save-section">
-                <button type="submit" className="btn btn-primary" disabled={isSaving}>
-                    {isSaving ? "Saving..." : "💾 Save Changes"}
-                </button>
-                <button type="reset" className="btn btn-secondary" disabled={isSaving}>
-                    🔄 Reset
-                </button>
-            </div>
-
-            <div className="delete-role-section">
-                <h3>⚠️ Danger Zone</h3>
-                <p>
-                    Deleting this role will permanently remove all its settings, configurations, and data. This action
-                    cannot be undone.
-                </p>
-                <button type="button" className="btn btn-danger">
-                    🗑️ Delete This Role
-                </button>
-            </div>
-        </form>
-    );
-}
-
-function RoleContentPlaceholder({name}: { name: string }) {
-    return (
-        <div className="section">
-            <h2 className="section-title">{name}</h2>
-            <div className="info-box">ℹ️ This section can be ported аналогично (1:1) по тому же шаблону.</div>
+      <div className="form-grid">
+        <div className="input-group form-full">
+          <TooltipLabel
+            title="Role Name (Frontend Display)"
+            text="The name of the role displayed to users on the frontend site and used for navigation and role selection; this name is only for visual display and user understanding and does not affect the intelligence, behavior, or logic of the avatar."
+          />
+          <input
+            name="displayName"
+            type="text"
+            defaultValue={defaults?.displayName ?? ""}
+            placeholder="Enter role name"
+          />
         </div>
-    );
+
+        <div className="input-group form-full">
+          <TooltipLabel
+            title="Brief Description"
+            text="A short text description of the role shown to users on the frontend that helps them understand what topics and questions can be addressed to this role; used exclusively for the interface and does not affect the avatar's responses or behavior."
+          />
+          <textarea
+            name="description"
+            defaultValue={defaults?.description ?? ""}
+            placeholder="Enter description"
+          />
+        </div>
+      </div>
+
+      <h2 className="section-title">Personalization</h2>
+
+      <div className="input-group">
+        <TooltipLabel
+          title="Agent Name"
+          text="The internal name the avatar uses for self-identification; this name participates in the working logic, influences response formation, and determines how the avatar perceives its own identity within the system."
+        />
+        <input
+          name="agentName"
+          type="text"
+          defaultValue={defaults?.agentName ?? ""}
+          placeholder="Enter agent name"
+        />
+      </div>
+
+      <div className="input-group">
+        <TooltipLabel
+          title="Persona / Role Description"
+          text="A detailed description of the role defining the character, communication style, topic areas for responses, acceptable and unacceptable assistance formats, and the overall behavioral model of the avatar when interacting with users."
+        />
+        <textarea
+          name="persona"
+          defaultValue={defaults?.persona ?? ""}
+          placeholder="Enter persona details"
+        />
+      </div>
+
+      <div className="input-group">
+        <TooltipLabel
+          title="System Prompt / Instructions"
+          text="The main system instruction that determines how the avatar thinks, which knowledge sources it uses, how it formulates responses, and in what format it delivers them; this is one of the key fields directly affecting the quality, stability, and predictability of responses."
+        />
+        <textarea
+          name="systemPrompt"
+          defaultValue={defaults?.systemPrompt ?? ""}
+          placeholder="Enter system prompt"
+        />
+      </div>
+      <div className="input-group">
+        <label htmlFor="voiceId">Voice ID</label>
+        <input
+          id="voiceId"
+          name="voiceId"
+          type="text"
+          defaultValue={defaults?.voiceId ?? ""}
+          placeholder="voice_neil_basic"
+        />
+      </div>
+      <div className="input-group">
+        <TooltipLabel
+          title="Personality Style"
+          text="A set of preset communication styles that slightly adjust the tone and manner of the avatar's responses (e.g., more formal or more friendly), without changing the knowledge content and reasoning logic."
+        />
+        <select
+          name="personalityStyle"
+          defaultValue={normalizePersonalityStyle(defaults?.personalityStyle)}
+        >
+          {personalityOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <SectionTooltipTitle
+        title="Backgrounds"
+        text="A set of background images used for avatars with transparent (green screen) video that can be selected by users on the frontend; backgrounds can be added and removed, and they only affect the visual design, not the avatar's behavior."
+      />
+
+      <div className="info-box">
+        ℹ️ Upload background images for Green Screen mode. Users will be able to
+        switch backgrounds on the frontend.
+      </div>
+      <div className="input-group">
+        <label htmlFor="backgroundsEnabled">Enable Backgrounds</label>
+        <div className="toggle-row">
+          <input
+            id="backgroundsEnabled"
+            name="backgroundsEnabled"
+            type="checkbox"
+            defaultChecked={defaults?.backgroundsEnabled ?? false}
+          />
+          <span>Allow background selection on the main page</span>
+        </div>
+        {/*<div className="info-box" style={{marginTop: 10}}>*/}
+        {/*Max upload size: {mainSettings.backgroundUploadLimitMb} MB*/}
+        {/*</div>*/}
+      </div>
+      <div className="backgrounds-grid">
+        {backgrounds.map((background) => (
+          <div key={background.id} className="background-card">
+            <div
+              className="background-preview"
+              style={
+                background.url
+                  ? {
+                      backgroundImage: `url(${background.url})`,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                    }
+                  : undefined
+              }
+            >
+              {background.theme?.trim() || "Background"}
+            </div>
+            <div className="background-title">{background.title}</div>
+            <div className="background-actions">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={onBackgroundUpload}
+              >
+                ✏️ Replace
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => onBackgroundRemove(background.id)}
+              >
+                🗑️ Delete
+              </button>
+            </div>
+          </div>
+        ))}
+
+        {/** biome-ignore lint/a11y/useSemanticElements: 1 */}
+        <div
+          className="add-background-card"
+          role="button"
+          tabIndex={0}
+          onClick={onBackgroundUpload}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ")
+              (e.currentTarget as HTMLDivElement).click();
+          }}
+        >
+          <div className="add-background-content">
+            <div className="icon">➕</div>
+            <div>
+              <strong>Add New Background</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="save-section">
+        <button type="submit" className="btn btn-primary" disabled={isSaving}>
+          {isSaving ? "Saving..." : "💾 Save Changes"}
+        </button>
+        <button type="reset" className="btn btn-secondary" disabled={isSaving}>
+          🔄 Reset
+        </button>
+      </div>
+
+      <div className="delete-role-section">
+        <h3>⚠️ Danger Zone</h3>
+        <p>
+          Deleting this agent will permanently remove all its settings,
+          configurations, and data. This action cannot be undone.
+        </p>
+        <button type="button" className="btn btn-danger" onClick={onDelete}>
+          🗑️ Delete This Agent
+        </button>
+      </div>
+    </form>
+  );
 }

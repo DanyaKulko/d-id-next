@@ -1,84 +1,166 @@
-import axios, { AxiosInstance } from "axios";
-import { CreateStreamResponseBody, CreateStreamRequestBody } from "@/types/agent.types";
+import axios, { type AxiosInstance } from "axios";
+import type {
+  CreateStreamRequestBody,
+  CreateStreamResponseBody,
+} from "@/types/agent.types";
+
+type IceCandidatePayload = {
+  candidate: string;
+  sdpMid?: string | null;
+  sdpMLineIndex?: number | null;
+};
 
 const createDidClient = (): AxiosInstance => {
-    const baseURL = process.env.DID_API_URL || "https://api.d-id.com";
-    const apiKey = process.env.DID_API_KEY;
+  const baseURL = process.env.DID_API_URL || "https://api.d-id.com";
+  const apiKey = process.env.DID_API_KEY;
 
-    if (!apiKey) throw new Error("DID_API_KEY is missing");
+  if (!apiKey) throw new Error("DID_API_KEY is missing");
 
-    return axios.create({
-        baseURL,
-        headers: {
-            Authorization: `Basic ${apiKey}`,
-            "Content-Type": "application/json",
-        },
-    });
+  return axios.create({
+    baseURL,
+    headers: {
+      Authorization: `Basic ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+  });
 };
 
 const client = createDidClient();
 
 export const didService = {
-    async getAgent(agentId: string) {
-        const { data } = await client.get(`/agents/${agentId}`);
-        return data;
+  async getAgent(agentId: string) {
+    const { data } = await client.get(`/agents/${agentId}`);
+    return data;
+  },
+
+  // TODO: confirm update endpoint + payload with the latest D-ID docs.
+  async updateAgent(agentId: string, payload: Record<string, unknown>) {
+    const { data } = await client.patch(`/agents/${agentId}`, payload);
+    return data;
+  },
+
+  async deleteAgent(agentId: string) {
+    await client.delete(`/agents/${agentId}`);
+    return { status: "deleted" };
+  },
+
+  async checkStatus() {
+    const { data } = await client.get(`/agents`, { params: { limit: 1 } });
+    return data;
+  },
+
+  // TODO: confirm knowledge base endpoints with latest D-ID docs.
+  async listKnowledgeDocuments(knowledgeBaseId: string) {
+    const { data } = await client.get(
+      `/knowledge/${knowledgeBaseId}/documents`,
+    );
+    return Array.isArray(data?.documents) ? data.documents : data;
+  },
+
+  async createKnowledgeDocument(
+    knowledgeBaseId: string,
+    payload: {
+      documentType: "pdf" | "text" | "powerpoint";
+      source_url: string;
+      title: string;
+      webhook?: string;
     },
+  ) {
+    const { data } = await client.post(
+      `/knowledge/${knowledgeBaseId}/documents`,
+      payload,
+    );
+    return data;
+  },
 
-    async createSession(agentId: string) {
-        const streamReq = await client.post<CreateStreamResponseBody>(
-            `/agents/${agentId}/streams`,
-            {
-                fluent: true,
-                compatibility_mode: "on",
-                stream_warmup: true,
-            } satisfies CreateStreamRequestBody
-        );
+  async deleteKnowledgeDocument(knowledgeBaseId: string, documentId: string) {
+    const resolvedId = documentId.includes("#")
+      ? (documentId.split("#").pop() ?? documentId)
+      : documentId;
+    await client.delete(
+      `/knowledge/${knowledgeBaseId}/documents/${resolvedId}`,
+    );
+    return { status: "deleted" };
+  },
 
-        const { id: streamId, offer, ice_servers, session_id: sessionId } = streamReq.data;
+  async createSession(agentId: string) {
+    const streamReq = await client.post<CreateStreamResponseBody>(
+      `/agents/${agentId}/streams`,
+      {
+        fluent: true,
+        compatibility_mode: "on",
+        stream_warmup: true,
+      } satisfies CreateStreamRequestBody,
+    );
 
-        const chatReq = await client.post(`/agents/${agentId}/chat`);
-        const { id: chatId } = chatReq.data;
+    const {
+      id: streamId,
+      offer,
+      ice_servers,
+      session_id: sessionId,
+    } = streamReq.data;
 
-        console.log(`Created Stream: ${streamId}, Session: ${sessionId}, Chat: ${chatId}`);
+    const chatReq = await client.post(`/agents/${agentId}/chat`);
+    const { id: chatId } = chatReq.data;
 
-        return { streamId, sessionId, chatId, offer, ice_servers };
-    },
+    console.log(
+      `Created Stream: ${streamId}, Session: ${sessionId}, Chat: ${chatId}`,
+    );
 
-    async submitAnswer(agentId: string, streamId: string, sessionId: string, answer: any) {
-        await client.post(`/agents/${agentId}/streams/${streamId}/sdp`, {
-            answer,
-            session_id: sessionId,
-        });
-        return { status: "success" };
-    },
+    return { streamId, sessionId, chatId, offer, ice_servers };
+  },
 
-    async submitIce(agentId: string, streamId: string, sessionId: string, candidate: any) {
-        await client.post(`/agents/${agentId}/streams/${streamId}/ice`, {
-            candidate: candidate.candidate,
-            sdpMid: candidate.sdpMid,
-            sdpMLineIndex: candidate.sdpMLineIndex,
-            session_id: sessionId,
-        });
-        return { status: "received" };
-    },
+  async submitAnswer(
+    agentId: string,
+    streamId: string,
+    sessionId: string,
+    answer: Record<string, unknown>,
+  ) {
+    await client.post(`/agents/${agentId}/streams/${streamId}/sdp`, {
+      answer,
+      session_id: sessionId,
+    });
+    return { status: "success" };
+  },
 
-    async chat(agentId: string, chatId: string, streamId: string, sessionId: string, text: string) {
-        const { data } = await client.post(`/agents/${agentId}/chat/${chatId}`, {
-            streamId,
-            sessionId,
-            messages: [
-                {
-                    role: "user",
-                    content: text,
-                    created_at: new Date().toISOString(),
-                },
-            ],
-        });
-        return data;
-    },
+  async submitIce(
+    agentId: string,
+    streamId: string,
+    sessionId: string,
+    candidate: IceCandidatePayload,
+  ) {
+    await client.post(`/agents/${agentId}/streams/${streamId}/ice`, {
+      candidate: candidate.candidate,
+      sdpMid: candidate.sdpMid,
+      sdpMLineIndex: candidate.sdpMLineIndex,
+      session_id: sessionId,
+    });
+    return { status: "received" };
+  },
 
-    async closeSession(agentId: string, streamId: string) {
-        await client.delete(`/agents/${agentId}/streams/${streamId}`);
-        return { status: "closed" };
-    }
+  async chat(
+    agentId: string,
+    chatId: string,
+    streamId: string,
+    sessionId: string,
+    text: string,
+  ) {
+    const { data } = await client.post(`/agents/${agentId}/chat/${chatId}`, {
+      streamId,
+      sessionId,
+      messages: [
+        {
+          role: "user",
+          content: text,
+          created_at: new Date().toISOString(),
+        },
+      ],
+    });
+    return data;
+  },
+
+  async closeSession(agentId: string, streamId: string) {
+    await client.delete(`/agents/${agentId}/streams/${streamId}`);
+    return { status: "closed" };
+  },
 };
