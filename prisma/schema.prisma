@@ -38,6 +38,7 @@ model User {
   twoFactorTokens TwoFactorToken[]
   roles           UserRole[]
   LoginEvent      LoginEvent[]
+  chatSessions    ChatSession[]
 }
 
 model Session {
@@ -115,11 +116,13 @@ model Agent {
   backgroundEnabled Boolean @default(false)
 
   idleVideoUrl String?
+  avatarImageUrl String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   backgrounds AgentBackground[]
+  chatSessions ChatSession[]
 
   @@map("agents")
 }
@@ -146,9 +149,82 @@ enum KnowledgeDocumentStatus {
   FAILED
 }
 
+enum ChatMessageRole {
+  SYSTEM
+  USER
+  ASSISTANT
+}
+
+enum ExternalServiceLogLevel {
+  INFO
+  WARNING
+  ERROR
+}
+
+model ChatSession {
+  id String @id @default(cuid())
+
+  didAgentId   String
+  didStreamId  String @unique
+  didSessionId String?
+  didChatId    String @unique
+
+  agentId String?
+  agent   Agent? @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  userId String?
+  user   User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  language  String?
+  device    String?
+  userAgent String?
+  ip        String?
+
+  endedAt DateTime?
+
+  messages ChatMessage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agentId, createdAt])
+  @@index([userId, createdAt])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id String @id @default(cuid())
+
+  sessionId String
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  role    ChatMessageRole
+  content String
+  language String?
+
+  createdAt DateTime @default(now())
+
+  @@index([sessionId, createdAt])
+  @@map("chat_messages")
+}
+
 enum ExternalSourceKind {
   TEXT
   VIDEO
+}
+
+model ExternalServiceLog {
+  id       String                 @id @default(cuid())
+  source   String
+  type     String
+  message  String
+  level    ExternalServiceLogLevel @default(ERROR)
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([source, createdAt])
+  @@map("external_service_logs")
 }
 
 model KnowledgeDocuments {

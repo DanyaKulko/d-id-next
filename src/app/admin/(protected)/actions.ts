@@ -5,7 +5,6 @@ import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { revalidatePath, revalidateTag } from "next/cache";
 import {
-  fetchAgentListFromDb,
   fetchAgentSettingsFromDb,
   findAgentByKey,
 } from "@/lib/agents/agents.db";
@@ -15,12 +14,13 @@ import { requireUser } from "@/lib/auth/require";
 import { prisma } from "@/lib/db/prisma";
 import { externalSourcesSeeds } from "@/lib/external-sources/config";
 import { resolveBaseUrl } from "@/lib/http/base-url";
+import {
+  isAxiosError,
+  logExternalServiceError,
+  resolveExternalErrorDetails,
+} from "@/lib/logging/external-errors";
 import { didService } from "@/lib/services/did.service";
 import type { AgentKey } from "./roles.types";
-
-function toObject(formData: FormData) {
-  return Object.fromEntries(formData.entries());
-}
 
 const getString = (value: FormDataEntryValue | null) =>
   typeof value === "string" ? value : "";
@@ -50,6 +50,29 @@ const normalizePersonalityStyle = (value: string) => {
   const trimmed = value.trim();
   if (!trimmed) return defaultPersonalityStyle;
   return personalityAliases[trimmed] ?? trimmed;
+};
+
+const logDidError = async (error: unknown, context: string) => {
+  if (!isAxiosError(error)) return;
+  const details = resolveExternalErrorDetails(error);
+  await logExternalServiceError({
+    source: "D-ID",
+    type: context,
+    message: details.message,
+    metadata: details.metadata,
+  });
+};
+
+const withDidLogging = async <T>(
+  context: string,
+  operation: () => Promise<T>,
+) => {
+  try {
+    return await operation();
+  } catch (error) {
+    await logDidError(error, context);
+    throw error;
+  }
 };
 
 async function requireAdmin() {
@@ -109,6 +132,60 @@ const buildDidInstructions = (systemPrompt: string, safetyRules: string) => {
   return prompt || safety;
 };
 
+const resolveString = (value: unknown, fallback = "") =>
+  typeof value === "string" ? value : fallback;
+
+const extractVoiceId = (agent: Record<string, unknown>) => {
+  const presenter = agent.presenter;
+  if (presenter && typeof presenter === "object") {
+    const presenterVoice = (presenter as Record<string, unknown>).voice;
+    if (presenterVoice && typeof presenterVoice === "object") {
+      return resolveString(
+        (presenterVoice as Record<string, unknown>).voice_id,
+        "",
+      );
+    }
+  }
+  const voice = agent.voice;
+  if (voice && typeof voice === "object") {
+    return resolveString(
+      (voice as Record<string, unknown>).voice_id ??
+        (voice as Record<string, unknown>).id,
+      "",
+    );
+  }
+  return resolveString(
+    agent.voice_id ?? agent.voiceId ?? agent.preview_voice_id,
+    "",
+  );
+};
+
+const extractIdleVideoUrl = (agent: Record<string, unknown>) => {
+  const presenter = agent.presenter;
+  if (!presenter || typeof presenter !== "object") return "";
+  return resolveString(
+    (presenter as Record<string, unknown>).idle_video ??
+      (presenter as Record<string, unknown>).idle_video_url,
+    "",
+  );
+};
+
+const extractAvatarImageUrl = (agent: Record<string, unknown>) => {
+  const presenter = agent.presenter;
+  if (!presenter || typeof presenter !== "object") return "";
+  return resolveString(
+    (presenter as Record<string, unknown>).source_url ??
+      (presenter as Record<string, unknown>).thumbnail ??
+      (presenter as Record<string, unknown>).image_url ??
+      (presenter as Record<string, unknown>).imageUrl ??
+      (presenter as Record<string, unknown>).thumbnail_url ??
+      (presenter as Record<string, unknown>).thumbnailUrl ??
+      (presenter as Record<string, unknown>).preview_image ??
+      (presenter as Record<string, unknown>).previewImage,
+    "",
+  );
+};
+
 async function updateDidAgentFromRole(
   agentId: string,
   input: {
@@ -121,7 +198,9 @@ async function updateDidAgentFromRole(
     voiceId?: string;
   },
 ) {
-  const existing = await didService.getAgent(agentId).catch(() => null);
+  const existing = await withDidLogging("Get Agent", () =>
+    didService.getAgent(agentId),
+  ).catch(() => null);
   const existingAgent =
     existing && typeof existing === "object"
       ? (existing as Record<string, unknown>)
@@ -195,25 +274,90 @@ async function updateDidAgentFromRole(
     payload.presenter = presenterPayload;
   }
 
-  // TODO: confirm D-ID payload field names for instructions if llm shape differs.
   if (Object.keys(payload).length === 0) return;
-  await didService.updateAgent(agentId, payload);
+  await withDidLogging("Update Agent", () =>
+    didService.updateAgent(agentId, payload),
+  );
 }
 
-export async function fetchAgentListAction() {
-  return fetchAgentListFromDb();
-}
-
-export async function fetchAgentSettingsAction(agentKey: AgentKey) {
-  return fetchAgentSettingsFromDb(agentKey);
-}
-
-export async function saveMainSettingsAction(formData: FormData) {
+export async function syncAgentFromDidAction(agentKey: AgentKey) {
   await requireAdmin();
-  const payload = toObject(formData);
-  console.log("[admin] saveMainSettings", payload);
-  revalidatePath("/admin");
-  return { ok: true };
+  const agent = await findAgentByKey(agentKey);
+  if (!agent?.agentId) {
+    throw new Error("Agent is missing a D-ID id");
+  }
+
+  const didAgentRaw = await withDidLogging("Get Agent", () =>
+    didService.getAgent(agent.agentId),
+  );
+  if (!didAgentRaw || typeof didAgentRaw !== "object") {
+    throw new Error("D-ID agent not found");
+  }
+
+  const didAgent = didAgentRaw as Record<string, unknown>;
+  const llm =
+    didAgent.llm && typeof didAgent.llm === "object"
+      ? (didAgent.llm as Record<string, unknown>)
+      : {};
+  const promptCustomization =
+    llm.prompt_customization && typeof llm.prompt_customization === "object"
+      ? (llm.prompt_customization as Record<string, unknown>)
+      : {};
+
+  const updateData: {
+    name?: string;
+    description?: string;
+    roleDescription?: string;
+    instructions?: string;
+    personality?: string;
+    voiceID?: string;
+    idleVideoUrl?: string;
+    avatarImageUrl?: string;
+  } = {};
+
+  const previewName = resolveString(
+    didAgent.preview_name ?? didAgent.previewName ?? didAgent.name,
+  ).trim();
+  if (previewName) updateData.name = previewName;
+
+  const description = resolveString(didAgent.description).trim();
+  if (description) updateData.description = description;
+
+  const role = resolveString(promptCustomization.role).trim();
+  if (role) updateData.roleDescription = role;
+
+  const personality = resolveString(promptCustomization.personality).trim();
+  if (personality) updateData.personality = personality;
+
+  const instructions = resolveString(
+    llm.instructions ?? llm.system_prompt ?? llm.systemPrompt,
+  ).trim();
+  if (instructions) updateData.instructions = instructions;
+
+  const voiceId = extractVoiceId(didAgent);
+  if (voiceId) updateData.voiceID = voiceId;
+
+  const idleVideoUrl = extractIdleVideoUrl(didAgent);
+  if (idleVideoUrl) updateData.idleVideoUrl = idleVideoUrl;
+
+  const avatarImageUrl = extractAvatarImageUrl(didAgent);
+  if (avatarImageUrl) updateData.avatarImageUrl = avatarImageUrl;
+
+  if (Object.keys(updateData).length > 0) {
+    await prisma.agent.update({
+      where: { id: agent.id },
+      data: updateData,
+    });
+  }
+
+  revalidatePath("/admin/roles");
+  revalidatePath(`/admin/roles/${agentKey}`);
+  revalidatePath(`/${agentKey}`);
+  revalidateTag("agents", {expire: 0});
+  revalidateTag(`agent:${agentKey}`, {expire: 0});
+
+  const settings = await fetchAgentSettingsFromDb(agentKey);
+  return { ok: true, settings };
 }
 
 export async function saveRoleSettingsAction(formData: FormData) {
@@ -238,7 +382,6 @@ export async function saveRoleSettingsAction(formData: FormData) {
 
   const agent = await findAgentByKey(agentKey);
   if (!agent) {
-    // TODO: decide if we should auto-create missing agent records.
     throw new Error("Agent not found in database");
   }
 
@@ -270,22 +413,20 @@ export async function saveRoleSettingsAction(formData: FormData) {
     await updateDidAgentFromRole(agent.agentId, {
       name: agentName,
       description,
-      role: persona, // Persona/Role Description maps to D-ID agent role.
+      role: persona,
       systemPrompt,
       safetyRules,
       personalityStyle,
       voiceId,
     });
-  } else {
-    // TODO: handle D-ID updates when agentId is missing.
   }
 
   revalidatePath("/admin/roles");
   revalidatePath(`/admin/roles/${agentKey}`);
   revalidatePath(`/${agentKey}`);
   revalidatePath("/");
-  revalidateTag("agents");
-  revalidateTag(`agent:${agentKey}`);
+  revalidateTag("agents", {expire: 0});
+  revalidateTag(`agent:${agentKey}`, {expire: 0});
   return { ok: true };
 }
 
@@ -301,32 +442,23 @@ export async function deleteRoleAction(agentKey: AgentKey) {
   }
 
   if (agent.agentId) {
-    await didService.deleteAgent(agent.agentId);
-  } else {
-    // TODO: handle missing D-ID agent id for delete.
+    await withDidLogging("Delete Agent", () =>
+      didService.deleteAgent(agent.agentId),
+    );
   }
   await prisma.agentBackground.deleteMany({ where: { agentId: agent.id } });
   await prisma.agent.delete({ where: { id: agent.id } });
 
   revalidatePath("/admin/roles");
   revalidatePath("/");
-  revalidateTag("agents");
+  revalidateTag("agents", {expire: 0});
 
-  return { ok: true };
-}
-
-export async function saveIntegrationConfigAction(formData: FormData) {
-  await requireAdmin();
-  const payload = toObject(formData);
-  console.log("[admin] saveIntegrationConfig", payload);
-  revalidatePath("/admin/settings");
-  revalidatePath("/admin/settings/integrations");
   return { ok: true };
 }
 
 export async function checkDidConnectionAction() {
   await requireAdmin();
-  await didService.checkStatus();
+  await withDidLogging("Check Status", () => didService.checkStatus());
   return { ok: true };
 }
 
@@ -379,6 +511,32 @@ export async function saveSafetyInstructionsAction(formData: FormData) {
     update: { value: safetyRules },
     create: { key: safetyRulesKey, value: safetyRules },
   });
+
+  const agents = await prisma.agent.findMany({
+    select: {
+      agentId: true,
+      name: true,
+      description: true,
+      roleDescription: true,
+      instructions: true,
+      personality: true,
+      voiceID: true,
+    },
+  });
+
+  for (const agent of agents) {
+    if (!agent.agentId) continue;
+    await updateDidAgentFromRole(agent.agentId, {
+      name: agent.name,
+      description: agent.description ?? "",
+      role: agent.roleDescription ?? "",
+      systemPrompt: agent.instructions ?? "",
+      safetyRules,
+      personalityStyle: agent.personality ?? defaultPersonalityStyle,
+      voiceId: agent.voiceID ?? "",
+    });
+  }
+
   revalidatePath("/admin/training");
   revalidatePath("/admin/training/safety");
   return { ok: true };
@@ -408,9 +566,9 @@ export async function saveManualTrainingAction(formData: FormData) {
     where: { key: manualTrainingDocKey },
   });
   if (existingDoc?.value) {
-    await didService
-      .deleteKnowledgeDocument(knowledgeBaseId, existingDoc.value)
-      .catch(() => undefined);
+    await withDidLogging("Delete Knowledge Document", () =>
+      didService.deleteKnowledgeDocument(knowledgeBaseId, existingDoc.value),
+    ).catch(() => undefined);
   }
 
   const existingFile = await prisma.appSetting.findUnique({
@@ -429,12 +587,14 @@ export async function saveManualTrainingAction(formData: FormData) {
 
   const webhookUrl = `${baseUrl}/api/webhooks/did/knowledge`;
 
-  const created = await didService.createKnowledgeDocument(knowledgeBaseId, {
-    documentType: "text",
-    source_url: `${baseUrl}${publicPath}`,
-    title: manualTrainingSource,
-    webhook: webhookUrl,
-  });
+  const created = await withDidLogging("Create Knowledge Document", () =>
+    didService.createKnowledgeDocument(knowledgeBaseId, {
+      documentType: "text",
+      source_url: `${baseUrl}${publicPath}`,
+      title: manualTrainingSource,
+      webhook: webhookUrl,
+    }),
+  );
 
   const docId =
     (created as Record<string, unknown>)?.id ??
@@ -522,9 +682,9 @@ export async function deleteKnowledgeDocumentAction(formData: FormData) {
   const didDocumentId = localDoc?.documentId ?? documentId;
 
   if (knowledgeBaseId && didDocumentId) {
-    await didService
-      .deleteKnowledgeDocument(knowledgeBaseId, didDocumentId)
-      .catch(() => undefined);
+    await withDidLogging("Delete Knowledge Document", () =>
+      didService.deleteKnowledgeDocument(knowledgeBaseId, didDocumentId),
+    ).catch(() => undefined);
   }
 
   if (isManual) {
@@ -603,8 +763,12 @@ export async function saveUserUpdateAction(formData: FormData) {
   if (action === "update") {
     const userId = getString(formData.get("userId"));
     const email = getString(formData.get("email")).trim().toLowerCase();
+    const newPassword = getString(formData.get("password"));
     if (!userId || !email) {
       throw new Error("User id and email are required");
+    }
+    if (newPassword && newPassword.length < 6) {
+      throw new Error("Password must be at least 6 characters");
     }
 
     const existingRoles = await prisma.userRole.findMany({
@@ -615,9 +779,14 @@ export async function saveUserUpdateAction(formData: FormData) {
       throw new Error("Cannot edit admin users here");
     }
 
+    const updateData: { email: string; passwordHash?: string } = { email };
+    if (newPassword) {
+      updateData.passwordHash = await hashPassword(newPassword);
+    }
+
     const updated = await prisma.user.update({
       where: { id: userId },
-      data: { email },
+      data: updateData,
       select: { id: true, email: true, createdAt: true, isActive: true },
     });
 
@@ -732,14 +901,5 @@ export async function saveAdminCredentialsAction(formData: FormData) {
 
   revalidatePath("/admin/settings");
   revalidatePath("/admin/settings/admin");
-  return { ok: true };
-}
-
-export async function saveSessionRetentionAction(formData: FormData) {
-  await requireAdmin();
-  const payload = toObject(formData);
-  console.log("[admin] saveSessionRetention", payload);
-  revalidatePath("/admin/settings");
-  revalidatePath("/admin/settings/sessions");
   return { ok: true };
 }

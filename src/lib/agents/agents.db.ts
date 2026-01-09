@@ -7,8 +7,6 @@ import type {
 } from "@/app/admin/(protected)/roles.types";
 import { prisma } from "@/lib/db/prisma";
 
-const fallbackVideoUrl = "https://neilavatar.com/data/neilcycle.mp4";
-
 const resolveString = (value: unknown, fallback = "") =>
   typeof value === "string" ? value : fallback;
 
@@ -35,6 +33,32 @@ const extractVoiceId = (agent: unknown) => {
   }
   return resolveString(
     record.voice_id ?? record.voiceId ?? record.preview_voice_id,
+    "",
+  );
+};
+
+const extractAvatarImageUrl = (agent: unknown) => {
+  if (!agent || typeof agent !== "object") return "";
+  const record = agent as Record<string, unknown>;
+  const presenter = record.presenter;
+  if (presenter && typeof presenter === "object") {
+    return resolveString(
+      (presenter as Record<string, unknown>).source_url ??
+        (presenter as Record<string, unknown>).thumbnail ??
+        (presenter as Record<string, unknown>).image_url ??
+        (presenter as Record<string, unknown>).imageUrl ??
+        (presenter as Record<string, unknown>).thumbnail_url ??
+        (presenter as Record<string, unknown>).thumbnailUrl ??
+        (presenter as Record<string, unknown>).preview_image ??
+        (presenter as Record<string, unknown>).previewImage,
+      "",
+    );
+  }
+  return resolveString(
+    record.image_url ??
+      record.imageUrl ??
+      record.preview_image ??
+      record.previewImage,
     "",
   );
 };
@@ -118,16 +142,27 @@ export async function fetchAgentSettingsFromDb(
     throw new Error("Agent not found");
   }
 
-  if ((!agent.voiceID || !agent.voiceID.trim()) && agent.agentId) {
+  if (
+    agent.agentId &&
+    (!agent.voiceID || !agent.voiceID.trim() || !agent.avatarImageUrl)
+  ) {
     const { didService } = await import("@/lib/services/did.service");
     const didAgent = await didService.getAgent(agent.agentId).catch(() => null);
     const voiceId = extractVoiceId(didAgent);
-    if (voiceId) {
+    const avatarImageUrl = extractAvatarImageUrl(didAgent);
+    const updateData: { voiceID?: string; avatarImageUrl?: string } = {};
+    if (voiceId && (!agent.voiceID || !agent.voiceID.trim())) {
+      updateData.voiceID = voiceId;
+    }
+    if (avatarImageUrl && !agent.avatarImageUrl) {
+      updateData.avatarImageUrl = avatarImageUrl;
+    }
+    if (Object.keys(updateData).length > 0) {
       await prisma.agent.update({
         where: { id: agent.id },
-        data: { voiceID: voiceId },
+        data: updateData,
       });
-      return toAgentSettings(agentKey, { ...agent, voiceID: voiceId });
+      return toAgentSettings(agentKey, { ...agent, ...updateData });
     }
   }
 
@@ -143,6 +178,7 @@ export async function fetchHomeAgents() {
       displayName: true,
       description: true,
       idleVideoUrl: true,
+      avatarImageUrl: true,
     },
     orderBy: { createdAt: "asc" },
   });
@@ -152,7 +188,8 @@ export async function fetchHomeAgents() {
     key: agent.slug ?? agent.agentId ?? agent.id,
     name: agent.displayName,
     description: agent.description ?? "",
-    videoUrl: agent.idleVideoUrl ?? fallbackVideoUrl,
+    videoUrl: agent.idleVideoUrl ?? "",
+    imageUrl: agent.avatarImageUrl ?? "",
   }));
 }
 

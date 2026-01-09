@@ -1,6 +1,7 @@
 import * as SpeechSDK from "microsoft-cognitiveservices-speech-sdk";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getAzureSpeechToken } from "@/app/actions/azure.actions";
+import { logExternalErrorAction } from "@/app/actions/logging.actions";
 
 const TOKEN_EXPIRATION_MS = 9 * 60 * 1000;
 
@@ -36,6 +37,23 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
     };
     return { token, region };
   }, []);
+
+  const logSttError = useCallback(
+    async (
+      type: string,
+      message: string,
+      metadata?: Record<string, unknown>,
+    ) => {
+      await logExternalErrorAction({
+        source: "Azure STT",
+        type,
+        message,
+        level: "ERROR",
+        metadata,
+      });
+    },
+    [],
+  );
 
   const startListening = useCallback(
     async (lang: string) => {
@@ -87,6 +105,13 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
 
         recognizer.canceled = (_s, e) => {
           console.warn(`STT Canceled: ${e.reason}`);
+          if (e.reason === SpeechSDK.CancellationReason.Error) {
+            void logSttError(
+              "STT Canceled",
+              e.errorDetails ?? "Speech recognition canceled",
+              { reason: e.reason },
+            );
+          }
           if (!isStoppedRef.current) setListening(false);
           recognizerRef.current = null;
         };
@@ -102,10 +127,15 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
         recognizerRef.current = recognizer;
       } catch (error) {
         console.error("STT Start Error:", error);
+        void logSttError(
+          "STT Start Error",
+          error instanceof Error ? error.message : "Failed to start STT",
+          { lang },
+        );
         setListening(false);
       }
     },
-    [onFinalTranscript, getOrFetchToken],
+    [onFinalTranscript, getOrFetchToken, logSttError],
   );
 
   const stopListening = useCallback(() => {

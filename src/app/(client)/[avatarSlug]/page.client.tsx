@@ -15,6 +15,12 @@ type DidAgentPayload = {
   presenter?: {
     idle_video?: string;
     idle_video_url?: string;
+    image_url?: string;
+    imageUrl?: string;
+    thumbnail_url?: string;
+    thumbnailUrl?: string;
+    preview_image?: string;
+    previewImage?: string;
   };
 };
 
@@ -22,6 +28,8 @@ interface IAvatarPageClientProps {
   agent: DidAgentPayload;
   agentName?: string;
   agentDescription?: string;
+  agentImageUrl?: string;
+  agentIdleVideoUrl?: string;
   backgrounds?: BackgroundOption[];
   backgroundsEnabled?: boolean;
 }
@@ -54,14 +62,19 @@ export const AvatarPageClient = ({
   agent,
   agentName,
   agentDescription,
+  agentImageUrl,
+  agentIdleVideoUrl,
   backgrounds,
   backgroundsEnabled,
 }: IAvatarPageClientProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hasGreetedRef = useRef(false);
+  const stageRef = useRef<HTMLDivElement | null>(null);
 
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [showError, setShowError] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [canFullscreen, setCanFullscreen] = useState(false);
   const [agentStatus, setAgentStatus] = useState<
     "idle" | "preparing" | "listening" | "thinking" | "speaking" | "timed_out"
   >("idle");
@@ -90,8 +103,42 @@ export const AvatarPageClient = ({
     }
   }, [backgroundOptions, selectedBackgroundId]);
 
+  useEffect(() => {
+    setCanFullscreen(Boolean(document.fullscreenEnabled));
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    const element = stageRef.current;
+    if (!element) return;
+
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => undefined);
+    } else {
+      element.requestFullscreen().catch(() => undefined);
+    }
+  }, []);
+
   const idleVideoUrl =
-    agent?.presenter?.idle_video ?? agent?.presenter?.idle_video_url ?? "";
+    agentIdleVideoUrl ??
+    agent?.presenter?.idle_video ??
+    agent?.presenter?.idle_video_url ??
+    "";
+  const idleImageUrl =
+    agentImageUrl ??
+    agent?.presenter?.image_url ??
+    agent?.presenter?.imageUrl ??
+    agent?.presenter?.thumbnail_url ??
+    agent?.presenter?.thumbnailUrl ??
+    agent?.presenter?.preview_image ??
+    agent?.presenter?.previewImage ??
+    "";
 
   const {
     connect,
@@ -116,9 +163,14 @@ export const AvatarPageClient = ({
     (text: string) => {
       setAgentStatus("thinking");
       resetTimer();
-      speak(text);
+      void speak(text, language).then((res) => {
+        if (!res?.success) {
+          setShowError(true);
+          setAgentStatus("idle");
+        }
+      });
     },
-    [speak, resetTimer],
+    [speak, resetTimer, language],
   );
 
   const { listening, startListening, stopListening, interimTranscript } =
@@ -130,7 +182,7 @@ export const AvatarPageClient = ({
     setIsVideoPlaying(false);
     hasGreetedRef.current = false;
     try {
-      await connect();
+      await connect({ language });
     } catch (e) {
       console.error(e);
       setShowError(true);
@@ -213,10 +265,10 @@ export const AvatarPageClient = ({
       hasGreetedRef.current = true;
       // setTimeout(() => {
       setAgentStatus("thinking");
-      speak("Hello");
+      speak("Hello", language);
       // }, 500);
     }
-  }, [connectionStatus, speak]);
+  }, [connectionStatus, speak, language]);
 
   const getStatusText = () => {
     switch (agentStatus) {
@@ -239,15 +291,30 @@ export const AvatarPageClient = ({
   return (
     <div className="na-main-layout">
       <div className="na-avatar-section">
-        <div className="na-avatar-container">
+        <div className="na-avatar-container" ref={stageRef}>
           <div className="na-status-badge">
             <span className={`na-status-indicator ${agentStatus}`}></span>
             <span>{getStatusText()}</span>
           </div>
 
+          {canFullscreen && (
+            <button
+              type="button"
+              className="na-fullscreen-btn"
+              onClick={toggleFullscreen}
+              aria-label={
+                isFullscreen ? "Exit full screen" : "Enter full screen"
+              }
+              title={isFullscreen ? "Exit full screen" : "Enter full screen"}
+            >
+              {isFullscreen ? "⤡" : "⤢"}
+            </button>
+          )}
+
           <AvatarStage
             videoRef={videoRef}
             idleVideoUrl={idleVideoUrl}
+            idleImageUrl={idleImageUrl}
             backgroundUrl={activeBackgroundUrl}
             agentName={agentName ?? agent?.name ?? "Neil Avatar"}
             agentDescription={agentDescription ?? agent?.description ?? ""}

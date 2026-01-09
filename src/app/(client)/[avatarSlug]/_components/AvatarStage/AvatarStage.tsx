@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { RefObject } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import "./AvatarStage.css";
@@ -278,6 +279,7 @@ export function useWhiteKeyWebGL(opts: {
 interface AvatarStageProps {
   videoRef: RefObject<HTMLVideoElement | null>;
   idleVideoUrl?: string;
+  idleImageUrl?: string;
   backgroundUrl?: string;
   isStreamReady: boolean;
   onStreamReady: () => void;
@@ -292,6 +294,7 @@ interface AvatarStageProps {
 export const AvatarStage: React.FC<AvatarStageProps> = ({
   videoRef,
   idleVideoUrl,
+  idleImageUrl,
   backgroundUrl,
   isStreamReady,
   onStreamReady,
@@ -303,6 +306,13 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
   onRestart,
 }) => {
   const [isIdleLoaded, setIsIdleLoaded] = useState(false);
+  const [idleFailed, setIdleFailed] = useState(false);
+
+  useEffect(() => {
+    if ((!idleVideoUrl && !idleImageUrl) || (idleFailed && !idleImageUrl)) {
+      setIsIdleLoaded(true);
+    }
+  }, [idleVideoUrl, idleImageUrl, idleFailed]);
 
   let viewMode: "ERROR" | "LOADING" | "STREAM" | "IDLE";
 
@@ -322,6 +332,8 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
   const showWebRTC = viewMode === "STREAM";
 
   const showIdleVideo = viewMode !== "STREAM";
+  const showIdleImage =
+    showIdleVideo && Boolean(idleImageUrl) && (!idleVideoUrl || idleFailed);
 
   const showLoader = viewMode === "LOADING";
 
@@ -380,6 +392,7 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
           muted
           playsInline
           onLoadedData={() => setIsIdleLoaded(true)}
+          onError={() => setIdleFailed(true)}
           style={{
             opacity: showIdleVideo ? 1 : 0,
             position: "absolute",
@@ -393,6 +406,25 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
             // Если сверху лоадер — немного размываем видео для акцента
             filter: showLoader ? "blur(5px) brightness(0.7)" : "none",
           }}
+        />
+      )}
+
+      {showIdleImage && idleImageUrl && (
+        <Image
+          src={idleImageUrl}
+          alt={`${agentName} idle`}
+          fill
+          sizes="100vw"
+          unoptimized
+          className="na-avatar-video na-layer-idle"
+          style={{
+            opacity: showIdleVideo ? 1 : 0,
+            objectFit: "cover",
+            transition: "opacity 0.5s ease",
+            zIndex: 10,
+          }}
+          onLoad={() => setIsIdleLoaded(true)}
+          onError={() => setIsIdleLoaded(true)}
         />
       )}
 
@@ -426,7 +458,7 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
           width: "100%",
           height: "100%",
           transition: "opacity 0.5s ease",
-          objectFit: "contain",
+          objectFit: "cover",
           zIndex: 15,
         }}
       />

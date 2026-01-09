@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { Fragment, useState, useTransition } from "react";
 import toast from "react-hot-toast";
 
 import {
@@ -9,19 +9,17 @@ import {
   saveAdminCredentialsAction,
   saveAuthRequirementAction,
   saveExternalSourcesConfigAction,
-  saveSessionRetentionAction,
   saveUserUpdateAction,
 } from "@/app/admin/(protected)/actions";
-import type { UserRow } from "@/app/admin/(protected)/admin-data";
-import { type SettingsTabId, settingsTabTitles } from "./settings.tabs";
-
-function setBreadcrumb(title: string) {
-  const el = document.getElementById("current-section");
-  if (el) el.textContent = title;
-
-  const h1 = document.querySelector(".page-title");
-  if (h1) h1.textContent = title;
-}
+import type {
+  ErrorLogFilters,
+  ErrorLogPage,
+  SessionFilters,
+  SessionPage,
+  SessionRoleOption,
+  UserRow,
+} from "@/app/admin/(protected)/admin-data";
+import type { SettingsTabId } from "./settings.tabs";
 
 type SettingsClientProps = {
   initialTab: SettingsTabId;
@@ -37,6 +35,11 @@ type SettingsClientProps = {
   };
   initialAuthRequired?: boolean;
   initialAdminEmail?: string;
+  initialSessions?: SessionPage;
+  initialSessionFilters?: SessionFilters;
+  initialSessionRoles?: SessionRoleOption[];
+  initialErrorLogs?: ErrorLogPage;
+  initialErrorLogFilters?: ErrorLogFilters;
 };
 
 const emptyExternalSources = {
@@ -55,26 +58,32 @@ export default function SettingsClient({
   initialExternalSourcesConfig,
   initialAuthRequired,
   initialAdminEmail,
+  initialSessions,
+  initialSessionFilters,
+  initialSessionRoles,
+  initialErrorLogs,
+  initialErrorLogFilters,
 }: SettingsClientProps) {
-  const router = useRouter();
   const activeTab = initialTab;
+  const router = useRouter();
 
   // sessions expand
   const [expandedSessions, setExpandedSessions] = useState<
     Record<string, boolean>
-  >({
-    session1: false,
-  });
+  >({});
+  const [expandedErrors, setExpandedErrors] = useState<Record<string, boolean>>(
+    {},
+  );
 
   // auth required toggle
   const [authRequired, setAuthRequired] = useState(
     initialAuthRequired ?? false,
   );
   const [users, setUsers] = useState<UserRow[]>(initialUsers ?? []);
-  const [integrationConfig, setIntegrationConfig] = useState(
+  const [integrationConfig] = useState(
     initialIntegrationConfig ?? { apiKey: "" },
   );
-  const [externalSourcesConfig, setExternalSourcesConfig] = useState(
+  const [externalSourcesConfig] = useState(
     initialExternalSourcesConfig ?? emptyExternalSources,
   );
   const [adminEmail, setAdminEmail] = useState(initialAdminEmail ?? "");
@@ -90,48 +99,86 @@ export default function SettingsClient({
   const [editUserEmail, setEditUserEmail] = useState("");
   const [deleteUserCandidate, setDeleteUserCandidate] =
     useState<UserRow | null>(null);
-
-  useEffect(() => {
-    if (initialUsers) {
-      setUsers(initialUsers);
-    }
-  }, [initialUsers]);
-
-  useEffect(() => {
-    if (initialIntegrationConfig) {
-      setIntegrationConfig(initialIntegrationConfig);
-    }
-  }, [initialIntegrationConfig]);
-
-  useEffect(() => {
-    if (initialExternalSourcesConfig) {
-      setExternalSourcesConfig(initialExternalSourcesConfig);
-    }
-  }, [initialExternalSourcesConfig]);
-
-  useEffect(() => {
-    if (typeof initialAuthRequired === "boolean") {
-      setAuthRequired(initialAuthRequired);
-    }
-  }, [initialAuthRequired]);
-
-  useEffect(() => {
-    if (typeof initialAdminEmail === "string") {
-      setAdminEmail(initialAdminEmail);
-    }
-  }, [initialAdminEmail]);
-
-  useEffect(() => {
-    setBreadcrumb(settingsTabTitles[activeTab]);
-  }, [activeTab]);
-
-  const switchTab = (tab: SettingsTabId) => {
-    if (tab === activeTab) return;
-    router.push(`/admin/settings/${tab}`);
-  };
+  const [editUserPassword, setEditUserPassword] = useState("");
+  const [editUserPasswordConfirm, setEditUserPasswordConfirm] = useState("");
 
   const toggleSession = (id: string) => {
     setExpandedSessions((s) => ({ ...s, [id]: !s[id] }));
+  };
+
+  const toggleError = (id: string) => {
+    setExpandedErrors((s) => ({ ...s, [id]: !s[id] }));
+  };
+
+  const sessionPage = initialSessions ?? {
+    rows: [],
+    total: 0,
+    page: 1,
+    limit: 25,
+    totalPages: 1,
+  };
+  const sessionFilters = initialSessionFilters ?? {
+    page: 1,
+    limit: 25,
+  };
+  const sessionRoles = initialSessionRoles ?? [];
+  const sessionPages = Array.from(
+    { length: sessionPage.totalPages },
+    (_, index) => index + 1,
+  );
+  const errorPage = initialErrorLogs ?? {
+    rows: [],
+    total: 0,
+    page: 1,
+    limit: 25,
+    totalPages: 1,
+  };
+  const errorFilters = initialErrorLogFilters ?? {
+    page: 1,
+    limit: 25,
+  };
+  const errorPages = Array.from(
+    { length: errorPage.totalPages },
+    (_, index) => index + 1,
+  );
+  const languageOptions = [
+    { value: "en-US", label: "English" },
+    { value: "es-ES", label: "Spanish" },
+    { value: "fr-FR", label: "French" },
+    { value: "de-DE", label: "German" },
+    { value: "ru-RU", label: "Russian" },
+    { value: "uk-UA", label: "Ukrainian" },
+    { value: "zh-CN", label: "Chinese" },
+    { value: "ja-JP", label: "Japanese" },
+  ];
+  const languageLabel = (value: string) =>
+    languageOptions.find((lang) => lang.value === value)?.label ?? value;
+
+  const buildSessionQuery = (overrides: Partial<SessionFilters> = {}) => {
+    const params = new URLSearchParams();
+    const roleId = overrides.roleId ?? sessionFilters.roleId;
+    const from = overrides.from ?? sessionFilters.from;
+    const to = overrides.to ?? sessionFilters.to;
+    const language = overrides.language ?? sessionFilters.language;
+    const page = overrides.page ?? sessionFilters.page;
+    const limit = overrides.limit ?? sessionFilters.limit;
+
+    if (roleId) params.set("role", roleId);
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    if (language) params.set("language", language);
+    params.set("page", String(page));
+    params.set("limit", String(limit));
+    return params.toString();
+  };
+
+  const buildErrorQuery = (overrides: Partial<ErrorLogFilters> = {}) => {
+    const params = new URLSearchParams();
+    const page = overrides.page ?? errorFilters.page;
+    const limit = overrides.limit ?? errorFilters.limit;
+    params.set("page", String(page));
+    params.set("limit", String(limit));
+    return params.toString();
   };
 
   const onAuthRequiredToggle = (checked: boolean) => {
@@ -206,6 +253,8 @@ export default function SettingsClient({
 
     setEditUserCandidate(user);
     setEditUserEmail(user.email);
+    setEditUserPassword("");
+    setEditUserPasswordConfirm("");
   };
 
   const deleteUser = (id: string) => {
@@ -222,11 +271,22 @@ export default function SettingsClient({
       toast.error("Email is required");
       return;
     }
+    if (editUserPassword && editUserPassword.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    if (editUserPassword && editUserPassword !== editUserPasswordConfirm) {
+      toast.error("Passwords do not match");
+      return;
+    }
 
     const formData = new FormData();
     formData.set("action", "update");
     formData.set("userId", editUserCandidate.id);
     formData.set("email", newEmail);
+    if (editUserPassword) {
+      formData.set("password", editUserPassword);
+    }
 
     startSaving(async () => {
       await saveUserUpdateAction(formData)
@@ -334,49 +394,7 @@ export default function SettingsClient({
 
   return (
     <>
-      <div className="tabs">
-        <button
-          type="button"
-          className={`tab ${activeTab === "integrations" ? "active" : ""}`}
-          onClick={() => switchTab("integrations")}
-        >
-          🔗 Integrations
-        </button>
-        <button
-          type="button"
-          className={`tab ${activeTab === "external-sources" ? "active" : ""}`}
-          onClick={() => switchTab("external-sources")}
-        >
-          📰 External Sources
-        </button>
-        <button
-          type="button"
-          className={`tab ${activeTab === "sessions" ? "active" : ""}`}
-          onClick={() => switchTab("sessions")}
-        >
-          📋 Session Records
-        </button>
-        <button
-          type="button"
-          className={`tab ${activeTab === "errors-debug" ? "active" : ""}`}
-          onClick={() => switchTab("errors-debug")}
-        >
-          ⚠️ Error Log
-        </button>
-        <button
-          type="button"
-          className={`tab ${activeTab === "admin" ? "active" : ""}`}
-          onClick={() => switchTab("admin")}
-        >
-          👨‍💼 Administrator
-        </button>
-      </div>
-
-      {/* Integrations */}
-      <div
-        id="integrations"
-        className={`tab-content ${activeTab === "integrations" ? "active" : ""}`}
-      >
+      {activeTab === "integrations" && (
         <div className="section">
           <div className="two-column">
             <form
@@ -434,13 +452,9 @@ export default function SettingsClient({
             </form>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* External Sources */}
-      <div
-        id="external-sources"
-        className={`tab-content ${activeTab === "external-sources" ? "active" : ""}`}
-      >
+      {activeTab === "external-sources" && (
         <form
           className="section"
           onSubmit={(event) => {
@@ -552,214 +566,332 @@ export default function SettingsClient({
             </button>
           </div>
         </form>
-      </div>
+      )}
 
-      {/* Session Records */}
-      <div
-        id="sessions"
-        className={`tab-content ${activeTab === "sessions" ? "active" : ""}`}
-      >
+      {activeTab === "sessions" && (
         <div className="section">
           <div className="info-box">
             ℹ️ Complete dialogues for response quality analysis. Click on a
             session to view detailed information.
           </div>
 
-          <div className="filters">
-            <select defaultValue="">
+          <form className="filters" method="get">
+            <select name="role" defaultValue={sessionFilters.roleId ?? ""}>
               <option value="">All Roles</option>
-              <option value="basic">Basic Neil</option>
-              <option value="tourism">Tourism Neil</option>
-              <option value="sports">Sports Neil</option>
-              <option value="politics">Politics Neil</option>
-              <option value="space">Space Neil</option>
+              {sessionRoles.map((role) => (
+                <option key={role.id} value={role.id}>
+                  {role.name}
+                </option>
+              ))}
             </select>
 
-            <select defaultValue="">
+            <select
+              name="language"
+              defaultValue={sessionFilters.language ?? ""}
+            >
               <option value="">All Languages</option>
-              <option value="en">English</option>
-              <option value="ru">Russian</option>
-              <option value="uk">Ukrainian</option>
+              {languageOptions.map((lang) => (
+                <option key={lang.value} value={lang.value}>
+                  {lang.label}
+                </option>
+              ))}
             </select>
 
-            <input type="date" placeholder="From" />
-            <input type="date" placeholder="To" />
+            <input
+              type="date"
+              name="from"
+              placeholder="From"
+              defaultValue={sessionFilters.from ?? ""}
+            />
+            <input
+              type="date"
+              name="to"
+              placeholder="To"
+              defaultValue={sessionFilters.to ?? ""}
+            />
 
-            <button type="button" className="btn btn-secondary btn-small">
+            <input type="hidden" name="page" value="1" />
+            <input type="hidden" name="limit" value={sessionFilters.limit} />
+
+            <button type="submit" className="btn btn-secondary btn-small">
               🔍 Apply Filters
             </button>
-          </div>
+          </form>
 
-          <table className="log-table">
-            <thead>
-              <tr>
-                <th>Session ID</th>
-                <th>Role</th>
-                <th>Language</th>
-                <th>Device</th>
-                <th>Messages</th>
-                <th>Start Time</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                className="session-row"
-                onClick={() => toggleSession("session1")}
-              >
-                <td>
-                  <code>sess_2025_001</code>
-                </td>
-                <td>Tourism Neil</td>
-                <td>English</td>
-                <td>Desktop</td>
-                <td>12</td>
-                <td>2025-01-22 14:30:15</td>
-              </tr>
-              <tr>
-                <td colSpan={6}>
-                  <div
-                    className={`expandable-content ${expandedSessions.session1 ? "expanded" : ""}`}
-                  >
-                    <div className="message-block user">
-                      <div className="message-meta">
-                        <strong>👤 User</strong> | 14:30:18 | Latency: 0ms
-                      </div>
-                      <div className="message-text">
-                        Have you been to Grand Canyon?
-                      </div>
-                      <div className="rag-trace">
-                        🎤 <strong>Audio:</strong> audio_input_001.mp3 |{" "}
-                        <strong>STT:</strong> &quot;Have you been to Grand
-                        Canyon?&quot;
-                      </div>
-                    </div>
+          {sessionPage.rows.length === 0 ? (
+            <div className="info-box">No sessions found for this filter.</div>
+          ) : (
+            <div className="table-scroll">
+              <table className="log-table">
+                <thead>
+                  <tr>
+                    <th>Session ID</th>
+                    <th>Role</th>
+                    <th>Language</th>
+                    <th>Device</th>
+                    <th>Messages</th>
+                    <th>Start Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sessionPage.rows.map((session) => (
+                    <Fragment key={session.id}>
+                      <tr
+                        className="session-row"
+                        onClick={() => toggleSession(session.id)}
+                      >
+                        <td>
+                          <code>{session.sessionId}</code>
+                        </td>
+                        <td>{session.roleName}</td>
+                        <td>{languageLabel(session.language)}</td>
+                        <td>{session.device}</td>
+                        <td>{session.messageCount}</td>
+                        <td>{session.startedAt}</td>
+                      </tr>
+                      <tr>
+                        <td colSpan={6}>
+                          <div
+                            className={`expandable-content ${
+                              expandedSessions[session.id] ? "expanded" : ""
+                            }`}
+                          >
+                            {session.messages.length === 0 ? (
+                              <div className="info-box">
+                                No messages recorded for this session yet.
+                              </div>
+                            ) : (
+                              session.messages.map((message) => (
+                                <div
+                                  key={message.id}
+                                  className={`message-block ${
+                                    message.role === "user"
+                                      ? "user"
+                                      : message.role === "assistant"
+                                        ? "avatar"
+                                        : ""
+                                  }`}
+                                >
+                                  <div className="message-meta">
+                                    <strong>
+                                      {message.role === "assistant"
+                                        ? "🤖 Avatar"
+                                        : message.role === "system"
+                                          ? "⚙️ System"
+                                          : "👤 User"}
+                                    </strong>{" "}
+                                    | {message.createdAt}
+                                  </div>
+                                  <div className="message-text">
+                                    {message.content}
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-                    <div className="message-block avatar">
-                      <div className="message-meta">
-                        <strong>🤖 Avatar</strong> | 14:30:21 | Latency: 2800ms
-                        | Source:{" "}
-                        <span className="badge internal">Internal</span>
-                      </div>
-                      <div className="message-text">
-                        Yes, I visited the Grand Canyon in 1991. It was
-                        absolutely breathtaking...
-                      </div>
-                      <div className="rag-trace">
-                        🔍 <strong>RAG:</strong> chunk_travel_gc_1991 (0.94) |
-                        LLM: ChatGPT-4
-                      </div>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          {sessionPage.totalPages > 1 && (
+            <form className="pagination" method="get">
+              <input
+                type="hidden"
+                name="role"
+                value={sessionFilters.roleId ?? ""}
+              />
+              <input
+                type="hidden"
+                name="language"
+                value={sessionFilters.language ?? ""}
+              />
+              <input
+                type="hidden"
+                name="from"
+                value={sessionFilters.from ?? ""}
+              />
+              <input type="hidden" name="to" value={sessionFilters.to ?? ""} />
+              <input type="hidden" name="limit" value={sessionFilters.limit} />
 
-          <div className="pagination">
-            <button type="button" className="active">
-              1
-            </button>
-            <button type="button">2</button>
-            <button type="button">3</button>
-            <button type="button">→</button>
-          </div>
+              {sessionPages.map((page) => (
+                <button
+                  key={page}
+                  type="submit"
+                  name="page"
+                  value={page}
+                  className={page === sessionPage.page ? "active" : ""}
+                >
+                  {page}
+                </button>
+              ))}
+            </form>
+          )}
 
-          <form
-            className="filters"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const formData = new FormData(event.currentTarget);
-              startSaving(async () => {
-                await saveSessionRetentionAction(formData)
-                  .then(() => toast.success("Session preferences saved"))
-                  .catch(() =>
-                    toast.error("Failed to save session preferences"),
-                  );
-              });
-            }}
-          >
-            <label htmlFor="retentionDays">Retention (days)</label>
+          <form className="filters" method="get">
+            <label htmlFor="rowsPerPage">Rows to show</label>
             <input
-              id="retentionDays"
-              name="retentionDays"
-              type="number"
-              min={1}
-              defaultValue={30}
+              type="hidden"
+              name="role"
+              value={sessionFilters.roleId ?? ""}
             />
-            <button
-              type="submit"
-              className="btn btn-primary btn-small"
-              disabled={isSaving}
+            <input
+              type="hidden"
+              name="language"
+              value={sessionFilters.language ?? ""}
+            />
+            <input
+              type="hidden"
+              name="from"
+              value={sessionFilters.from ?? ""}
+            />
+            <input type="hidden" name="to" value={sessionFilters.to ?? ""} />
+            <input type="hidden" name="page" value={1} />
+            <select
+              id="rowsPerPage"
+              name="limit"
+              defaultValue={sessionFilters.limit}
+              onChange={(event) => {
+                const limit = Number(event.currentTarget.value);
+                router.push(
+                  `/admin/settings/sessions?${buildSessionQuery({
+                    limit,
+                    page: 1,
+                  })}`,
+                );
+              }}
             >
-              {isSaving ? "Saving..." : "💾 Save Preferences"}
-            </button>
+              {[10, 20, 30, 50, 100].map((value) => (
+                <option key={value} value={value}>
+                  {value} rows
+                </option>
+              ))}
+            </select>
           </form>
         </div>
-      </div>
+      )}
 
-      {/* Error Log & Debug */}
-      <div
-        id="errors-debug"
-        className={`tab-content ${activeTab === "errors-debug" ? "active" : ""}`}
-      >
+      {activeTab === "errors-debug" && (
         <div className="section">
           <div className="info-box">ℹ️ System errors and integration issues</div>
 
-          <table className="log-table">
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Source</th>
-                <th>Type</th>
-                <th>Description</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>2025-01-22 14:25:33</td>
-                <td>
-                  <span className="badge error">D-ID</span>
-                </td>
-                <td>Connection Timeout</td>
-                <td>WebRTC connection timeout after 30s</td>
-                <td>
-                  <button type="button" className="btn btn-secondary btn-small">
-                    Details
-                  </button>
-                </td>
-              </tr>
-              <tr>
-                <td>2025-01-22 13:18:45</td>
-                <td>
-                  <span className="badge warning">ChatGPT</span>
-                </td>
-                <td>Rate Limit</td>
-                <td>API rate limit exceeded, retry after 60s</td>
-                <td>
-                  <button type="button" className="btn btn-secondary btn-small">
-                    Details
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          {errorPage.rows.length === 0 ? (
+            <div className="info-box">No error logs yet.</div>
+          ) : (
+            <div className="table-scroll">
+              <table className="log-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Source</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {errorPage.rows.map((log) => (
+                    <Fragment key={log.id}>
+                      <tr
+                        className="error-log-row"
+                        onClick={() => toggleError(log.id)}
+                      >
+                        <td>{log.createdAt}</td>
+                        <td>
+                          <span className={`badge ${log.level}`}>
+                            {log.source}
+                          </span>
+                        </td>
+                        <td>{log.type}</td>
+                        <td>{log.message}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-small"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleError(log.id);
+                            }}
+                          >
+                            {expandedErrors[log.id] ? "Hide" : "Details"}
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colSpan={5}>
+                          <div
+                            className={`expandable-content ${
+                              expandedErrors[log.id] ? "expanded" : ""
+                            }`}
+                          >
+                            {log.metadata ? (
+                              <pre className="log-metadata">
+                                {JSON.stringify(log.metadata, null, 2)}
+                              </pre>
+                            ) : (
+                              <div className="log-empty">
+                                No additional details available.
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-          <div className="pagination">
-            <button type="button" className="active">
-              1
-            </button>
-            <button type="button">2</button>
-            <button type="button">→</button>
-          </div>
+          {errorPage.totalPages > 1 && (
+            <form className="pagination" method="get">
+              <input type="hidden" name="limit" value={errorFilters.limit} />
+              {errorPages.map((page) => (
+                <button
+                  key={page}
+                  type="submit"
+                  name="page"
+                  value={page}
+                  className={page === errorPage.page ? "active" : ""}
+                >
+                  {page}
+                </button>
+              ))}
+            </form>
+          )}
+
+          <form className="filters" method="get">
+            <label htmlFor="errorRows">Rows to show</label>
+            <input type="hidden" name="page" value={1} />
+            <select
+              id="errorRows"
+              name="limit"
+              defaultValue={errorFilters.limit}
+              onChange={(event) => {
+                const limit = Number(event.currentTarget.value);
+                router.push(
+                  `/admin/settings/errors-debug?${buildErrorQuery({
+                    limit,
+                    page: 1,
+                  })}`,
+                );
+              }}
+            >
+              {[10, 20, 30, 50, 100].map((value) => (
+                <option key={value} value={value}>
+                  {value} rows
+                </option>
+              ))}
+            </select>
+          </form>
         </div>
-      </div>
+      )}
 
-      {/* Administrator */}
-      <div
-        id="admin"
-        className={`tab-content ${activeTab === "admin" ? "active" : ""}`}
-      >
+      {activeTab === "admin" && (
         <div className="section">
           <h2 className="section-title">User Access Management</h2>
 
@@ -796,7 +928,7 @@ export default function SettingsClient({
             ➕ Add New User
           </button>
 
-          <div style={{ overflowX: "auto" }}>
+          <div className="table-scroll">
             <table className="log-table">
               <thead>
                 <tr>
@@ -902,7 +1034,7 @@ export default function SettingsClient({
             </button>
           </form>
         </div>
-      </div>
+      )}
 
       {showAddUser && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
@@ -1015,6 +1147,32 @@ export default function SettingsClient({
                   onChange={(event) => setEditUserEmail(event.target.value)}
                   placeholder="user@example.com"
                   required
+                />
+              </div>
+              <div className="input-group">
+                <label htmlFor="editUserPassword">New Password</label>
+                <input
+                  id="editUserPassword"
+                  type="password"
+                  value={editUserPassword}
+                  onChange={(event) => setEditUserPassword(event.target.value)}
+                  placeholder="Leave blank to keep current password"
+                  minLength={6}
+                />
+              </div>
+              <div className="input-group">
+                <label htmlFor="editUserPasswordConfirm">
+                  Confirm New Password
+                </label>
+                <input
+                  id="editUserPasswordConfirm"
+                  type="password"
+                  value={editUserPasswordConfirm}
+                  onChange={(event) =>
+                    setEditUserPasswordConfirm(event.target.value)
+                  }
+                  placeholder="Repeat new password"
+                  minLength={6}
                 />
               </div>
             </div>

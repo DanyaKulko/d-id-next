@@ -14,6 +14,7 @@ import toast from "react-hot-toast";
 import {
   deleteRoleAction,
   saveRoleSettingsAction,
+  syncAgentFromDidAction,
 } from "@/app/admin/(protected)/actions";
 import type {
   AgentKey,
@@ -68,14 +69,15 @@ export default function RolesClient({
     initialAgentSettings?.backgrounds ?? [],
   );
   const [isSaving, startSaving] = useTransition();
+  const [isSyncing, startSyncing] = useTransition();
+  const [isDeleting, startDeleting] = useTransition();
+  const [isUploading, setIsUploading] = useState(false);
   const [showBackgroundModal, setShowBackgroundModal] = useState(false);
   const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
   const [backgroundTitle, setBackgroundTitle] = useState("");
   const [backgroundTheme, setBackgroundTheme] = useState("");
   const [deleteAgentCandidate, setDeleteAgentCandidate] =
     useState<AgentListItem | null>(null);
-  const [showAddAgentModal, setShowAddAgentModal] = useState(false);
-  const [newAgentName, setNewAgentName] = useState("");
 
   useEffect(() => {
     setAgents(initialAgents);
@@ -138,6 +140,21 @@ export default function RolesClient({
     });
   };
 
+  const syncFromDid = () => {
+    if (!activeAgentKey) return;
+    startSyncing(async () => {
+      await syncAgentFromDidAction(activeAgentKey)
+        .then((res) => {
+          if (res?.settings) {
+            setAgentSettings(res.settings);
+            setBackgrounds(res.settings.backgrounds);
+          }
+          toast.success("Agent synced from D-ID");
+        })
+        .catch(() => toast.error("Failed to sync agent from D-ID"));
+    });
+  };
+
   const removeBackground = async (id: string) => {
     const snapshot = backgrounds;
     setBackgrounds((prev) => prev.filter((bg) => bg.id !== id));
@@ -185,6 +202,7 @@ export default function RolesClient({
     const theme = backgroundTheme.trim() || "default";
 
     try {
+      setIsUploading(true);
       const formData = new FormData();
       formData.set("agentKey", activeAgentKey);
       formData.set("title", title);
@@ -209,6 +227,7 @@ export default function RolesClient({
       toast.error("Failed to upload background");
     } finally {
       setBackgroundFile(null);
+      setIsUploading(false);
     }
   };
 
@@ -221,32 +240,19 @@ export default function RolesClient({
   const confirmDeleteRole = async () => {
     const targetKey = deleteAgentCandidate?.key;
     if (!targetKey) return;
-    try {
-      const result = await deleteRoleAction(targetKey);
-      if (result?.skipped) {
-        toast("Deletion is disabled (guarded)", { icon: "⚠️" });
-        return;
+    startDeleting(async () => {
+      try {
+        const result = await deleteRoleAction(targetKey);
+        if (result?.skipped) {
+          toast("Deletion is disabled (guarded)", { icon: "⚠️" });
+          return;
+        }
+        toast.success("Agent deleted");
+        setDeleteAgentCandidate(null);
+      } catch {
+        toast.error("Failed to delete agent");
       }
-      toast.success("Agent deleted");
-      setDeleteAgentCandidate(null);
-    } catch {
-      toast.error("Failed to delete agent");
-    }
-  };
-
-  const openAddAgentModal = () => {
-    setNewAgentName("");
-    setShowAddAgentModal(true);
-  };
-
-  const confirmAddAgent = () => {
-    if (!newAgentName.trim()) {
-      toast.error("Agent name is required");
-      return;
-    }
-    // TODO: implement agent creation (DB + D-ID) once API flow is approved.
-    toast("TODO: Agent creation is not wired yet.", { icon: "🛠️" });
-    setShowAddAgentModal(false);
+    });
   };
 
   const breadcrumbRole = useMemo(() => {
@@ -274,13 +280,13 @@ export default function RolesClient({
           </button>
         ))}
 
-        <button
-          type="button"
-          className="add-role-tab"
-          onClick={openAddAgentModal}
-        >
-          <span>➕</span> Add New Agent
-        </button>
+        {/*<button*/}
+        {/*  type="button"*/}
+        {/*  className="add-role-tab"*/}
+        {/*  onClick={openAddAgentModal}*/}
+        {/*>*/}
+        {/*  <span>➕</span> Add New Agent*/}
+        {/*</button>*/}
       </div>
 
       {/* Breadcrumb sync (1:1 поведение) */}
@@ -303,7 +309,9 @@ export default function RolesClient({
             onBackgroundRemove={removeBackground}
             onSubmit={handleSave}
             onDelete={handleDeleteRole}
+            onSync={syncFromDid}
             isSaving={isSaving}
+            isSyncing={isSyncing}
           />
         </div>
       )}
@@ -371,9 +379,9 @@ export default function RolesClient({
                 type="button"
                 className="btn btn-primary"
                 onClick={submitBackgroundUpload}
-                disabled={isSaving}
+                disabled={isUploading}
               >
-                {isSaving ? "Uploading..." : "Upload Background"}
+                {isUploading ? "Uploading..." : "Upload Background"}
               </button>
             </div>
           </div>
@@ -416,62 +424,9 @@ export default function RolesClient({
                 type="button"
                 className="btn btn-danger"
                 onClick={confirmDeleteRole}
-                disabled={isSaving}
+                disabled={isDeleting}
               >
-                {isSaving ? "Deleting..." : "Delete Agent"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showAddAgentModal && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true">
-          <div className="modal-card">
-            <div className="modal-header">
-              <div>
-                <div className="modal-title">Add New Agent</div>
-                <div className="modal-subtitle">
-                  TODO: connect to D-ID creation flow.
-                </div>
-              </div>
-              <button
-                type="button"
-                className="btn btn-secondary btn-small"
-                onClick={() => setShowAddAgentModal(false)}
-              >
-                ✕ Close
-              </button>
-            </div>
-
-            <div className="modal-body">
-              <div className="input-group">
-                <label htmlFor="newAgentName">Agent name</label>
-                <input
-                  id="newAgentName"
-                  type="text"
-                  value={newAgentName}
-                  onChange={(event) => setNewAgentName(event.target.value)}
-                  placeholder="New Neil Agent"
-                />
-              </div>
-            </div>
-
-            <div className="modal-footer">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setShowAddAgentModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={confirmAddAgent}
-                disabled={isSaving}
-              >
-                {isSaving ? "Creating..." : "Create Agent"}
+                {isDeleting ? "Deleting..." : "Delete Agent"}
               </button>
             </div>
           </div>
@@ -530,7 +485,9 @@ type RoleContentProps = {
   onBackgroundRemove: (id: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onDelete: () => void;
+  onSync: () => void;
   isSaving: boolean;
+  isSyncing: boolean;
 };
 
 function RoleContent({
@@ -540,7 +497,9 @@ function RoleContent({
   onBackgroundRemove,
   onSubmit,
   onDelete,
+  onSync,
   isSaving,
+  isSyncing,
 }: RoleContentProps) {
   return (
     <form className="section" onSubmit={onSubmit}>
@@ -723,8 +682,13 @@ function RoleContent({
         <button type="submit" className="btn btn-primary" disabled={isSaving}>
           {isSaving ? "Saving..." : "💾 Save Changes"}
         </button>
-        <button type="reset" className="btn btn-secondary" disabled={isSaving}>
-          🔄 Reset
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={onSync}
+          disabled={isSyncing || isSaving}
+        >
+          {isSyncing ? "Syncing..." : "🔄 Sync from D-ID"}
         </button>
       </div>
 

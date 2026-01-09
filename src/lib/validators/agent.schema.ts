@@ -21,6 +21,14 @@ export const chatSchema = z.object({
   streamId: z.string().min(1),
   chatId: z.string().min(1),
   text: z.string().min(1),
+  language: z.string().optional(),
+});
+
+export const assistantMessageSchema = z.object({
+  sessionId: z.string().min(1),
+  streamId: z.string().min(1),
+  chatId: z.string().min(1),
+  message: z.string().min(1),
 });
 
 export const closeSessionSchema = z.object({

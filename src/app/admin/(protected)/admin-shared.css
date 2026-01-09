@@ -78,6 +78,7 @@ h3 {
   color: #718096;
   transition: all 0.2s;
   white-space: nowrap;
+  text-decoration: none;
 }
 
 .tab:hover {
@@ -280,6 +281,16 @@ textarea {
   color: #2c5282;
 }
 
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-scroll .log-table {
+  min-width: 720px;
+}
+
 .badge,
 .status-badge {
   display: inline-block;
@@ -297,6 +308,16 @@ textarea {
 .badge.error {
   background: #fed7d7;
   color: #c53030;
+}
+
+.badge.warning {
+  background: #fefcbf;
+  color: #b7791f;
+}
+
+.badge.info {
+  background: #bee3f8;
+  color: #2c5282;
 }
 
 .status-badge.processing {

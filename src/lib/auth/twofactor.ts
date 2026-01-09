@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { prisma } from "@/lib/db/prisma";
 
-// import { sendOtpEmail } from "@/lib/email/smtp";
+import { sendOtpEmail } from "@/lib/email/smtp";
 
 function sha256(input: string) {
   return crypto.createHash("sha256").update(input).digest("base64url");
@@ -11,7 +11,7 @@ function otp6() {
 }
 const OTP_TTL_MIN = 10;
 
-export async function startEmail2fa(userId: string, _email: string) {
+export async function startEmail2fa(userId: string, email: string) {
   await prisma.twoFactorToken.updateMany({
     where: { userId, consumedAt: null, expiresAt: { gt: new Date() } },
     data: { consumedAt: new Date() },
@@ -27,7 +27,7 @@ export async function startEmail2fa(userId: string, _email: string) {
   });
 
   console.log("code", code);
-  // await sendOtpEmail({ to: email, code, ttlMinutes: OTP_TTL_MIN });
+  await sendOtpEmail({ to: email, code, ttlMinutes: OTP_TTL_MIN });
 
   return { tokenId: t.id, expiresAt: t.expiresAt };
 }

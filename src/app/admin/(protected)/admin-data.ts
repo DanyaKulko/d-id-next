@@ -19,7 +19,70 @@ export type KnowledgeItem = {
   sourceLabel: string;
   created: string;
   status: "processing" | "error" | "active";
-  url?: string;
+  url: string | undefined;
+};
+
+export type SessionMessageItem = {
+  id: string;
+  role: "system" | "user" | "assistant";
+  content: string;
+  createdAt: string;
+};
+
+export type SessionRow = {
+  id: string;
+  sessionId: string;
+  roleName: string;
+  language: string;
+  device: string;
+  messageCount: number;
+  startedAt: string;
+  messages: SessionMessageItem[];
+};
+
+export type SessionRoleOption = {
+  id: string;
+  name: string;
+};
+
+export type SessionFilters = {
+  roleId?: string;
+  from?: string;
+  to?: string;
+  language?: string;
+  page: number;
+  limit: number;
+};
+
+export type SessionPage = {
+  rows: SessionRow[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+};
+
+export type ErrorLogRow = {
+  id: string;
+  createdAt: string;
+  source: string;
+  type: string;
+  message: string;
+  level: "error" | "warning" | "info";
+  metadata?: unknown;
+};
+
+export type ErrorLogFilters = {
+  page: number;
+  limit: number;
+};
+
+export type ErrorLogPage = {
+  rows: ErrorLogRow[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 };
 
 const safetyRulesKey = "safetyRules";
@@ -45,6 +108,62 @@ const normalizeDidDocumentId = (value: string) =>
 const matchesDidDocumentId = (value: string, candidate: string) =>
   value === candidate ||
   normalizeDidDocumentId(value) === normalizeDidDocumentId(candidate);
+
+const isCookieLikeValue = (value: string) => {
+  const lower = value.toLowerCase();
+  if (lower.includes("awsalb") || lower.includes("awsalbcors")) return true;
+  if (lower.includes("expires=") || lower.includes("path=")) return true;
+  return value.includes(";") || value.includes("=");
+};
+
+const resolveSessionIdentifier = (session: {
+  didSessionId: string | null;
+  didChatId: string;
+  didStreamId: string;
+  id: string;
+}) => {
+  const preferred = session.didSessionId?.trim() ?? "";
+  if (preferred && !isCookieLikeValue(preferred)) {
+    return preferred;
+  }
+  return session.didChatId || session.didStreamId || session.id;
+};
+
+const resolveDeviceLabel = (userAgent?: string | null) => {
+  if (!userAgent) return "Unknown";
+  const ua = userAgent.toLowerCase();
+  if (ua.includes("mobile")) return "Mobile";
+  if (ua.includes("tablet") || ua.includes("ipad")) return "Tablet";
+  return "Desktop";
+};
+
+const toLocalDateTime = (date: Date) => {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+    date.getDate(),
+  )} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(
+    date.getSeconds(),
+  )}`;
+};
+
+const parseDateRange = (from?: string, to?: string) => {
+  const range: { gte?: Date; lte?: Date } = {};
+  if (from) {
+    const start = new Date(from);
+    if (!Number.isNaN(start.valueOf())) {
+      start.setHours(0, 0, 0, 0);
+      range.gte = start;
+    }
+  }
+  if (to) {
+    const end = new Date(to);
+    if (!Number.isNaN(end.valueOf())) {
+      end.setHours(23, 59, 59, 999);
+      range.lte = end;
+    }
+  }
+  return range;
+};
 
 export async function fetchUsers(): Promise<UserRow[]> {
   const users = await prisma.user.findMany({
@@ -271,7 +390,7 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
             doc.documentUrl,
         };
       })
-      .filter((item): item is KnowledgeItem => Boolean(item));
+      .filter((item): item is KnowledgeItem => item !== null);
 
     const extraLocal = await prisma.knowledgeDocuments.findMany({
       where: { documentId: { notIn: queryDocumentIds } },
@@ -392,5 +511,119 @@ export async function fetchExternalSourcesConfig() {
     videoLink: videoSource?.link ?? videoSeed?.link ?? "",
     videoCron: videoSource?.cron ?? videoSeed?.cron ?? "",
     videoAccessKey: videoSource?.accessKey ?? "",
+  };
+}
+
+export async function fetchSessionRoles(): Promise<SessionRoleOption[]> {
+  const agents = await prisma.agent.findMany({
+    select: { id: true, displayName: true },
+    orderBy: { createdAt: "asc" },
+  });
+  return agents.map((agent) => ({ id: agent.id, name: agent.displayName }));
+}
+
+export async function fetchSessionRecords(
+  filters: SessionFilters,
+): Promise<SessionPage> {
+    // @ts-ignore
+  const where: Parameters<typeof prisma.chatSession.count>[0]["where"] = {};
+  if (filters.roleId) {
+    where.agentId = filters.roleId;
+  }
+  const range = parseDateRange(filters.from, filters.to);
+  if (range.gte || range.lte) {
+    where.createdAt = range;
+  }
+  if (filters.language) {
+    where.language = filters.language;
+  }
+
+  const total = await prisma.chatSession.count({ where });
+  const totalPages = Math.max(1, Math.ceil(total / filters.limit));
+  const page = Math.min(Math.max(filters.page, 1), totalPages);
+  const sessions = await prisma.chatSession.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    skip: (page - 1) * filters.limit,
+    take: filters.limit,
+    include: {
+      agent: { select: { displayName: true } },
+      messages: { orderBy: { createdAt: "asc" } },
+      _count: { select: { messages: true } },
+    },
+  });
+
+  const rows: SessionRow[] = sessions.map((session) => {
+    const languageCount = new Map<string, number>();
+    for (const message of session.messages) {
+      if (message.role !== "USER") continue;
+      if (!message.language) continue;
+      const current = languageCount.get(message.language) ?? 0;
+      languageCount.set(message.language, current + 1);
+    }
+    const dominantLanguage = Array.from(languageCount.entries()).sort(
+      (a, b) => b[1] - a[1],
+    )[0]?.[0];
+
+    return {
+      id: session.id,
+      sessionId: resolveSessionIdentifier(session),
+      roleName: session.agent?.displayName ?? session.didAgentId,
+      language: dominantLanguage ?? session.language ?? "Unknown",
+      device: session.device ?? resolveDeviceLabel(session.userAgent),
+      messageCount: session._count.messages,
+      startedAt: toLocalDateTime(session.createdAt),
+      messages: session.messages.map((message) => ({
+        id: message.id,
+        role: message.role.toLowerCase() as SessionMessageItem["role"],
+        content: message.content,
+        createdAt: toLocalDateTime(message.createdAt),
+      })),
+    };
+  });
+
+  return {
+    rows,
+    total,
+    page,
+    limit: filters.limit,
+    totalPages,
+  };
+}
+
+export async function fetchErrorLogs(
+  filters: ErrorLogFilters,
+): Promise<ErrorLogPage> {
+  const total = await prisma.externalServiceLog.count();
+  const totalPages = Math.max(1, Math.ceil(total / filters.limit));
+  const page = Math.min(Math.max(filters.page, 1), totalPages);
+
+  const logs = await prisma.externalServiceLog.findMany({
+    orderBy: { createdAt: "desc" },
+    skip: (page - 1) * filters.limit,
+    take: filters.limit,
+  });
+
+  const rows: ErrorLogRow[] = logs.map((log) => ({
+    id: log.id,
+    createdAt: toLocalDateTime(log.createdAt),
+    source: log.source,
+    type: log.type,
+    message: log.message,
+    level:
+      log.level === "WARNING"
+        ? "warning"
+        : log.level === "INFO"
+          ? "info"
+          : "error",
+    metadata: log.metadata ?? undefined,
+  }));
+
+  return {
+    rows,
+    total,
+    page,
+    limit: filters.limit,
+    totalPages,
   };
 }

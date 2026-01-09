@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  appendAssistantMessageAction,
   chatAction,
+  closeSessionAction,
   createSessionAction,
   submitAnswerAction,
   submitIceAction,
@@ -23,6 +25,21 @@ export const useAgent = (
     chatId: string;
   } | null>(null);
   const currentVideoIdRef = useRef<string | null>(null);
+  const lastAssistantRef = useRef<string | null>(null);
+
+  const decodeChatAnswer = useCallback((raw: string) => {
+    const marker = "chat/answer";
+    if (!raw.startsWith(marker)) return null;
+    const idx = raw.indexOf(":");
+    if (idx === -1) return null;
+    const encoded = raw.slice(idx + 1);
+    if (!encoded) return null;
+    try {
+      return decodeURIComponent(encoded.replace(/\+/g, " ")).trim();
+    } catch {
+      return encoded.trim();
+    }
+  }, []);
 
   const cleanup = useCallback(() => {
     if (pcRef.current) {
@@ -36,6 +53,8 @@ export const useAgent = (
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
+    idsRef.current = null;
+    currentVideoIdRef.current = null;
     setIsAgentSpeaking(false);
     setStatus("idle");
   }, [videoRef]);
@@ -44,121 +63,142 @@ export const useAgent = (
     return () => cleanup();
   }, [cleanup]);
 
-  const connect = useCallback(async () => {
-    if (status === "connecting" || status === "connected") return;
-    setStatus("connecting");
+  const connect = useCallback(
+    async (metadata?: { language?: string }) => {
+      if (status === "connecting" || status === "connected") return;
+      setStatus("connecting");
 
-    try {
-      const res = await createSessionAction(agentId);
-      if (!res.success) {
-        console.error("Session creation failed:", res);
-        setStatus("error");
-        return;
-      }
+      try {
+        const res = await createSessionAction(agentId, metadata);
+        if (!res.success) {
+          console.error("Session creation failed:", res);
+          setStatus("error");
+          return;
+        }
 
-      // @ts-expect-error D-ID stream payload shape is validated at runtime.
-      const { streamId, sessionId, chatId, offer, ice_servers } = res.data;
-      idsRef.current = { streamId, sessionId, chatId };
+        // @ts-expect-error D-ID stream payload shape is validated at runtime.
+        const { streamId, sessionId, chatId, offer, ice_servers } = res.data;
+        idsRef.current = { streamId, sessionId, chatId };
 
-      const pc = new RTCPeerConnection({
-        iceServers: ice_servers || [{ urls: "stun:stun.l.google.com:19302" }],
-        iceTransportPolicy: "all",
-      });
-      pcRef.current = pc;
+        const pc = new RTCPeerConnection({
+          iceServers: ice_servers || [{ urls: "stun:stun.l.google.com:19302" }],
+          iceTransportPolicy: "all",
+        });
+        pcRef.current = pc;
 
-      const dc = pc.createDataChannel("JanusDataChannel");
-      dcRef.current = dc;
+        const dc = pc.createDataChannel("JanusDataChannel");
+        dcRef.current = dc;
 
-      dc.onmessage = (event) => {
-        const msg = event.data;
-        console.log("dc.onmessage", msg);
+        dc.onmessage = (event) => {
+          const msg = event.data;
+          console.log("dc.onmessage", msg);
 
-        if (msg.includes("stream/started")) {
-          console.log("⚡ D-ID Event: START Talking");
-          setIsAgentSpeaking(true);
-
-          const match = msg.match(/{.*}/);
-          if (match) {
-            try {
-              const parsed = JSON.parse(match[0]);
-              currentVideoIdRef.current = parsed.metadata?.videoId;
-            } catch (e) {
-              console.error("Parse videoId error", e);
+          if (typeof msg === "string") {
+            const answer = decodeChatAnswer(msg);
+            if (answer && idsRef.current) {
+              if (lastAssistantRef.current !== answer) {
+                lastAssistantRef.current = answer;
+                appendAssistantMessageAction(agentId, {
+                  streamId: idsRef.current.streamId,
+                  sessionId: idsRef.current.sessionId,
+                  chatId: idsRef.current.chatId,
+                  message: answer,
+                });
+              }
             }
           }
-        } else if (msg.includes("stream/done")) {
-          console.log("⚡ D-ID Event: STOP Talking");
-          setIsAgentSpeaking(false);
-          currentVideoIdRef.current = null;
-        }
-      };
 
-      pc.ontrack = (event) => {
-        if (event.streams?.[0] && videoRef.current) {
-          if (videoRef.current.srcObject !== event.streams[0]) {
-            videoRef.current.srcObject = event.streams[0];
-            videoRef.current.muted = false;
-            videoRef.current
-              .play()
-              .catch((e) => console.warn("Video play error:", e));
+          if (typeof msg === "string" && msg.includes("stream/started")) {
+            console.log("⚡ D-ID Event: START Talking");
+            setIsAgentSpeaking(true);
+
+            const match = msg.match(/{.*}/);
+            if (match) {
+              try {
+                const parsed = JSON.parse(match[0]);
+                currentVideoIdRef.current = parsed.metadata?.videoId;
+              } catch (e) {
+                console.error("Parse videoId error", e);
+              }
+            }
+          } else if (typeof msg === "string" && msg.includes("stream/done")) {
+            console.log("⚡ D-ID Event: STOP Talking");
+            setIsAgentSpeaking(false);
+            currentVideoIdRef.current = null;
           }
-        }
-      };
+        };
 
-      pc.onicecandidate = (event) => {
-        if (event.candidate && idsRef.current) {
-          const candidatePlain = {
-            candidate: event.candidate.candidate,
-            sdpMid: event.candidate.sdpMid,
-            sdpMLineIndex: event.candidate.sdpMLineIndex,
-          };
+        pc.ontrack = (event) => {
+          if (event.streams?.[0] && videoRef.current) {
+            if (videoRef.current.srcObject !== event.streams[0]) {
+              videoRef.current.srcObject = event.streams[0];
+              videoRef.current.muted = false;
+              videoRef.current
+                .play()
+                .catch((e) => console.warn("Video play error:", e));
+            }
+          }
+        };
 
-          submitIceAction(agentId, {
-            streamId: idsRef.current.streamId,
-            sessionId: idsRef.current.sessionId,
-            // @ts-expect-error Candidate shape is validated before transport.
-            candidate: candidatePlain,
-          });
-        }
-      };
+        pc.onicecandidate = (event) => {
+          if (event.candidate && idsRef.current) {
+            const candidatePlain = {
+              candidate: event.candidate.candidate,
+              sdpMid: event.candidate.sdpMid,
+              sdpMLineIndex: event.candidate.sdpMLineIndex,
+            };
 
-      pc.oniceconnectionstatechange = () => {
-        console.log("ICE State:", pc.iceConnectionState);
-        if (pc.iceConnectionState === "connected") setStatus("connected");
-        if (
-          pc.iceConnectionState === "failed" ||
-          pc.iceConnectionState === "disconnected"
-        ) {
-          setStatus("error");
-          cleanup();
-        }
-      };
+            submitIceAction(agentId, {
+              streamId: idsRef.current.streamId,
+              sessionId: idsRef.current.sessionId,
+              // @ts-expect-error Candidate shape is validated before transport.
+              candidate: candidatePlain,
+            });
+          }
+        };
 
-      await pc.setRemoteDescription(new RTCSessionDescription(offer));
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
+        pc.oniceconnectionstatechange = () => {
+          console.log("ICE State:", pc.iceConnectionState);
+          if (pc.iceConnectionState === "connected") setStatus("connected");
+          if (
+            pc.iceConnectionState === "failed" ||
+            pc.iceConnectionState === "disconnected"
+          ) {
+            setStatus("error");
+            cleanup();
+          }
+        };
 
-      await submitAnswerAction(agentId, {
-        streamId,
-        sessionId,
-        answer: { type: "answer", sdp: answer.sdp },
-      });
-    } catch (e) {
-      console.error("Connection failed:", e);
-      setStatus("error");
-      cleanup();
-    }
-  }, [status, cleanup, videoRef, agentId]);
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+
+        await submitAnswerAction(agentId, {
+          streamId,
+          sessionId,
+          answer: { type: "answer", sdp: answer.sdp },
+        });
+      } catch (e) {
+        console.error("Connection failed:", e);
+        setStatus("error");
+        cleanup();
+      }
+    },
+    [status, cleanup, videoRef, agentId, decodeChatAnswer],
+  );
 
   const speak = useCallback(
-    (text: string) => {
-      if (status !== "connected" || !idsRef.current) return;
+    async (text: string, language?: string) => {
+      if (status !== "connected" || !idsRef.current) {
+        return { success: false, error: "Not connected" };
+      }
 
-      chatAction(agentId, {
+      return chatAction(agentId, {
         streamId: idsRef.current.streamId,
         sessionId: idsRef.current.sessionId,
         chatId: idsRef.current.chatId,
         text,
+        language,
       });
     },
     [status, agentId],
@@ -181,9 +221,20 @@ export const useAgent = (
     setIsAgentSpeaking(false);
   }, []);
 
+  const disconnect = useCallback(async () => {
+    const ids = idsRef.current;
+    if (ids) {
+      await closeSessionAction(agentId, {
+        streamId: ids.streamId,
+        chatId: ids.chatId,
+      });
+    }
+    cleanup();
+  }, [agentId, cleanup]);
+
   return {
     connect,
-    disconnect: cleanup,
+    disconnect,
     speak,
     interrupt,
     status,

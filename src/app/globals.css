@@ -49,6 +49,7 @@ body {
   color: var(--na-text-on-light);
   background: var(--na-bg-base);
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 .na-container {

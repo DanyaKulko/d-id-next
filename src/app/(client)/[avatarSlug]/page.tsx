@@ -1,11 +1,11 @@
-import Link from "next/link";
 import "./page.css";
 import Image from "next/image";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 import { AvatarPageClient } from "@/app/(client)/[avatarSlug]/page.client";
 import logo from "@/assets/img/neil_avatar_logo.png";
 import { findAgentByKey } from "@/lib/agents/agents.db";
 import { enforceClientAuth } from "@/lib/auth/client-access";
-import { didService } from "@/lib/services/did.service";
 
 type AvatarPageProps = {
   params: Promise<{ avatarSlug: string }>;
@@ -15,11 +15,10 @@ export default async function AvatarPage({ params }: AvatarPageProps) {
   const { avatarSlug } = await params;
   await enforceClientAuth(`/${avatarSlug}`);
   const agentRecord = await findAgentByKey(avatarSlug);
-  // TODO: add notFound() handling when the slug does not match a local or D-ID agent.
-  const didAgentId = agentRecord?.agentId ?? avatarSlug;
-  const agent = await didService
-    .getAgent(didAgentId)
-    .catch((err) => err.toJSON());
+  if (!agentRecord?.agentId) {
+    notFound();
+  }
+  const agent = { id: agentRecord.agentId };
   return (
     <>
       <header className="na-header">
@@ -36,10 +35,14 @@ export default async function AvatarPage({ params }: AvatarPageProps) {
       <main className="na-container">
         <AvatarPageClient
           agent={agent}
-          agentName={agentRecord?.displayName ?? agent?.name ?? "Neil Avatar"}
-          agentDescription={
-            agentRecord?.description ?? agent?.description ?? ""
+          agentName={
+            agentRecord?.displayName ?? agentRecord?.name ?? "Neil Avatar"
           }
+          agentDescription={
+            agentRecord?.description ?? agentRecord?.description ?? ""
+          }
+          agentImageUrl={agentRecord?.avatarImageUrl ?? ""}
+          agentIdleVideoUrl={agentRecord?.idleVideoUrl ?? ""}
           backgrounds={agentRecord?.backgrounds ?? []}
           backgroundsEnabled={agentRecord?.backgroundEnabled ?? false}
         />

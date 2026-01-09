@@ -23,7 +23,7 @@ export async function sendOtpEmail(params: {
   await transporter.sendMail({
     from: requireEnv("SMTP_FROM"),
     to: params.to,
-    subject: "Код подтверждения",
-    text: `Код: ${params.code}\nДействует: ${params.ttlMinutes} минут.`,
+    subject: "Confirmation Code",
+    text: `Your OTP code: ${params.code}\nValid for ${params.ttlMinutes} minutes.`,
   });
 }

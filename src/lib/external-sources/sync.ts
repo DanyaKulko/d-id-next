@@ -25,7 +25,7 @@ type ExternalSourceEntry = {
   cron: string;
 };
 
-const buildHeaders = (apiKey?: string) => {
+const buildHeaders = (apiKey?: string): HeadersInit => {
   if (!apiKey) return {};
   return {
     Authorization: `Bearer ${apiKey}`,

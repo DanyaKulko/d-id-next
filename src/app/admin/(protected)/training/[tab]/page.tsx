@@ -6,12 +6,7 @@ import {
   type KnowledgeItem,
 } from "@/app/admin/(protected)/admin-data";
 import TrainingClient from "../training.client";
-import {
-  type TrainingTabId,
-  trainingTabs,
-  trainingTabTitles,
-} from "../training.tabs";
-import "../page.css";
+import { type TrainingTabId, trainingTabs } from "../training.tabs";
 
 type TrainingTabPageProps = {
   params: Promise<{ tab: string }>;
@@ -26,7 +21,6 @@ export default async function TrainingTabPage({
     redirect("/admin/training/archive");
   }
 
-  const title = trainingTabTitles[tab];
   let knowledge: KnowledgeItem[] = [];
   let safetyRules = "";
   let manualText = "";
@@ -44,24 +38,12 @@ export default async function TrainingTabPage({
   }
 
   return (
-    <div className="container">
-      <div className="breadcrumbs">
-        <div className="breadcrumb-item">Training</div>
-        <span className="breadcrumb-separator">›</span>
-        <div className="breadcrumb-item" id="current-section">
-          {title}
-        </div>
-      </div>
-
-      <h1 className="page-title">{title}</h1>
-
-      <TrainingClient
-        key={tab}
-        initialTab={tab}
-        initialKnowledge={knowledge}
-        initialSafetyRules={safetyRules}
-        initialManualText={manualText}
-      />
-    </div>
+    <TrainingClient
+      key={tab}
+      initialTab={tab}
+      initialKnowledge={knowledge}
+      initialSafetyRules={safetyRules}
+      initialManualText={manualText}
+    />
   );
 }

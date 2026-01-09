@@ -135,7 +135,7 @@ export default function LoginClient() {
                 placeholder="you@company.com"
                 autoComplete="username"
                 required
-                pattern="^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+                pattern="^[^@\s]+@[^@\s]+\.[^@\s]+$"
                 title="Enter a valid email address"
               />
             </div>

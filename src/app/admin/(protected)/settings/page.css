@@ -81,6 +81,14 @@
   background: #ebf8ff;
 }
 
+.error-log-row {
+  cursor: pointer;
+}
+
+.error-log-row:hover {
+  background: #fef6e6;
+}
+
 .expandable-content {
   display: none;
   background: #f7fafc;
@@ -91,6 +99,21 @@
 
 .expandable-content.expanded {
   display: block;
+}
+
+.log-metadata {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 12px;
+  font-size: 12px;
+  color: #2d3748;
+  white-space: pre-wrap;
+}
+
+.log-empty {
+  font-size: 13px;
+  color: #718096;
 }
 
 .message-block {
@@ -142,7 +165,7 @@
 .toggle-switch {
   position: relative;
   flex: 1 0 60px;
-  width: 60px;
+  max-width: 60px;
   height: 30px;
 }
 

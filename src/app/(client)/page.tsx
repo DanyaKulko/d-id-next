@@ -34,13 +34,33 @@ export default async function Home() {
         <div className="na-roles-grid">
           {avatars.map((avatar, index) => (
             <Link
-              href={`./${avatar.key}`}
+              href={`/${avatar.key}`}
               key={avatar.id}
               className={`na-card na-card--${index === 0 ? "full" : "half"}`}
             >
-              <video className="na-card-video" autoPlay loop muted playsInline>
-                <source src={avatar.videoUrl} type="video/mp4" />
-              </video>
+              {avatar.videoUrl ? (
+                <video
+                  className="na-card-video"
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                >
+                  <source src={avatar.videoUrl} type="video/mp4" />
+                </video>
+              ) : avatar.imageUrl ? (
+                <Image
+                  className="na-card-image"
+                  src={avatar.imageUrl}
+                  alt={`${avatar.name} preview`}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                  unoptimized
+                  loading="lazy"
+                />
+              ) : (
+                <div className="na-card-image na-card-image--empty" />
+              )}
               <div className="na-card-overlay"></div>
               <div className="na-card-content">
                 <h3 className="na-card-title">{avatar.name}</h3>

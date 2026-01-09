@@ -1,13 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  useTransition,
-} from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import toast from "react-hot-toast";
 import { useAzureSTT } from "@/app/(client)/[avatarSlug]/_hooks/useAzureSTT";
 import {
@@ -16,15 +9,7 @@ import {
   saveSafetyInstructionsAction,
 } from "@/app/admin/(protected)/actions";
 import type { KnowledgeItem } from "@/app/admin/(protected)/admin-data";
-import { type TrainingTabId, trainingTabTitles } from "./training.tabs";
-
-function setBreadcrumb(level2: string) {
-  const el = document.getElementById("current-section");
-  if (el) el.textContent = level2;
-
-  const h1 = document.querySelector(".page-title");
-  if (h1) h1.textContent = level2;
-}
+import type { TrainingTabId } from "./training.tabs";
 
 type TrainingClientProps = {
   initialTab: TrainingTabId;
@@ -39,7 +24,6 @@ export default function LearningClient({
   initialSafetyRules,
   initialManualText,
 }: TrainingClientProps) {
-  const router = useRouter();
   const activeTab = initialTab;
   const [search, setSearch] = useState("");
   const [knowledge, setKnowledge] = useState<KnowledgeItem[]>(initialKnowledge);
@@ -58,22 +42,6 @@ export default function LearningClient({
   const { listening, startListening, stopListening, interimTranscript } =
     useAzureSTT(handleDictationFinal);
 
-  useEffect(() => {
-    setBreadcrumb(trainingTabTitles[activeTab]);
-  }, [activeTab]);
-
-  useEffect(() => {
-    setKnowledge(initialKnowledge);
-  }, [initialKnowledge]);
-
-  useEffect(() => {
-    setSafetyRules(initialSafetyRules);
-  }, [initialSafetyRules]);
-
-  useEffect(() => {
-    setManualText(initialManualText);
-  }, [initialManualText]);
-
   const filteredKnowledge = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return knowledge;
@@ -84,11 +52,6 @@ export default function LearningClient({
       return hay.includes(q);
     });
   }, [knowledge, search]);
-
-  const switchTab = (tab: TrainingTabId) => {
-    if (tab === activeTab) return;
-    router.push(`/admin/training/${tab}`);
-  };
 
   const handleDelete = (item: KnowledgeItem) => {
     setDeleteCandidate(item);
@@ -126,45 +89,7 @@ export default function LearningClient({
 
   return (
     <>
-      <div className="tabs">
-        <button
-          type="button"
-          className={`tab ${activeTab === "archive" ? "active" : ""}`}
-          onClick={() => switchTab("archive")}
-        >
-          📚 Knowledge Archive
-        </button>
-
-        {/*<button*/}
-        {/*    type="button"*/}
-        {/*    className={`tab ${activeTab === "prerendered" ? "active" : ""}`}*/}
-        {/*    onClick={() => switchTab("prerendered")}*/}
-        {/*>*/}
-        {/*    🎬 Pre-rendered Templates*/}
-        {/*</button>*/}
-
-        <button
-          type="button"
-          className={`tab ${activeTab === "safety" ? "active" : ""}`}
-          onClick={() => switchTab("safety")}
-        >
-          🛡️ Safety
-        </button>
-
-        <button
-          type="button"
-          className={`tab ${activeTab === "manual" ? "active" : ""}`}
-          onClick={() => switchTab("manual")}
-        >
-          ✍️ Manual Training
-        </button>
-      </div>
-
-      {/* Knowledge Archive */}
-      <div
-        id="archive"
-        className={`tab-content ${activeTab === "archive" ? "active" : ""}`}
-      >
+      {activeTab === "archive" && (
         <div className="section">
           <h2
             className="section-title-with-tooltip"
@@ -245,7 +170,7 @@ export default function LearningClient({
             </div>
           ))}
         </div>
-      </div>
+      )}
 
       {/* Pre-rendered Templates */}
       {/*<div id="prerendered" className={`tab-content ${activeTab === "prerendered" ? "active" : ""}`}>*/}
@@ -306,11 +231,7 @@ export default function LearningClient({
       {/*    </div>*/}
       {/*</div>*/}
 
-      {/* Safety */}
-      <div
-        id="safety"
-        className={`tab-content ${activeTab === "safety" ? "active" : ""}`}
-      >
+      {activeTab === "safety" && (
         <form
           className="section"
           onSubmit={(event) => {
@@ -364,13 +285,9 @@ export default function LearningClient({
             {isSaving ? "Saving..." : "💾 Save Settings"}
           </button>
         </form>
-      </div>
+      )}
 
-      {/* Manual Training */}
-      <div
-        id="manual"
-        className={`tab-content ${activeTab === "manual" ? "active" : ""}`}
-      >
+      {activeTab === "manual" && (
         <form
           className="section"
           onSubmit={(event) => {
@@ -384,9 +301,9 @@ export default function LearningClient({
             formData.set("manualLearning", manualText);
 
             startSaving(async () => {
-                await saveManualTrainingAction(formData)
-                    .then(() => toast.success("Manual training saved"))
-                    .catch(() => toast.error("Failed to save training"))
+              await saveManualTrainingAction(formData)
+                .then(() => toast.success("Manual training saved"))
+                .catch(() => toast.error("Failed to save training"));
             });
           }}
         >
@@ -462,7 +379,7 @@ export default function LearningClient({
             </button>
           </div>
         </form>
-      </div>
+      )}
 
       {deleteCandidate && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">

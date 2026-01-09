@@ -3,13 +3,51 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Toaster } from "react-hot-toast";
 
 export default function AdminNavbar() {
   const pathname = usePathname();
+  const [creditsStatus, setCreditsStatus] = useState<
+    "loading" | "ready" | "error"
+  >("loading");
+  const [credits, setCredits] = useState<{
+    remaining: number;
+    total: number;
+    expireAt?: string | null;
+  } | null>(null);
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(`${href}/`) ? "active" : "";
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadCredits = async () => {
+      try {
+        const response = await fetch("/api/admin/credits");
+        if (!response.ok) throw new Error("Failed to load credits");
+        const data = (await response.json()) as {
+          remaining?: number;
+          total?: number;
+          expireAt?: string | null;
+        };
+        if (cancelled) return;
+        setCredits({
+          remaining: Number(data.remaining ?? 0),
+          total: Number(data.total ?? 0),
+          expireAt: data.expireAt ?? null,
+        });
+        setCreditsStatus("ready");
+      } catch {
+        if (cancelled) return;
+        setCreditsStatus("error");
+      }
+    };
+    loadCredits();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <>
@@ -26,7 +64,27 @@ export default function AdminNavbar() {
             </div>
             <span>Gokhale CMS</span>
           </Link>
-
+          <div className="gokhale-nav-credits">
+            {creditsStatus === "loading" && (
+              <div className="credits-pill credits-skeleton" />
+            )}
+            {creditsStatus === "error" && (
+              <div className="credits-pill credits-error">Credits: —</div>
+            )}
+            {creditsStatus === "ready" && credits && (
+              <div className="credits-pill">
+                <span>Credits</span>
+                <strong>
+                  {credits.remaining.toFixed(1)}/{credits.total.toFixed(1)}
+                </strong>
+                {credits.expireAt && (
+                  <span className="credits-expiry">
+                    exp {new Date(credits.expireAt).toLocaleDateString()}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
           <ul className="gokhale-nav-links">
             <li>
               <Link

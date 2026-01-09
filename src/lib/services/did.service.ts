@@ -49,6 +49,11 @@ export const didService = {
     return data;
   },
 
+  async getCredits() {
+    const { data } = await client.get(`/credits`);
+    return data;
+  },
+
   // TODO: confirm knowledge base endpoints with latest D-ID docs.
   async listKnowledgeDocuments(knowledgeBaseId: string) {
     const { data } = await client.get(
@@ -143,18 +148,16 @@ export const didService = {
     chatId: string,
     streamId: string,
     sessionId: string,
-    text: string,
+    messages: {
+      role: "system" | "user" | "assistant";
+      content: string;
+      created_at: string;
+    }[],
   ) {
     const { data } = await client.post(`/agents/${agentId}/chat/${chatId}`, {
       streamId,
       sessionId,
-      messages: [
-        {
-          role: "user",
-          content: text,
-          created_at: new Date().toISOString(),
-        },
-      ],
+      messages,
     });
     return data;
   },

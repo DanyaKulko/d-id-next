@@ -75,6 +75,24 @@
   z-index: 1;
 }
 
+.na-card-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
+}
+
+.na-card-image--empty {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 222, 179, 0.35),
+    rgba(201, 218, 227, 0.6)
+  );
+}
+
 .na-card-overlay {
   position: absolute;
   top: 0;
