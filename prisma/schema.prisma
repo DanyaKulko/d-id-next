@@ -12,6 +12,11 @@ enum Role {
   ADMIN
 }
 
+enum BackgroundKeyColor {
+  WHITE
+  GREEN
+}
+
 enum AuthEventType {
   LOGIN_PASSWORD
   LOGIN_OTP_SENT
@@ -114,6 +119,7 @@ model Agent {
 
   voiceID           String
   backgroundEnabled Boolean @default(false)
+  backgroundKeyColor BackgroundKeyColor?
 
   idleVideoUrl String?
   avatarImageUrl String?

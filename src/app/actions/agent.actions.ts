@@ -80,7 +80,7 @@ const updateSessionLanguage = async (
         language: { not: null },
       },
       _count: { _all: true },
-      orderBy: { _count: { _all: "desc" } },
+      orderBy: { _count: { language: "desc" } },
       take: 1,
     })
     .then((rows) => rows[0]?.language ?? null)

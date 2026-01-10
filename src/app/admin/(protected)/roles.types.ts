@@ -2,6 +2,8 @@ export type AgentKey = string;
 
 export type BackgroundTheme = string;
 
+export type BackgroundKeyColor = "white" | "green";
+
 export type BackgroundItem = {
   id: string;
   title: string;
@@ -19,6 +21,7 @@ export type AgentSettings = {
   personalityStyle: string;
   voiceId: string;
   backgroundsEnabled: boolean;
+  backgroundKeyColor?: BackgroundKeyColor;
   backgrounds: BackgroundItem[];
 };
 
@@ -27,6 +30,3 @@ export type AgentListItem = {
   displayName: string;
 };
 
-export function isBackgroundTheme(value: string): value is BackgroundTheme {
-  return value.trim().length > 0;
-}

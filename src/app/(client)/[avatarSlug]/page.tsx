@@ -18,7 +18,11 @@ export default async function AvatarPage({ params }: AvatarPageProps) {
   if (!agentRecord?.agentId) {
     notFound();
   }
-  const agent = { id: agentRecord.agentId };
+
+  const backgroundKeyColor = agentRecord.backgroundKeyColor
+    ? agentRecord.backgroundKeyColor.toLowerCase() as 'white' | 'green'
+    : undefined;
+
   return (
     <>
       <header className="na-header">
@@ -34,7 +38,7 @@ export default async function AvatarPage({ params }: AvatarPageProps) {
 
       <main className="na-container">
         <AvatarPageClient
-          agent={agent}
+          agent={agentRecord}
           agentName={
             agentRecord?.displayName ?? agentRecord?.name ?? "Neil Avatar"
           }
@@ -45,6 +49,7 @@ export default async function AvatarPage({ params }: AvatarPageProps) {
           agentIdleVideoUrl={agentRecord?.idleVideoUrl ?? ""}
           backgrounds={agentRecord?.backgrounds ?? []}
           backgroundsEnabled={agentRecord?.backgroundEnabled ?? false}
+          backgroundKeyColor={backgroundKeyColor}
         />
 
         <div className="na-brand-logo">

@@ -162,8 +162,8 @@ export const didService = {
     return data;
   },
 
-  async closeSession(agentId: string, streamId: string) {
-    await client.delete(`/agents/${agentId}/streams/${streamId}`);
+  async closeSession(_agentId: string, _streamId: string) {
+    // await client.delete(`/agents/${agentId}/streams/${streamId}`);
     return { status: "closed" };
   },
 };

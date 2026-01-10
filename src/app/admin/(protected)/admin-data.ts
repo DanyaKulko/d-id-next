@@ -525,7 +525,7 @@ export async function fetchSessionRoles(): Promise<SessionRoleOption[]> {
 export async function fetchSessionRecords(
   filters: SessionFilters,
 ): Promise<SessionPage> {
-    // @ts-ignore
+  // @ts-expect-error Prisma type inference doesn't like dynamic filters here.
   const where: Parameters<typeof prisma.chatSession.count>[0]["where"] = {};
   if (filters.roleId) {
     where.agentId = filters.roleId;

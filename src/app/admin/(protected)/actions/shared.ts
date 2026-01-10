@@ -1,0 +1,268 @@
+import { requireRole } from "@/lib/auth/rbac";
+import { requireUser } from "@/lib/auth/require";
+import {
+  isAxiosError,
+  logExternalServiceError,
+  resolveExternalErrorDetails,
+} from "@/lib/logging/external-errors";
+import { didService } from "@/lib/services/did.service";
+
+export const getString = (value: FormDataEntryValue | null) =>
+  typeof value === "string" ? value : "";
+
+export const getOptionalString = (value: FormDataEntryValue | null) =>
+  typeof value === "string" ? value : undefined;
+
+export const safetyRulesKey = "safetyRules";
+export const manualTrainingKey = "manualTrainingText";
+export const manualTrainingDocKey = "manualTrainingDocId";
+export const manualTrainingFileKey = "manualTrainingFilePath";
+export const authRequiredKey = "requireAuthentication";
+export const manualTrainingSource = "Manual training";
+export const textBlogSource = "Text blog";
+export const videoTranscriptsSource = "Video transcripts";
+export const defaultPersonalityStyle = "Friendly and Professional";
+
+const personalityAliases: Record<string, string> = {
+  friendly: defaultPersonalityStyle,
+  fun: "Fun and Engaging",
+  warm: "Warm and Supportive",
+  direct: "Direct and Concise",
+  sophisticated: "Sophisticated and Formal",
+  confident: "Confident and Persuasive",
+};
+
+export const normalizePersonalityStyle = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return defaultPersonalityStyle;
+  return personalityAliases[trimmed] ?? trimmed;
+};
+
+export async function requireAdmin() {
+  const user = await requireUser();
+  requireRole(user.roles, "ADMIN");
+  return user;
+}
+
+export const formatSafetyRules = (rules: string) => {
+  const trimmed = rules.trim();
+  if (!trimmed) return "";
+  return `Safety rules:\n${trimmed}`;
+};
+
+export const stripSafetyRulesFromPrompt = (prompt: string) => {
+  const idx = prompt.toLowerCase().indexOf("safety rules:");
+  if (idx === -1) return prompt.trim();
+  return prompt.slice(0, idx).trim();
+};
+
+export const buildDidInstructions = (
+  systemPrompt: string,
+  safetyRules: string,
+) => {
+  const prompt = stripSafetyRulesFromPrompt(systemPrompt);
+  const safety = formatSafetyRules(safetyRules);
+  if (!prompt && !safety) return "";
+  if (prompt && safety) {
+    return `${prompt}\n\n${safety}`;
+  }
+  return prompt || safety;
+};
+
+export const resolveString = (value: unknown, fallback = "") =>
+  typeof value === "string" ? value : fallback;
+
+export const extractVoiceId = (agent: Record<string, unknown>) => {
+  const presenter = agent.presenter;
+  if (presenter && typeof presenter === "object") {
+    const presenterVoice = (presenter as Record<string, unknown>).voice;
+    if (presenterVoice && typeof presenterVoice === "object") {
+      return resolveString(
+        (presenterVoice as Record<string, unknown>).voice_id,
+        "",
+      );
+    }
+  }
+  const voice = agent.voice;
+  if (voice && typeof voice === "object") {
+    return resolveString(
+      (voice as Record<string, unknown>).voice_id ??
+        (voice as Record<string, unknown>).id,
+      "",
+    );
+  }
+  return resolveString(
+    agent.voice_id ?? agent.voiceId ?? agent.preview_voice_id,
+    "",
+  );
+};
+
+export const extractIdleVideoUrl = (agent: Record<string, unknown>) => {
+  const presenter = agent.presenter;
+  if (!presenter || typeof presenter !== "object") return "";
+  return resolveString(
+    (presenter as Record<string, unknown>).idle_video ??
+      (presenter as Record<string, unknown>).idle_video_url,
+    "",
+  );
+};
+
+export const extractAvatarImageUrl = (agent: Record<string, unknown>) => {
+  const presenter = agent.presenter;
+  if (!presenter || typeof presenter !== "object") return "";
+  return resolveString(
+    (presenter as Record<string, unknown>).source_url ??
+      (presenter as Record<string, unknown>).thumbnail ??
+      (presenter as Record<string, unknown>).image_url ??
+      (presenter as Record<string, unknown>).imageUrl ??
+      (presenter as Record<string, unknown>).thumbnail_url ??
+      (presenter as Record<string, unknown>).thumbnailUrl ??
+      (presenter as Record<string, unknown>).preview_image ??
+      (presenter as Record<string, unknown>).previewImage,
+    "",
+  );
+};
+
+const logDidError = async (error: unknown, context: string) => {
+  if (!isAxiosError(error)) return;
+  const details = resolveExternalErrorDetails(error);
+  await logExternalServiceError({
+    source: "D-ID",
+    type: context,
+    message: details.message,
+    metadata: details.metadata,
+  });
+};
+
+export const withDidLogging = async <T>(
+  context: string,
+  operation: () => Promise<T>,
+) => {
+  try {
+    return await operation();
+  } catch (error) {
+    await logDidError(error, context);
+    throw error;
+  }
+};
+
+export async function updateDidAgentFromRole(
+  agentId: string,
+  input: {
+    name: string;
+    description: string;
+    role: string;
+    systemPrompt: string;
+    safetyRules: string;
+    personalityStyle: string;
+    voiceId?: string;
+  },
+) {
+  const existing = await withDidLogging("Get Agent", () =>
+    didService.getAgent(agentId),
+  ).catch(() => null);
+  const existingAgent =
+    existing && typeof existing === "object"
+      ? (existing as Record<string, unknown>)
+      : null;
+  if (!existingAgent) return;
+
+  const payload: Record<string, unknown> = {};
+  const llmPayload =
+    existingAgent.llm && typeof existingAgent.llm === "object"
+      ? ({ ...existingAgent.llm } as Record<string, unknown>)
+      : {};
+  const presenterPayload =
+    existingAgent.presenter && typeof existingAgent.presenter === "object"
+      ? ({ ...existingAgent.presenter } as Record<string, unknown>)
+      : {};
+  const promptCustomization =
+    llmPayload.prompt_customization &&
+    typeof llmPayload.prompt_customization === "object"
+      ? ({ ...llmPayload.prompt_customization } as Record<string, unknown>)
+      : {};
+
+  if ("preview_name" in existingAgent) {
+    payload.preview_name = input.name || existingAgent.preview_name;
+  } else if (input.name) {
+    payload.preview_name = input.name;
+  }
+  payload.description = input.description ?? existingAgent.description ?? "";
+
+  const instructions = buildDidInstructions(
+    input.systemPrompt,
+    input.safetyRules,
+  );
+  if (instructions) {
+    if ("instructions" in llmPayload) {
+      llmPayload.instructions = instructions;
+    } else if ("system_prompt" in llmPayload) {
+      llmPayload.system_prompt = instructions;
+    } else {
+      llmPayload.instructions = instructions;
+    }
+  }
+
+  if (input.role) {
+    promptCustomization.role = input.role;
+  }
+
+  if (input.personalityStyle) {
+    promptCustomization.personality = input.personalityStyle;
+  }
+
+  if (Object.keys(promptCustomization).length > 0) {
+    llmPayload.prompt_customization = promptCustomization;
+  }
+
+  if (Object.keys(llmPayload).length > 0) {
+    payload.llm = llmPayload;
+  }
+
+  if (input.voiceId) {
+    const existingVoice =
+      presenterPayload.voice && typeof presenterPayload.voice === "object"
+        ? ({ ...presenterPayload.voice } as Record<string, unknown>)
+        : {};
+    existingVoice.voice_id = input.voiceId;
+    presenterPayload.voice = existingVoice;
+  }
+
+  if (Object.keys(presenterPayload).length > 0) {
+    payload.presenter = presenterPayload;
+  }
+
+  const fullPayload: Record<string, unknown> = {};
+  const allowedFields = [
+    "embed",
+    "triggers",
+    "llm",
+    "preview_thumbnail",
+    "presenter",
+    "preview_name",
+    "description",
+    "access",
+    "starter_message",
+    "greetings",
+    "use_case",
+    "knowledge",
+  ];
+
+  for (const field of allowedFields) {
+    if (field in payload) {
+      fullPayload[field] = payload[field];
+      continue;
+    }
+    if (field in existingAgent) {
+      fullPayload[field] = existingAgent[field];
+    }
+  }
+  if (process.env.DID_KNOWLEDGE_BASE_ID) {
+    fullPayload.knowledge = { id: process.env.DID_KNOWLEDGE_BASE_ID };
+  }
+
+  if (Object.keys(fullPayload).length === 0) return;
+  await withDidLogging("Update Agent", () =>
+    didService.updateAgent(agentId, fullPayload),
+  );
+}

@@ -2,15 +2,11 @@ import { randomUUID } from "node:crypto";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
-import { isBackgroundTheme } from "@/app/admin/(protected)/roles.types";
 import { prisma } from "@/lib/db/prisma";
 
 export const runtime = "nodejs";
 
-// TODO: add auth/role guard once admin API auth helpers are available.
-// TODO: switch to a persistent storage for production deployments.
 const uploadRoot = path.join(process.cwd(), "public", "uploads", "backgrounds");
-// TODO: load max upload size from admin settings.
 const maxUploadMb = 25;
 
 const sanitizeFileName = (value: string) =>
@@ -20,17 +16,17 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const agentKeyRaw = formData.get("agentKey") ?? formData.get("roleId");
   const titleRaw = formData.get("title");
-  const themeRaw = formData.get("theme");
+  // const themeRaw = formData.get("theme");
   const file = formData.get("file");
 
   if (typeof agentKeyRaw !== "string" || !agentKeyRaw.trim()) {
     return NextResponse.json({ error: "Invalid agent key" }, { status: 400 });
   }
 
-  const theme =
-    typeof themeRaw === "string" && isBackgroundTheme(themeRaw)
-      ? themeRaw.trim()
-      : "default";
+  // const theme =
+  //   typeof themeRaw === "string" && isBackgroundTheme(themeRaw)
+  //     ? themeRaw.trim()
+  //     : "default";
 
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "File is required" }, { status: 400 });
@@ -81,7 +77,7 @@ export async function POST(request: Request) {
     data: {
       agentId: agent.id,
       title,
-      theme,
+      theme: "default",
       url,
     },
   });

@@ -20,6 +20,56 @@
   aspect-ratio: 16 / 9;
 }
 
+.na-mic-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 20, 34, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+  backdrop-filter: blur(2px);
+  padding: var(--na-space-md);
+}
+
+.na-mic-card {
+  background: #ffffff;
+  color: #284664;
+  border-radius: 16px;
+  padding: 24px;
+  width: min(360px, 100%);
+  text-align: center;
+  box-shadow: 0 20px 40px rgba(18, 32, 52, 0.25);
+}
+
+.na-mic-icon {
+  font-size: 30px;
+}
+
+.na-mic-title {
+  margin: 12px 0 6px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.na-mic-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.na-mic-error {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #f44336;
+}
+
+.na-mic-actions {
+  margin-top: 16px;
+  display: grid;
+  gap: 8px;
+}
+
 .na-avatar-overlay {
   position: absolute;
   top: 0;

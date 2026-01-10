@@ -4,6 +4,7 @@ import type {
   AgentListItem,
   AgentSettings,
   BackgroundItem,
+  BackgroundKeyColor,
 } from "@/app/admin/(protected)/roles.types";
 import { prisma } from "@/lib/db/prisma";
 
@@ -75,6 +76,7 @@ const toAgentSettings = (
     personality: string | null;
     voiceID: string;
     backgroundEnabled: boolean;
+    backgroundKeyColor: string | null;
     backgrounds: {
       id: string;
       title: string;
@@ -100,6 +102,9 @@ const toAgentSettings = (
     personalityStyle: agent.personality ?? "Friendly and Professional",
     voiceId: agent.voiceID ?? "",
     backgroundsEnabled: agent.backgroundEnabled ?? false,
+    backgroundKeyColor: agent.backgroundKeyColor
+      ? (agent.backgroundKeyColor.toLowerCase() as BackgroundKeyColor)
+      : undefined,
     backgrounds,
   };
 };

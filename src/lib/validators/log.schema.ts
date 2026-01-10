@@ -5,7 +5,5 @@ export const externalLogSchema = z.object({
   type: z.string().min(1).max(120),
   message: z.string().min(1).max(2000),
   level: z.enum(["INFO", "WARNING", "ERROR"]).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
-
-export type ExternalLogInput = z.infer<typeof externalLogSchema>;
