@@ -74,8 +74,8 @@ services:
       APP_BASE_URL: "http://app:3000"
       CRON_SECRET: ${CRON_SECRET}
     volumes:
-      - ./scripts/setup-cron.sh:/setup-cron.sh
-    command: [ "sh", "-c", "chmod +x /setup-cron.sh && /setup-cron.sh" ]
+      - ./scripts/cron/setup-cron.sh:/setup-cron.sh
+    command: ["sh", "/setup-cron.sh"]
     restart: unless-stopped
 
 volumes:
