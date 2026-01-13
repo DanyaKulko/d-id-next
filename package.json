@@ -7,7 +7,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "biome check",
-    "cron:external-sources": "tsx scripts/cron-sync-external-sources.ts",
     "format": "biome format --write"
   },
   "dependencies": {

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./UserGuideModal.module.css";
+import logo from "@/assets/img/neil_avatar_logo.png";
 
 const SLIDES_DATA = [
   {
@@ -12,7 +13,7 @@ const SLIDES_DATA = [
       <>
         <div className={styles["na-slide-logo-modal"]}>
           <Image
-            src="https://neilavatar.com/data/logo-neil.png"
+            src={logo}
             alt="Neil Avatar Logo"
             width={200}
             height={200}

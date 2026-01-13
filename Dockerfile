@@ -26,7 +26,7 @@ COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
-RUN npm install dotenv prisma
+RUN npm install dotenv prisma ioredis bullmq openai axios html-to-text
 
 RUN npm install -g tsx
 
