@@ -113,9 +113,9 @@ export default function LoginClient() {
 
         {!isOtp ? (
           <form action={loginAction}>
-            <button type="button" onClick={handleCreateAdmin}>
-              Create Admin
-            </button>
+            {/*<button type="button" onClick={handleCreateAdmin}>*/}
+            {/*  Create Admin*/}
+            {/*</button>*/}
             <div className="form-group">
               <label htmlFor="email">Email</label>
               <input
@@ -125,7 +125,7 @@ export default function LoginClient() {
                 placeholder="Enter your username"
                 required
                 autoComplete="username"
-                pattern="^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+                pattern="^[^@\s]+@[^@\s]+\.[^@\s]+$"
                 title="Enter a valid email address"
               />
             </div>
@@ -158,7 +158,8 @@ export default function LoginClient() {
               type="submit"
               className="login-button"
               disabled={
-                loginPending || (isProd && siteKey ? !recaptchaToken : false)
+                loginPending
+                // loginPending || (isProd && siteKey ? !recaptchaToken : false)
               }
             >
               {loginPending ? "Signing in..." : "Login"}

@@ -3,10 +3,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: url("/images/login-background.png") no-repeat center
-    center;
-  background-size: contain;
-  background-color: #000;
+  background: url("/images/login-background.png");
+    background-size: cover!important;
+    background-repeat: no-repeat;
   position: relative;
   font-family:
     system-ui,
