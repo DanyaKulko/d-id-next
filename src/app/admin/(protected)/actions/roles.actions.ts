@@ -261,7 +261,6 @@ export async function saveRoleSettingsAction(formData: FormData) {
 
   const agent = await findAgentByKey(agentKey);
   if (!agent) {
-    // TODO: decide if we should auto-create missing agent records.
     throw new Error("Agent not found in database");
   }
 
@@ -313,7 +312,6 @@ export async function saveRoleSettingsAction(formData: FormData) {
       voiceId,
     });
   } else {
-    // TODO: handle D-ID updates when agentId is missing.
   }
 
   revalidatePath("/admin/roles");
@@ -330,18 +328,11 @@ export async function deleteRoleAction(agentKey: AgentKey) {
   const agent = await findAgentByKey(agentKey);
   if (!agent) throw new Error("Agent not found");
 
-  const deletionGuard = process.env.ALLOW_AGENT_DELETE !== "true";
-  if (deletionGuard) {
-    // TODO: remove this guard when deletion is approved.
-    return { ok: false, skipped: true };
-  }
-
   if (agent.agentId) {
     await withDidLogging("Delete Agent", () =>
       didService.deleteAgent(agent.agentId),
     );
   } else {
-    // TODO: handle missing D-ID agent id for delete.
   }
   await prisma.agentBackground.deleteMany({ where: { agentId: agent.id } });
   await prisma.agent.delete({ where: { id: agent.id } });

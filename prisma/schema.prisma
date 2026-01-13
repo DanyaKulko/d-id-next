@@ -117,17 +117,17 @@ model Agent {
   instructions    String?
   personality     String?
 
-  voiceID           String
-  backgroundEnabled Boolean @default(false)
+  voiceID            String
+  backgroundEnabled  Boolean             @default(false)
   backgroundKeyColor BackgroundKeyColor?
 
-  idleVideoUrl String?
+  idleVideoUrl   String?
   avatarImageUrl String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  backgrounds AgentBackground[]
+  backgrounds  AgentBackground[]
   chatSessions ChatSession[]
 
   @@map("agents")
@@ -171,15 +171,15 @@ model ChatSession {
   id String @id @default(cuid())
 
   didAgentId   String
-  didStreamId  String @unique
+  didStreamId  String  @unique
   didSessionId String?
-  didChatId    String @unique
+  didChatId    String  @unique
 
   agentId String?
-  agent   Agent? @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  agent   Agent?  @relation(fields: [agentId], references: [id], onDelete: SetNull)
 
   userId String?
-  user   User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   language  String?
   device    String?
@@ -204,8 +204,8 @@ model ChatMessage {
   sessionId String
   session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
-  role    ChatMessageRole
-  content String
+  role     ChatMessageRole
+  content  String
   language String?
 
   createdAt DateTime @default(now())
@@ -220,7 +220,7 @@ enum ExternalSourceKind {
 }
 
 model ExternalServiceLog {
-  id       String                 @id @default(cuid())
+  id       String                  @id @default(cuid())
   source   String
   type     String
   message  String
@@ -240,10 +240,30 @@ model KnowledgeDocuments {
   documentUrl String?
   status      KnowledgeDocumentStatus @default(PROCESSING)
 
+  charCount Int     @default(0)
+  isFull    Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  posts ProcessedPost[]
+
   @@map("knowledge_bases")
+}
+
+model ProcessedPost {
+  id         String @id @default(cuid())
+  externalId String @unique
+
+  content   String @db.Text
+  charCount Int
+
+  knowledgeDocumentId String?
+  knowledgeDocument   KnowledgeDocuments? @relation(fields: [knowledgeDocumentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@map("processed_posts")
 }
 
 model ExternalSource {

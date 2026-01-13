@@ -1,7 +1,7 @@
 "use client";
 
 import {useRouter} from "next/navigation";
-import {Fragment, useState, useTransition} from "react";
+import {Fragment, type FormEvent, useState, useTransition} from "react";
 import toast from "react-hot-toast";
 
 import {
@@ -114,12 +114,12 @@ export default function SettingsClient({
         rows: [],
         total: 0,
         page: 1,
-        limit: 25,
+        limit: 10,
         totalPages: 1,
     };
     const sessionFilters = initialSessionFilters ?? {
         page: 1,
-        limit: 25,
+        limit: 10,
     };
     const sessionRoles = initialSessionRoles ?? [];
     const sessionPages = Array.from(
@@ -179,6 +179,31 @@ export default function SettingsClient({
         params.set("page", String(page));
         params.set("limit", String(limit));
         return params.toString();
+    };
+
+    const applySessionFilters = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        const role = String(formData.get("role") ?? "").trim();
+        const language = String(formData.get("language") ?? "").trim();
+        const from = String(formData.get("from") ?? "").trim();
+        const to = String(formData.get("to") ?? "").trim();
+        const limitRaw = Number.parseInt(
+            String(formData.get("limit") ?? sessionFilters.limit),
+            10,
+        );
+        const limit = Number.isNaN(limitRaw) ? sessionFilters.limit : limitRaw;
+
+        router.push(
+            `/admin/settings/sessions?${buildSessionQuery({
+                roleId: role || undefined,
+                language: language || undefined,
+                from: from || undefined,
+                to: to || undefined,
+                page: 1,
+                limit,
+            })}`,
+        );
     };
 
     const onAuthRequiredToggle = (checked: boolean) => {
@@ -530,9 +555,13 @@ export default function SettingsClient({
                         session to view detailed information.
                     </div>
 
-                    <form className="filters" method="get">
+                    <form
+                        className="filters"
+                        method="get"
+                        onSubmit={applySessionFilters}
+                    >
                         <select name="role" defaultValue={sessionFilters.roleId ?? ""}>
-                            <option value="">All Roles</option>
+                            <option value="all">All Roles</option>
                             {sessionRoles.map((role) => (
                                 <option key={role.id} value={role.id}>
                                     {role.name}
@@ -544,7 +573,7 @@ export default function SettingsClient({
                             name="language"
                             defaultValue={sessionFilters.language ?? ""}
                         >
-                            <option value="">All Languages</option>
+                            <option value="all">All Languages</option>
                             {languageOptions.map((lang) => (
                                 <option key={lang.value} value={lang.value}>
                                     {lang.label}
@@ -692,12 +721,12 @@ export default function SettingsClient({
                         <input
                             type="hidden"
                             name="role"
-                            value={sessionFilters.roleId ?? ""}
+                            value={sessionFilters.roleId ?? "all"}
                         />
                         <input
                             type="hidden"
                             name="language"
-                            value={sessionFilters.language ?? ""}
+                            value={sessionFilters.language ?? "all"}
                         />
                         <input
                             type="hidden"

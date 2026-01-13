@@ -76,6 +76,8 @@ export default function RolesClient({
     const [showBackgroundModal, setShowBackgroundModal] = useState(false);
     const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
     const [backgroundTitle, setBackgroundTitle] = useState("");
+    const [backgroundEditing, setBackgroundEditing] =
+        useState<BackgroundItem | null>(null);
     const [deleteAgentCandidate, setDeleteAgentCandidate] =
         useState<AgentListItem | null>(null);
     const [showAddAgentModal, setShowAddAgentModal] = useState(false);
@@ -182,9 +184,10 @@ export default function RolesClient({
         }
     };
 
-    const openBackgroundModal = () => {
+    const openBackgroundModal = (background?: BackgroundItem) => {
         setBackgroundFile(null);
-        setBackgroundTitle("");
+        setBackgroundTitle(background?.title ?? "");
+        setBackgroundEditing(background ?? null);
         // setBackgroundTheme("");
         setShowBackgroundModal(true);
     };
@@ -208,35 +211,57 @@ export default function RolesClient({
     const submitBackgroundUpload = async () => {
         if (!activeAgentKey) return;
         const file = backgroundFile;
-        if (!file) return;
-        const title = backgroundTitle.trim() || file.name;
+        if (!file && !backgroundEditing) return;
+        const title = backgroundTitle.trim() || file?.name || "";
         // const theme = backgroundTheme.trim() || "default";
 
         try {
             setIsUploading(true);
             const formData = new FormData();
             formData.set("agentKey", activeAgentKey);
-            formData.set("title", title);
-            formData.set("file", file);
+            if (title) {
+                formData.set("title", title);
+            }
+            if (file) {
+                formData.set("file", file);
+            }
+            if (backgroundEditing) {
+                formData.set("backgroundId", backgroundEditing.id);
+            }
 
             const response = await fetch("/api/admin/backgrounds", {
-                method: "POST",
+                method: backgroundEditing ? "PATCH" : "POST",
                 body: formData,
             });
 
             if (!response.ok) {
-                toast.error("Failed to upload background");
+                toast.error(
+                    backgroundEditing
+                        ? "Failed to update background"
+                        : "Failed to upload background",
+                );
                 return;
             }
 
             const newBackground = (await response.json()) as BackgroundItem;
-            setBackgrounds((prev) => [...prev, newBackground]);
-            toast.success("Background uploaded");
+            setBackgrounds((prev) =>
+                backgroundEditing
+                    ? prev.map((bg) => (bg.id === newBackground.id ? newBackground : bg))
+                    : [...prev, newBackground],
+            );
+            toast.success(
+                backgroundEditing ? "Background updated" : "Background uploaded",
+            );
             setShowBackgroundModal(false);
         } catch {
-            toast.error("Failed to upload background");
+            toast.error(
+                backgroundEditing
+                    ? "Failed to update background"
+                    : "Failed to upload background",
+            );
         } finally {
             setBackgroundFile(null);
+            setBackgroundEditing(null);
             setIsUploading(false);
         }
     };
@@ -285,11 +310,7 @@ export default function RolesClient({
         if (!targetKey) return;
         startDeleting(async () => {
             try {
-                const result = await deleteRoleAction(targetKey);
-                if (result?.skipped) {
-                    toast("Deletion is disabled (guarded)", {icon: "⚠️"});
-                    return;
-                }
+                await deleteRoleAction(targetKey);
                 toast.success("Agent deleted");
                 setDeleteAgentCandidate(null);
             } catch {
@@ -305,16 +326,6 @@ export default function RolesClient({
 
     return (
         <>
-            <div className="role-toolbar">
-                <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={openAddAgentModal}
-                >
-                    ➕ Add Agent by ID
-                </button>
-            </div>
-            {/* Role Tabs */}
             <div className="role-tabs">
                 {agents.map((agent) => (
                     <button
@@ -330,19 +341,17 @@ export default function RolesClient({
                     </button>
                 ))}
 
-                {/*<button*/}
-                {/*  type="button"*/}
-                {/*  className="add-role-tab"*/}
-                {/*  onClick={openAddAgentModal}*/}
-                {/*>*/}
-                {/*  <span>➕</span> Add New Agent*/}
-                {/*</button>*/}
+                <button
+                  type="button"
+                  className="add-role-tab"
+                  onClick={openAddAgentModal}
+                >
+                  <span>➕</span> Add New Agent
+                </button>
             </div>
 
-            {/* Breadcrumb sync (1:1 поведение) */}
             <BreadcrumbSync title={breadcrumbRole}/>
 
-            {/* Contents */}
             {agents.length === 0 ? (
                 <div className="section">
                     <div className="info-box">
@@ -371,15 +380,24 @@ export default function RolesClient({
                     <div className="modal-card">
                         <div className="modal-header">
                             <div>
-                                <div className="modal-title">Upload Background</div>
+                                <div className="modal-title">
+                                    {backgroundEditing
+                                        ? "Replace Background"
+                                        : "Upload Background"}
+                                </div>
                                 <div className="modal-subtitle">
-                                    Add a new background image for this agent.
+                                    {backgroundEditing
+                                        ? "Update the selected background image."
+                                        : "Add a new background image for this agent."}
                                 </div>
                             </div>
                             <button
                                 type="button"
                                 className="btn btn-secondary btn-small"
-                                onClick={() => setShowBackgroundModal(false)}
+                                onClick={() => {
+                                    setShowBackgroundModal(false);
+                                    setBackgroundEditing(null);
+                                }}
                             >
                                 ✕ Close
                             </button>
@@ -421,7 +439,10 @@ export default function RolesClient({
                             <button
                                 type="button"
                                 className="btn btn-secondary"
-                                onClick={() => setShowBackgroundModal(false)}
+                                onClick={() => {
+                                    setShowBackgroundModal(false);
+                                    setBackgroundEditing(null);
+                                }}
                             >
                                 Cancel
                             </button>
@@ -431,7 +452,11 @@ export default function RolesClient({
                                 onClick={submitBackgroundUpload}
                                 disabled={isUploading}
                             >
-                                {isUploading ? "Uploading..." : "Upload Background"}
+                                {isUploading
+                                    ? "Saving..."
+                                    : backgroundEditing
+                                        ? "Update Background"
+                                        : "Upload Background"}
                             </button>
                         </div>
                     </div>
@@ -566,11 +591,6 @@ export default function RolesClient({
 }
 
 function BreadcrumbSync({title}: { title: string }) {
-    // чисто визуально “как в статике”: меняем текст хлебных крошек
-    // без прямого DOM: просто рендерим поверх, но у тебя в page.tsx id="current-role"
-    // поэтому сделаем через эффект:
-    // Можно и без эффекта — просто в page.tsx прокинуть breadcrumbRole.
-    // Чтобы не переписывать page.tsx, делаем effect.
     useEffect(() => {
         const el = document.getElementById("current-role");
         if (el) el.textContent = title;
@@ -583,9 +603,9 @@ function TooltipLabel(props: { title: string; text: string }) {
     return (
         <label className="with-tooltip" htmlFor={"#"}>
             {props.title}
-            <span className="tooltip-icon" aria-hidden="true">
-        ?
-      </span>
+      {/*      <span className="tooltip-icon" aria-hidden="true">*/}
+      {/*  ?*/}
+      {/*</span>*/}
             <span className="tooltip-text" role="tooltip">
         {props.text}
       </span>
@@ -610,7 +630,7 @@ function SectionTooltipTitle(props: { title: string; text: string }) {
 type RoleContentProps = {
     defaults: AgentSettings | null;
     backgrounds: BackgroundItem[];
-    onBackgroundUpload: () => void;
+    onBackgroundUpload: (background?: BackgroundItem) => void;
     onBackgroundRemove: (id: string) => void;
     onSubmit: (event: FormEvent<HTMLFormElement>) => void;
     onDelete: () => void;
@@ -663,6 +683,19 @@ function RoleContent({
 
             <h2 className="section-title">Personalization</h2>
 
+            <div className="input-group">
+                <TooltipLabel
+                    title="Agent id"
+                    text="The internal name the avatar uses for self-identification; this name participates in the working logic, influences response formation, and determines how the avatar perceives its own identity within the system."
+                />
+                <input
+                    name="agentName"
+                    type="text"
+                    defaultValue={defaults?.agentId ?? ""}
+                    placeholder="Enter agent name"
+                    disabled={true}
+                />
+            </div>
             <div className="input-group">
                 <TooltipLabel
                     title="Agent Name"
@@ -746,9 +779,6 @@ function RoleContent({
                     />
                     <span>Allow background selection on the main page</span>
                 </div>
-                {/*<div className="info-box" style={{marginTop: 10}}>*/}
-                {/*Max upload size: {mainSettings.backgroundUploadLimitMb} MB*/}
-                {/*</div>*/}
             </div>
             <div className="input-group">
                 <label htmlFor="backgroundKeyColor">Background Key Color</label>
@@ -775,17 +805,13 @@ function RoleContent({
                                     }
                                     : undefined
                             }
-                        >
-                            {/*<span className="background-preview__label">*/}
-                            {/*    {background.theme?.trim() || "Background"}*/}
-                            {/*</span>*/}
-                        </div>
+                        />
                         <div className="background-title">{background.title}</div>
                         <div className="background-actions">
                             <button
                                 type="button"
                                 className="btn btn-secondary"
-                                onClick={onBackgroundUpload}
+                                onClick={() => onBackgroundUpload(background)}
                             >
                                 ✏️ Replace
                             </button>
@@ -805,7 +831,7 @@ function RoleContent({
                     className="add-background-card"
                     role="button"
                     tabIndex={0}
-                    onClick={onBackgroundUpload}
+                    onClick={() => onBackgroundUpload()}
                     onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ")
                             (e.currentTarget as HTMLDivElement).click();
@@ -818,6 +844,10 @@ function RoleContent({
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <div className="info-box" style={{marginTop: 10}}>
+                Max upload size: {25} MB
             </div>
 
             <div className="save-section">

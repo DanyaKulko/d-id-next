@@ -47,14 +47,31 @@ export async function requireAdmin() {
 export const formatSafetyRules = (rules: string) => {
   const trimmed = rules.trim();
   if (!trimmed) return "";
-  return `Safety rules:\n${trimmed}`;
+  const normalized = trimmed.replace(/^safety rules\s*:?\s*/i, "").trim();
+  if (!normalized) return "";
+  return `Safety rules:\n${normalized}`;
 };
 
-export const stripSafetyRulesFromPrompt = (prompt: string) => {
-  const idx = prompt.toLowerCase().indexOf("safety rules:");
-  if (idx === -1) return prompt.trim();
-  return prompt.slice(0, idx).trim();
+export const splitSafetyRulesFromPrompt = (prompt: string) => {
+  const trimmed = prompt.trim();
+  if (!trimmed) return { prompt: "", safetyRules: "" };
+  const match = trimmed.match(
+    /(?:^|\n)\s*safety rules\s*:?\s*(?:\n|$)/i,
+  );
+  if (!match || typeof match.index !== "number") {
+    return { prompt: trimmed, safetyRules: "" };
+  }
+  const start = match.index;
+  const promptPart = trimmed.slice(0, start).trim();
+  const safetyPart = trimmed.slice(start + match[0].length).trim();
+  return {
+    prompt: promptPart,
+    safetyRules: safetyPart,
+  };
 };
+
+export const stripSafetyRulesFromPrompt = (prompt: string) =>
+  splitSafetyRulesFromPrompt(prompt).prompt;
 
 export const buildDidInstructions = (
   systemPrompt: string,
@@ -215,9 +232,13 @@ export async function updateDidAgentFromRole(
     llmPayload.prompt_customization = promptCustomization;
   }
 
+  llmPayload.template = 'rag-ungrounded'
+
   if (Object.keys(llmPayload).length > 0) {
     payload.llm = llmPayload;
   }
+
+  delete llmPayload.prompt_customization;
 
   if (input.voiceId) {
     const existingVoice =

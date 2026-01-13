@@ -1,3 +1,5 @@
+@token=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiIyIiwianRpIjoiZTk1MTA0YjJkYWMwYjc2MmEwMDA3NzhiNWFmNjVmZjNhZDIyOGJhNjExMmFiNmNmZDc1ZTc0MzNmZjJiZjViOTBlOWYwYzZlOGQxMzM1NzAiLCJpYXQiOjE3Njc4OTgzNDAuNjQwMjEyLCJuYmYiOjE3Njc4OTgzNDAuNjQwMjE1LCJleHAiOjE3NjkxOTQzNDAuNjA3MTUzLCJzdWIiOiI3Iiwic2NvcGVzIjpbIioiXX0.Mr0L_vz_QwOTK85zOsqwwGCOhJCzWIldQt8BNQGhNKXzsMK26gEMDSvKXw2rVp_2-_dbHjtVJCBwwMxByTI3R3aZG2qCbSWuVvyee90w2MIFeWZRujYVB5abHRpT3vOXVDjAITiIbshIij8kgqjf7hq2AcHypdhdKzPuvTCHXkghwsGgWqoEpbBsoqdBWXSEAnp0juRKzH6shc3trEzP3DAwcjo7uBAx7vGMWWKAv7nbo0eJcbgJ4t9FMiubWwqfDmadPGKwOczb1Q__ofz_xeiZF5GPZVh3-5wCacPALg6HyqdU0VF-ZO4GHZLK8vU0qhNYKKiA2iBx9O9ArQqHX_JIquc7a0jSHh4pVxQebr6Yx5koRvS6MceGRzXXkqa5zI_sFQIcRjZJdFBgc0X7OY3xPh3cf3Rk-umzz7tdD9Zxkc5DlkcrHutZsvpIXzL1rmEPrM4cDa4ITVrJTIV66pzOHgI09JpUft8EZG3PeHc2GrRVjROh2-H0Sf1LJBsQNvpVgoM7t0z5r8n97G5ukyYd1SpiTC-KriEWwgV1YFtq-X4UxyQ02KG9CMuBMMkZwv_sPh17h2B9cDm2AHl4fbq_Be0S78Xydd8ehZPp8fwHv7SfEvVqIKNxvuZz5iOu_heaGLW6TiMRUQTf-Gsf6amAqiuX6C0T8-fONrAuvIY
+
 ### GET request to example server
 GET https://api.d-id.com/agents/me
 Content-Type: application/json
@@ -9,4 +11,29 @@ GET https://api.d-id.com/agents/v2_agt_kIkd4Xm-
 Content-Type: application/json
 Authorization: Basic aW5mby5teWRyaW5rQGdtYWlsLmNvbQ:PNDO4wGy2jHwkGjmvaDct
 
-###
+#user: neil@avatar.platform
+#pass: @v@t@r_nE!L
+#api_client: 2
+#api_secret: 6iOggPWw6ESdPtCz9RMTDD159NaZrCK503rIq25u
+
+### TOKEN
+POST https://www.dondemineilstravels.com/oauth/token
+Content-Type: application/json
+
+{
+  "username": "neil@avatar.platform",
+  "password": "@v@t@r_nE!L",
+  "grant_type": "password",
+  "scope": "*",
+  "client_id": "2",
+  "client_secret": "6iOggPWw6ESdPtCz9RMTDD159NaZrCK503rIq25u"
+}
+
+### GET
+GET https://malinicms.com/api/v2/posts?sort=date&limit=50&direction=desc
+Authorization: Bearer {{token}}
+
+
+### GET
+GET https://www.dondemineilstravels.com/api/v2/questions
+Authorization: Bearer {{token}}

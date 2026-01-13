@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/db/prisma";
 import { externalSourcesSeeds } from "@/lib/external-sources/config";
+import { parseStoredDocumentIds } from "@/lib/external-sources/documents";
 import { didService } from "@/lib/services/did.service";
 
 export type UserRow = {
@@ -216,39 +217,46 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
 
   const textSource = externalSources.find((item) => item.kind === "TEXT");
   const videoSource = externalSources.find((item) => item.kind === "VIDEO");
+  const textDocIds = parseStoredDocumentIds(textSource?.documentId ?? null);
+  const videoDocIds = parseStoredDocumentIds(videoSource?.documentId ?? null);
 
   const knownDocIdMap = new Map<string, string>();
   const registerDocId = (docId: string, label: string) => {
     knownDocIdMap.set(docId, label);
     knownDocIdMap.set(normalizeDidDocumentId(docId), label);
   };
+  const registerDocIds = (docIds: string[], label: string) => {
+    for (const docId of docIds) {
+      registerDocId(docId, label);
+    }
+  };
   if (manualDoc?.value) {
     registerDocId(manualDoc.value, manualTrainingSource);
   }
-  if (textSource?.documentId) {
-    registerDocId(textSource.documentId, textBlogSource);
+  if (textDocIds.length > 0) {
+    registerDocIds(textDocIds, textBlogSource);
   }
-  if (videoSource?.documentId) {
-    registerDocId(videoSource.documentId, videoTranscriptsSource);
+  if (videoDocIds.length > 0) {
+    registerDocIds(videoDocIds, videoTranscriptsSource);
   }
 
-  const expectedDocIdBySourceKey = new Map<string, string>();
+  const expectedDocIdBySourceKey = new Map<string, Set<string>>();
   if (manualDoc?.value) {
     expectedDocIdBySourceKey.set(
       manualTrainingSource.toLowerCase(),
-      manualDoc.value,
+      new Set([manualDoc.value, normalizeDidDocumentId(manualDoc.value)]),
     );
   }
-  if (textSource?.documentId) {
+  if (textDocIds.length > 0) {
     expectedDocIdBySourceKey.set(
       textBlogSource.toLowerCase(),
-      textSource.documentId,
+      new Set(textDocIds.flatMap((id) => [id, normalizeDidDocumentId(id)])),
     );
   }
-  if (videoSource?.documentId) {
+  if (videoDocIds.length > 0) {
     expectedDocIdBySourceKey.set(
       videoTranscriptsSource.toLowerCase(),
-      videoSource.documentId,
+      new Set(videoDocIds.flatMap((id) => [id, normalizeDidDocumentId(id)])),
     );
   }
 
@@ -257,10 +265,16 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
       ? [manualDoc.value, normalizeDidDocumentId(manualDoc.value)]
       : [];
     const textDocIds = textSource?.documentId
-      ? [textSource.documentId, normalizeDidDocumentId(textSource.documentId)]
+      ? parseStoredDocumentIds(textSource.documentId).flatMap((id) => [
+          id,
+          normalizeDidDocumentId(id),
+        ])
       : [];
     const videoDocIds = videoSource?.documentId
-      ? [videoSource.documentId, normalizeDidDocumentId(videoSource.documentId)]
+      ? parseStoredDocumentIds(videoSource.documentId).flatMap((id) => [
+          id,
+          normalizeDidDocumentId(id),
+        ])
       : [];
 
     if (manualDocIds.length > 0) {
@@ -360,9 +374,9 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
               : titleKey === videoTranscriptsSource.toLowerCase()
                 ? videoTranscriptsSource
                 : undefined;
-        const expectedDocId = expectedDocIdBySourceKey.get(titleKey);
+        const expectedDocIds = expectedDocIdBySourceKey.get(titleKey);
 
-        if (expectedDocId && !matchesDidDocumentId(docId, expectedDocId)) {
+        if (expectedDocIds && !expectedDocIds.has(docId)) {
           return null;
         }
 
@@ -400,11 +414,12 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
     const extraMapped = extraLocal
       .map((doc) => {
         const sourceKey = doc.source.trim().toLowerCase();
-        const expectedDocId = expectedDocIdBySourceKey.get(sourceKey);
+        const expectedDocIds = expectedDocIdBySourceKey.get(sourceKey);
         if (
-          expectedDocId &&
+          expectedDocIds &&
           doc.documentId &&
-          !matchesDidDocumentId(doc.documentId, expectedDocId)
+          !expectedDocIds.has(doc.documentId) &&
+          !expectedDocIds.has(normalizeDidDocumentId(doc.documentId))
         ) {
           return null;
         }
@@ -427,13 +442,15 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
 
     await cleanupKnownSources();
     const combined = [...mapped, ...extraMapped];
-    const dedupeKeys = new Set([
-      "manual training",
-      "text blog",
-      "video transcripts",
-    ]);
+    const seenIds = new Set<string>();
+    const unique = combined.filter((item) => {
+      if (seenIds.has(item.id)) return false;
+      seenIds.add(item.id);
+      return true;
+    });
+    const dedupeKeys = new Set(["manual training"]);
     const seen = new Set<string>();
-    return combined.filter((item) => {
+    return unique.filter((item) => {
       const key = item.sourceLabel.trim().toLowerCase();
       if (!dedupeKeys.has(key)) return true;
       if (seen.has(key)) return false;

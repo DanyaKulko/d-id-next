@@ -33,7 +33,6 @@ export const didService = {
     return data;
   },
 
-  // TODO: confirm update endpoint + payload with the latest D-ID docs.
   async updateAgent(agentId: string, payload: Record<string, unknown>) {
     const { data } = await client.patch(`/agents/${agentId}`, payload);
     return data;
@@ -54,7 +53,6 @@ export const didService = {
     return data;
   },
 
-  // TODO: confirm knowledge base endpoints with latest D-ID docs.
   async listKnowledgeDocuments(knowledgeBaseId: string) {
     const { data } = await client.get(
       `/knowledge/${knowledgeBaseId}/documents`,

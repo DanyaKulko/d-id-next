@@ -6,12 +6,6 @@
   flex-wrap: wrap;
 }
 
-.role-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 12px;
-}
-
 .role-tab {
   padding: 12px 20px;
   background: transparent;

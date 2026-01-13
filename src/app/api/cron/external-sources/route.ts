@@ -1,27 +1,18 @@
-import { NextResponse } from "next/server";
-import { syncExternalSources } from "@/lib/external-sources/sync";
+import { NextResponse } from 'next/server';
+import {knowledgeQueue} from "@/lib/external-sources/queue";
 
-export const runtime = "nodejs";
-
-export async function POST(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const headerSecret = request.headers.get("x-cron-secret");
-    if (!headerSecret || headerSecret !== secret) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function POST(req: Request) {
+    const authHeader = req.headers.get('authorization');
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-  }
 
-  try {
-    const result = await syncExternalSources();
-    return NextResponse.json(result);
-  } catch (error) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    );
-  }
+    await knowledgeQueue.add('sync-daily', {
+        apiUrl: 'http://www.dondemineilstravels.com/api/v2/posts',
+    }, {
+        removeOnComplete: true,
+        removeOnFail: 10
+    });
+
+    return NextResponse.json({ status: 'Sync job scheduled' });
 }

@@ -22,7 +22,6 @@ const run = async () => {
   const llm = toRecord(didAgentRecord.llm);
   const promptCustomization = toRecord(llm.prompt_customization);
 
-  // TODO: verify D-ID agent field mappings with the latest docs.
   const name = resolveString(
     didAgentRecord.preview_name ?? didAgentRecord.name,
     slug ?? agentId,
@@ -63,7 +62,6 @@ const run = async () => {
     "",
   );
 
-  // TODO: decide how to derive slug values when not provided via CLI.
   const existing = await prisma.agent.findUnique({ where: { agentId } });
   const data = {
     agentId,

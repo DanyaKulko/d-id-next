@@ -120,3 +120,85 @@ export async function DELETE(request: Request) {
 
   return NextResponse.json({ ok: true });
 }
+
+export async function PATCH(request: Request) {
+  const formData = await request.formData();
+  const idRaw = formData.get("backgroundId") ?? formData.get("id");
+  const titleRaw = formData.get("title");
+  const file = formData.get("file");
+
+  if (typeof idRaw !== "string" || !idRaw.trim()) {
+    return NextResponse.json(
+      { error: "Background id is required" },
+      { status: 400 },
+    );
+  }
+
+  const background = await prisma.agentBackground.findUnique({
+    where: { id: idRaw },
+  });
+  if (!background) {
+    return NextResponse.json(
+      { error: "Background not found" },
+      { status: 404 },
+    );
+  }
+
+  const title =
+    typeof titleRaw === "string" && titleRaw.trim()
+      ? titleRaw.trim()
+      : background.title;
+
+  let nextUrl = background.url;
+  let oldFilePath: string | null = null;
+
+  if (file instanceof File) {
+    if (file.size > maxUploadMb * 1024 * 1024) {
+      return NextResponse.json({ error: "File is too large" }, { status: 413 });
+    }
+
+    if (!file.type.startsWith("image/")) {
+      return NextResponse.json(
+        { error: "Only images are allowed" },
+        { status: 415 },
+      );
+    }
+
+    const extension = path.extname(file.name) || ".png";
+    const safeBase = sanitizeFileName(path.basename(file.name, extension));
+    const fileName = `${Date.now()}-${safeBase}-${randomUUID()}${extension}`;
+    const agentDir = path.join(uploadRoot, background.agentId);
+
+    await mkdir(agentDir, { recursive: true });
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const destination = path.join(agentDir, fileName);
+    await writeFile(destination, buffer);
+
+    nextUrl = `/uploads/backgrounds/${background.agentId}/${fileName}`;
+    oldFilePath = path.join(
+      process.cwd(),
+      "public",
+      background.url.replace(/^\/+/, ""),
+    );
+  }
+
+  const updated = await prisma.agentBackground.update({
+    where: { id: background.id },
+    data: {
+      title,
+      url: nextUrl,
+    },
+  });
+
+  if (oldFilePath) {
+    await unlink(oldFilePath).catch(() => undefined);
+  }
+
+  return NextResponse.json({
+    id: updated.id,
+    title: updated.title,
+    theme: updated.theme,
+    url: updated.url,
+  });
+}

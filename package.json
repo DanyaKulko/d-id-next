@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "biome check",
-    "cron:external-sources": "node scripts/cron-sync-external-sources.js",
+    "cron:external-sources": "tsx scripts/cron-sync-external-sources.ts",
     "format": "biome format --write"
   },
   "dependencies": {
@@ -15,9 +15,12 @@
     "@prisma/adapter-pg": "^7.2.0",
     "@prisma/client": "^7.2.0",
     "axios": "^1.13.2",
+    "bullmq": "^5.66.4",
+    "ioredis": "^5.9.1",
     "microsoft-cognitiveservices-speech-sdk": "^1.47.0",
     "next": "16.1.1",
     "nodemailer": "^7.0.12",
+    "openai": "^6.16.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-google-recaptcha": "^3.1.0",

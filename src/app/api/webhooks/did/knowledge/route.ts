@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 
 export const runtime = "nodejs";
-// TODO: validate webhook signatures once D-ID provides a shared secret.
 
 const resolvePayloadRecord = (
   value: unknown,

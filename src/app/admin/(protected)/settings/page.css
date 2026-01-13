@@ -222,6 +222,7 @@ input:checked + .slider:before {
   display: flex;
   gap: 15px;
   margin-bottom: 20px;
+    align-items: center;
   flex-wrap: wrap;
 }
 

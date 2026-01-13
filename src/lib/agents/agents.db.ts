@@ -7,6 +7,7 @@ import type {
   BackgroundKeyColor,
 } from "@/app/admin/(protected)/roles.types";
 import { prisma } from "@/lib/db/prisma";
+import {didService} from "@/lib/services/did.service";
 
 const resolveString = (value: unknown, fallback = "") =>
   typeof value === "string" ? value : fallback;
@@ -68,6 +69,7 @@ const toAgentSettings = (
   key: AgentKey,
   agent: {
     id: string;
+    agentId: string | null;
     displayName: string;
     description: string | null;
     name: string;
@@ -94,6 +96,7 @@ const toAgentSettings = (
 
   return {
     key,
+      agentId: agent.agentId,
     displayName: agent.displayName,
     description: agent.description ?? "",
     agentName: agent.name,
@@ -151,7 +154,6 @@ export async function fetchAgentSettingsFromDb(
     agent.agentId &&
     (!agent.voiceID || !agent.voiceID.trim() || !agent.avatarImageUrl)
   ) {
-    const { didService } = await import("@/lib/services/did.service");
     const didAgent = await didService.getAgent(agent.agentId).catch(() => null);
     const voiceId = extractVoiceId(didAgent);
     const avatarImageUrl = extractAvatarImageUrl(didAgent);

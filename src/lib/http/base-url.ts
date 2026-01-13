@@ -4,11 +4,15 @@ export async function resolveBaseUrl() {
   const envUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL;
   if (envUrl) return envUrl.replace(/\/+$/, "");
 
-  const hdrs = await headers();
-  const proto = hdrs.get("x-forwarded-proto") ?? "http";
-  const host = hdrs.get("x-forwarded-host") ?? hdrs.get("host");
-  if (!host) {
+  try {
+    const hdrs = await headers();
+    const proto = hdrs.get("x-forwarded-proto") ?? "http";
+    const host = hdrs.get("x-forwarded-host") ?? hdrs.get("host");
+    if (!host) {
+      return "http://localhost:3000";
+    }
+    return `${proto}://${host}`;
+  } catch {
     return "http://localhost:3000";
   }
-  return `${proto}://${host}`;
 }

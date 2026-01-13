@@ -1,4 +1,35 @@
 services:
+  app:
+    build: .
+    container_name: d-id_next
+    env_file:
+      - ./.env
+    environment:
+      NODE_ENV: production
+    volumes:
+      - ./public/uploads:/app/public/uploads
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: .
+    container_name: d-id_cron_worker
+    restart: always
+    env_file: .env
+    command: ["npx", "tsx", "scripts/cron/knowledge-worker.ts"]
+    volumes:
+      - ./public/uploads:/app/public/uploads
+    depends_on:
+      - app
+      - redis
+      - postgres
+
+
   postgres:
     image: postgres:18.1
     container_name: d-id_postgres
@@ -12,27 +43,41 @@ services:
       - '5432:5432'
     restart: unless-stopped
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER} -d ${DB_NAME}']
+      test: [ 'CMD-SHELL', 'pg_isready -U ${DB_USER} -d ${DB_NAME}' ]
       interval: 10s
       timeout: 5s
       retries: 5
     mem_limit: 2g
     mem_reservation: 1g
 
-  external_sources_cron:
-    image: node:20-alpine
-    container_name: d-id_external_sources_cron
-    working_dir: /app
-    command: ["sh", "/app/scripts/cron-entrypoint.sh"]
-    environment:
-      APP_BASE_URL: ${APP_BASE_URL}
-      CRON_SECRET: ${CRON_SECRET}
-      EXTERNAL_SOURCES_CRON: ${EXTERNAL_SOURCES_CRON}
-      EXTERNAL_TEXT_CRON: ${EXTERNAL_TEXT_CRON}
-      EXTERNAL_VIDEO_CRON: ${EXTERNAL_VIDEO_CRON}
+  redis:
+    image: redis:8-alpine
+    container_name: d-id_redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    restart: always
     volumes:
-      - ./:/app
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  external_sources_cron:
+    image: alpine:3.18
+    container_name: d-id_external_sources_cron
+    depends_on:
+      - app
+    environment:
+      APP_BASE_URL: "http://app:3000"
+      CRON_SECRET: ${CRON_SECRET}
+    volumes:
+      - ./scripts/setup-cron.sh:/setup-cron.sh
+    command: [ "sh", "-c", "chmod +x /setup-cron.sh && /setup-cron.sh" ]
     restart: unless-stopped
 
 volumes:
-    pg_data:
+  redis_data:
+  pg_data:

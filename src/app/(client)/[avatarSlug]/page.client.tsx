@@ -45,12 +45,12 @@ type BackgroundOption = {
 
 const languages = [
     {code: "en-US", label: "🇺🇸 English"},
+    {code: "hi-IN", label: "🇮🇳 Hindi"},
+    {code: "mr-IN", label: "🇮🇳 Marathi"},
     {code: "es-ES", label: "🇪🇸 Spanish"},
     {code: "fr-FR", label: "🇫🇷 French"},
-    {code: "de-DE", label: "🇩🇪 German"},
     {code: "ru-RU", label: "🇷🇺 Russian"},
-    {code: "zh-CN", label: "🇨🇳 Chinese"},
-    {code: "ja-JP", label: "🇯🇵 Japanese"},
+    {code: "id-ID", label: "🇮🇩 Indonesian"},
 ];
 
 export const AvatarPageClient = ({

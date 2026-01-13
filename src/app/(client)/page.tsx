@@ -6,6 +6,8 @@ import UserGuideModal from "@/components/UserGuideModal/UserGuideModal";
 import { fetchHomeAgents } from "@/lib/agents/agents.db";
 import { enforceClientAuth } from "@/lib/auth/client-access";
 
+export const dynamic = 'force-dynamic';
+
 export default async function Home() {
   await enforceClientAuth("/");
   const avatars = await fetchHomeAgents();
