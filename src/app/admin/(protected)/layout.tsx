@@ -6,6 +6,15 @@ import { UserProvider } from "@/lib/auth/user-context";
 import "./admin-shared.css";
 import "./layout.css";
 
+export const metadata = {
+    title: "Admin Dashboard",
+    description: "Administration dashboard for managing the application.",
+    robots: {
+        index: false,
+        follow: false,
+    },
+};
+
 export default async function AdminLayout({
   children,
 }: {

@@ -241,7 +241,7 @@ export async function saveAdminCredentialsAction(formData: FormData) {
     throw new Error("Admin user not found");
   }
 
-  const valid = await verifyPassword(currentPassword, admin.passwordHash);
+  const valid = await verifyPassword(admin.passwordHash, currentPassword);
   if (!valid) {
     return { ok: false, error: "Incorrect current password" };
   }
