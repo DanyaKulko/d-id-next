@@ -336,7 +336,6 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
     const [isIdleVideoLoaded, setIsIdleVideoLoaded] = useState(false);
     const [idleFailed, setIdleFailed] = useState(false);
     const [keyingAvailable, setKeyingAvailable] = useState(true);
-    const [isMobile, setIsMobile] = useState(false);
     const idleRef = useRef<HTMLVideoElement | null>(null);
 
     useEffect(() => {
@@ -344,31 +343,6 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
             setKeyingAvailable(true);
         }
     }, [backgroundUrl]);
-
-    useEffect(() => {
-        if (typeof window === "undefined") return;
-        const widthQuery = window.matchMedia("(max-width: 768px)");
-        const coarseQuery = window.matchMedia("(pointer: coarse)");
-        const update = () =>
-            setIsMobile(widthQuery.matches || coarseQuery.matches);
-        update();
-
-        const attach = (query: MediaQueryList, listener: () => void) => {
-            if (query.addEventListener) {
-                query.addEventListener("change", listener);
-                return () => query.removeEventListener("change", listener);
-            }
-            query.addListener(listener);
-            return () => query.removeListener(listener);
-        };
-
-        const detachWidth = attach(widthQuery, update);
-        const detachCoarse = attach(coarseQuery, update);
-        return () => {
-            detachWidth();
-            detachCoarse();
-        };
-    }, []);
 
     useEffect(() => {
         setIsIdleVideoLoaded(false);
@@ -414,31 +388,15 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
 
     const showErrorLayer = viewMode === "ERROR";
 
-    const keyingParams = useMemo(() => {
-        const base = {
+    const keyingParams = useMemo(
+        () => ({
+            threshold: 0.6,
+            softness: 0.15,
             videoContrast: 1.0,
             videoBrightness: 1.0,
-        };
-        if (!isMobile) {
-            return {
-                ...base,
-                threshold: 0.6,
-                softness: 0.15,
-            };
-        }
-        if (backgroundKeyColor === "green") {
-            return {
-                ...base,
-                threshold: 0.72,
-                softness: 0.2,
-            };
-        }
-        return {
-            ...base,
-            threshold: 0.66,
-            softness: 0.18,
-        };
-    }, [isMobile, backgroundKeyColor]);
+        }),
+        [],
+    );
 
     const {canvasRef} = useWhiteKeyWebGL({
         sourceVideoRef: videoRef,
@@ -546,15 +504,10 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
             />
             <canvas
                 ref={canvasRef}
+                className="na-canvas-layer"
                 style={{
                     opacity: enableKeying ? 1 : 0,
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    width: "100%",
-                    height: "100%",
                     transition: "opacity 0.45s ease",
-                    objectFit: "cover",
                     zIndex: 15,
                 }}
             />

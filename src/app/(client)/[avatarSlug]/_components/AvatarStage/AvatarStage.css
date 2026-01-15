@@ -32,10 +32,21 @@
   z-index: 2;
 }
 
+.na-canvas-layer {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: auto;
+  height: auto;
+  min-width: 100%;
+  min-height: 100%;
+  transform: translate(-50%, -50%);
+}
+
 .na-stage-wrapper.is-loading .na-layer-background,
 .na-stage-wrapper.is-loading .na-layer-idle,
 .na-stage-wrapper.is-loading .na-layer-stream,
-.na-stage-wrapper.is-loading canvas {
+.na-stage-wrapper.is-loading .na-canvas-layer {
   filter: blur(6px);
 }
 
@@ -81,7 +92,7 @@
     object-position: calc(50% + var(--na-mobile-offset-x)) 50%;
   }
 
-  .na-stage-wrapper canvas {
-    transform: translateX(var(--na-mobile-offset-x));
+  .na-stage-wrapper .na-canvas-layer {
+    transform: translate(-50%, -50%) translateX(var(--na-mobile-offset-x));
   }
 }
