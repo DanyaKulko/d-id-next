@@ -7,8 +7,8 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    await knowledgeQueue.add('sync-daily', {
-        apiUrl: 'http://www.dondemineilstravels.com/api/v2/posts',
+    await knowledgeQueue.add('knowledge-sync-queue', {
+        apiUrl: 'https://www.dondemineilstravels.com/api/v2/posts',
     }, {
         removeOnComplete: true,
         removeOnFail: 10

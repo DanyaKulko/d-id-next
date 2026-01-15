@@ -67,18 +67,8 @@ export default function LearningClient({
     startSaving(async () => {
       await deleteKnowledgeDocumentAction(formData)
         .then(() => {
-          const sourceKey = item.sourceLabel.trim().toLowerCase();
-          const shouldClearSource = [
-            "manual training",
-            "text blog",
-            "video transcripts",
-          ].includes(sourceKey);
           setKnowledge((prev) =>
-            shouldClearSource
-              ? prev.filter(
-                  (doc) => doc.sourceLabel.trim().toLowerCase() !== sourceKey,
-                )
-              : prev.filter((doc) => doc.id !== item.id),
+            prev.filter((doc) => doc.id !== item.id),
           );
           toast.success("Document deleted");
           setDeleteCandidate(null);
@@ -146,19 +136,19 @@ export default function LearningClient({
               </div>
 
               <div className="btn-group">
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => {
-                    if (k.url) {
-                      window.open(k.url, "_blank", "noopener,noreferrer");
-                    } else {
-                      toast.error("Document URL is missing");
-                    }
-                  }}
-                >
-                  👁️ View / Edit
-                </button>
+                {/*<button*/}
+                {/*  type="button"*/}
+                {/*  className="btn btn-primary"*/}
+                {/*  onClick={() => {*/}
+                {/*    if (k.url) {*/}
+                {/*      window.open(k.url, "_blank", "noopener,noreferrer");*/}
+                {/*    } else {*/}
+                {/*      toast.error("Document URL is missing");*/}
+                {/*    }*/}
+                {/*  }}*/}
+                {/*>*/}
+                {/*  👁️ View / Edit*/}
+                {/*</button>*/}
                 <button
                   type="button"
                   className="btn btn-danger"

@@ -452,29 +452,55 @@ export default function SettingsClient({
                         for the knowledge base.
                     </div>
 
-                    <h2 className="section-title">Text Articles (JSON)</h2>
+                    <h2 className="section-title">Text Articles + Video Transcript</h2>
 
                     <div className="cron-settings">
                         <div className="input-group">
-                            <label htmlFor={"textLink"}>JSON API Link</label>
+                            <label htmlFor={"textLink"}>Base API Link</label>
                             <input
                                 id="textLink"
                                 name="textLink"
                                 type="url"
                                 defaultValue={externalSourcesConfig.textLink}
-                                placeholder="https://example.com/api/blog/posts.json"
+                                placeholder="https://www.dondemineilstravels.com"
                                 disabled={true}
                             />
                         </div>
 
                         <div className="input-group">
-                            <label htmlFor={"textAccessKey"}>Access Key</label>
+                            <label htmlFor={"textAccessKey"}>Client Secret</label>
                             <input
                                 id="textAccessKey"
                                 name="textAccessKey"
                                 type="text"
-                                defaultValue={externalSourcesConfig.textAccessKey}
+                                defaultValue={'6iOg********************Iq25u'}
                                 placeholder="API Key"
+                                disabled={true}
+                            />
+                        </div>
+                    </div>
+                    <div className="cron-settings">
+                        <div className="input-group">
+                            <label htmlFor={"textLink"}>Username</label>
+                            <input
+                                id="textLink"
+                                name="textLink"
+                                type="url"
+                                defaultValue={'neil@avatar.platform'}
+                                placeholder="Username"
+                                disabled={true}
+                            />
+                        </div>
+
+                        <div className="input-group">
+                            <label htmlFor={"textAccessKey"}>Password</label>
+                            <input
+                                id="textAccessKey"
+                                name="textAccessKey"
+                                type="text"
+                                defaultValue={'*********'}
+                                placeholder="Password"
+                                disabled={true}
                             />
                         </div>
                     </div>
@@ -486,65 +512,24 @@ export default function SettingsClient({
                             name="textCron"
                             type="text"
                             defaultValue={externalSourcesConfig.textCron}
-                            placeholder="0 2 * * * (every day at 2:00 AM)"
+                            placeholder="0 0 * * * (every day at midnight)"
                             disabled={true}
                         />
                     </div>
 
-                    <h2 className="section-title">Video Transcription (JSON)</h2>
-
-                    <div className="cron-settings">
-                        <div className="input-group">
-                            <label htmlFor={"videoLink"}>JSON API Link</label>
-                            <input
-                                id="videoLink"
-                                name="videoLink"
-                                type="url"
-                                defaultValue={externalSourcesConfig.videoLink}
-                                placeholder="https://example.com/api/video-transcripts.json"
-                                disabled={true}
-                            />
-                        </div>
-
-                        <div className="input-group">
-                            <label htmlFor={"videoAccessKey"}>Access Key</label>
-                            <input
-                                id="videoAccessKey"
-                                name="videoAccessKey"
-                                type="text"
-                                defaultValue={externalSourcesConfig.videoAccessKey}
-                                placeholder="API Key"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="input-group">
-                        <label htmlFor={"videoCron"}>
-                            CRON Settings (Update Frequency)
-                        </label>
-                        <input
-                            id="videoCron"
-                            name="videoCron"
-                            type="text"
-                            defaultValue={externalSourcesConfig.videoCron}
-                            placeholder="0 3 * * * (every day at 3:00 AM)"
-                            disabled={true}
-                        />
-                    </div>
-
-                    <div style={{marginTop: 30}}>
-                        <button
-                            type="submit"
-                            className="btn btn-primary"
-                            disabled={isSaving}
-                        >
-                            {isSaving ? "Saving..." : "💾 Save Settings"}
-                        </button>
-                        {" "}
-                        <button type="button" className="btn btn-secondary">
-                            🔄 Test Connection
-                        </button>
-                    </div>
+                    {/*<div style={{marginTop: 30}}>*/}
+                    {/*    <button*/}
+                    {/*        type="submit"*/}
+                    {/*        className="btn btn-primary"*/}
+                    {/*        disabled={isSaving}*/}
+                    {/*    >*/}
+                    {/*        {isSaving ? "Saving..." : "💾 Save Settings"}*/}
+                    {/*    </button>*/}
+                    {/*    {" "}*/}
+                    {/*    <button type="button" className="btn btn-secondary">*/}
+                    {/*        🔄 Test Connection*/}
+                    {/*    </button>*/}
+                    {/*</div>*/}
                 </form>
             )}
 
