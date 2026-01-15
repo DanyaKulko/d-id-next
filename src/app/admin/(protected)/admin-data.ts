@@ -1,7 +1,6 @@
 "use server";
 
 import { prisma } from "@/lib/db/prisma";
-import { externalSourcesSeeds } from "@/lib/external-sources/config";
 import { parseStoredDocumentIds } from "@/lib/external-sources/documents";
 import { didService } from "@/lib/services/did.service";
 
@@ -504,7 +503,11 @@ const maskCentered = (str: string, unmaskedChars = 4) => {
 
 export async function fetchIntegrationConfig() {
   const apiKey = process.env.DID_API_KEY;
-  return { apiKey: apiKey ? maskCentered(apiKey, 8) : "" };
+  const azureRegion = process.env.AZURE_SPEECH_REGION ?? "";
+  return {
+    apiKey: apiKey ? maskCentered(apiKey, 8) : "",
+    azureRegion,
+  };
 }
 
 export async function fetchAuthRequirement(): Promise<boolean> {
@@ -512,23 +515,6 @@ export async function fetchAuthRequirement(): Promise<boolean> {
     where: { key: authRequiredKey },
   });
   return setting?.value === "true";
-}
-
-export async function fetchExternalSourcesConfig() {
-  const sources = await prisma.externalSource.findMany();
-  const textSource = sources.find((item) => item.kind === "TEXT");
-  const videoSource = sources.find((item) => item.kind === "VIDEO");
-  const textSeed = externalSourcesSeeds.find((item) => item.kind === "TEXT");
-  const videoSeed = externalSourcesSeeds.find((item) => item.kind === "VIDEO");
-
-  return {
-    textLink: textSource?.link ?? textSeed?.link ?? "",
-    textCron: textSource?.cron ?? textSeed?.cron ?? "",
-    textAccessKey: textSource?.accessKey ?? "",
-    videoLink: videoSource?.link ?? videoSeed?.link ?? "",
-    videoCron: videoSource?.cron ?? videoSeed?.cron ?? "",
-    videoAccessKey: videoSource?.accessKey ?? "",
-  };
 }
 
 export async function fetchSessionRoles(): Promise<SessionRoleOption[]> {

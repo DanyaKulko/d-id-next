@@ -77,6 +77,7 @@ const toAgentSettings = (
     instructions: string | null;
     personality: string | null;
     voiceID: string;
+    mobileVideoOffsetPx?: number | null;
     backgroundEnabled: boolean;
     backgroundKeyColor: string | null;
     backgrounds: {
@@ -104,6 +105,7 @@ const toAgentSettings = (
     systemPrompt: agent.instructions ?? "",
     personalityStyle: agent.personality ?? "Friendly and Professional",
     voiceId: agent.voiceID ?? "",
+    mobileVideoOffsetPx: agent.mobileVideoOffsetPx ?? 0,
     backgroundsEnabled: agent.backgroundEnabled ?? false,
     backgroundKeyColor: agent.backgroundKeyColor
       ? (agent.backgroundKeyColor.toLowerCase() as BackgroundKeyColor)
@@ -116,7 +118,7 @@ const getAgentList = unstable_cache(
   async () =>
     prisma.agent.findMany({
       select: { id: true, agentId: true, slug: true, displayName: true },
-      orderBy: { createdAt: "asc" },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     }),
   ["agents-list"],
   { revalidate: 60, tags: ["agents"] },
@@ -187,7 +189,7 @@ export async function fetchHomeAgents() {
       idleVideoUrl: true,
       avatarImageUrl: true,
     },
-    orderBy: { createdAt: "asc" },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
   });
 
   return agents.map((agent) => ({

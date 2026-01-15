@@ -11,7 +11,7 @@
   background: transparent;
   border: none;
   border-bottom: 3px solid transparent;
-  cursor: pointer;
+  cursor: grab;
   font-size: 14px;
   font-weight: 500;
   color: #718096;
@@ -27,9 +27,22 @@
   background: #f7fafc;
 }
 
+.role-tab:active {
+  cursor: grabbing;
+}
+
 .role-tab.active {
   color: #4299e1;
   border-bottom-color: #4299e1;
+}
+
+.role-tab.is-dragging {
+  opacity: 0.5;
+}
+
+.role-tab.is-drop-target {
+  border-bottom-color: #38a169;
+  background: #f0fff4;
 }
 
 .add-role-tab {

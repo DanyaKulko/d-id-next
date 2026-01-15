@@ -34,6 +34,7 @@ interface IAvatarPageClientProps {
     backgrounds?: BackgroundOption[];
     backgroundsEnabled?: boolean;
     backgroundKeyColor?: "white" | "green";
+    mobileVideoOffsetPx?: number;
 }
 
 type BackgroundOption = {
@@ -62,6 +63,7 @@ export const AvatarPageClient = ({
                                      backgrounds,
                                      backgroundsEnabled,
                                      backgroundKeyColor,
+                                     mobileVideoOffsetPx,
                                  }: IAvatarPageClientProps) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const hasGreetedRef = useRef(false);
@@ -69,8 +71,12 @@ export const AvatarPageClient = ({
 
     const [isVideoPlaying, setIsVideoPlaying] = useState(false);
     const [showError, setShowError] = useState(false);
-    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [isNativeFullscreen, setIsNativeFullscreen] = useState(false);
+    const [isPseudoFullscreen, setIsPseudoFullscreen] = useState(false);
     const [canFullscreen, setCanFullscreen] = useState(false);
+    const [supportsNativeFullscreen, setSupportsNativeFullscreen] = useState<
+        boolean | null
+    >(null);
     const [micPermission, setMicPermission] = useState<
         "unknown" | "granted" | "denied" | "prompt"
     >("unknown");
@@ -83,6 +89,8 @@ export const AvatarPageClient = ({
     >("idle");
     const [language, setLanguage] = useState(languages[0].code);
     const [selectedBackgroundId, setSelectedBackgroundId] = useState("default");
+
+    const isFullscreen = isNativeFullscreen || isPseudoFullscreen;
 
     const backgroundOptions = useMemo(
         () => (backgrounds ?? []).filter((bg) => bg.url),
@@ -118,14 +126,40 @@ export const AvatarPageClient = ({
             msFullscreenElement?: Element | null;
         };
 
-        const isEnabled = Boolean(
-            doc.fullscreenEnabled ||
-            doc.webkitFullscreenEnabled ||
-            doc.mozFullScreenEnabled ||
-            doc.msFullscreenEnabled
+        const element = stageRef.current as
+            | (HTMLElement & {
+                  webkitRequestFullscreen?: () => Promise<void>;
+                  mozRequestFullScreen?: () => Promise<void>;
+                  msRequestFullscreen?: () => Promise<void>;
+              })
+            | null;
+        const root = document.documentElement as HTMLElement & {
+            webkitRequestFullscreen?: () => Promise<void>;
+            mozRequestFullScreen?: () => Promise<void>;
+            msRequestFullscreen?: () => Promise<void>;
+        };
+
+        const nativeFlag =
+            doc.fullscreenEnabled ??
+            doc.webkitFullscreenEnabled ??
+            doc.mozFullScreenEnabled ??
+            doc.msFullscreenEnabled;
+
+        const elementSupports = Boolean(
+            element?.requestFullscreen ||
+            element?.webkitRequestFullscreen ||
+            element?.mozRequestFullScreen ||
+            element?.msRequestFullscreen ||
+            root.requestFullscreen ||
+            root.webkitRequestFullscreen ||
+            root.mozRequestFullScreen ||
+            root.msRequestFullscreen,
         );
 
-        setCanFullscreen(isEnabled);
+        const isEnabled = nativeFlag === false ? false : elementSupports;
+
+        setSupportsNativeFullscreen(isEnabled);
+        setCanFullscreen(true);
 
         const getFullscreenElement = () =>
             doc.fullscreenElement ||
@@ -135,10 +169,9 @@ export const AvatarPageClient = ({
             null;
 
         const handleChange = () => {
-            setIsFullscreen(Boolean(getFullscreenElement()));
+            setIsNativeFullscreen(Boolean(getFullscreenElement()));
         };
 
-        // современное + вендорные
         const events = [
             "fullscreenchange",
             "webkitfullscreenchange",
@@ -155,6 +188,23 @@ export const AvatarPageClient = ({
             events.forEach((e) => document.removeEventListener(e, handleChange));
         };
     }, []);
+
+    useEffect(() => {
+        if (typeof document === "undefined") return;
+        const className = "na-body-pseudo-fullscreen";
+        if (isPseudoFullscreen) {
+            document.body.classList.add(className);
+        } else {
+            document.body.classList.remove(className);
+        }
+        return () => document.body.classList.remove(className);
+    }, [isPseudoFullscreen]);
+
+    useEffect(() => {
+        if (isNativeFullscreen && isPseudoFullscreen) {
+            setIsPseudoFullscreen(false);
+        }
+    }, [isNativeFullscreen, isPseudoFullscreen]);
 
 
     useEffect(() => {
@@ -182,15 +232,60 @@ export const AvatarPageClient = ({
     console.log('showMicPrompt', showMicPrompt);
 
     const toggleFullscreen = useCallback(() => {
-        const element = stageRef.current;
+        const element = stageRef.current as
+            | (HTMLElement & {
+                  webkitRequestFullscreen?: () => Promise<void>;
+                  mozRequestFullScreen?: () => Promise<void>;
+                  msRequestFullscreen?: () => Promise<void>;
+              })
+            | null;
         if (!element) return;
 
-        if (document.fullscreenElement) {
-            document.exitFullscreen().catch(() => undefined);
-        } else {
-            element.requestFullscreen().catch(() => undefined);
+        const doc = document as Document & {
+            webkitFullscreenElement?: Element | null;
+            mozFullScreenElement?: Element | null;
+            msFullscreenElement?: Element | null;
+            webkitExitFullscreen?: () => Promise<void>;
+            mozCancelFullScreen?: () => Promise<void>;
+            msExitFullscreen?: () => Promise<void>;
+        };
+
+        const request =
+            element.requestFullscreen ||
+            element.webkitRequestFullscreen ||
+            element.mozRequestFullScreen ||
+            element.msRequestFullscreen;
+
+        const hasNativeFullscreen =
+            supportsNativeFullscreen !== false && Boolean(request);
+
+        if (!hasNativeFullscreen) {
+            setIsPseudoFullscreen((prev) => !prev);
+            return;
         }
-    }, []);
+
+        const isActive =
+            doc.fullscreenElement ||
+            doc.webkitFullscreenElement ||
+            doc.mozFullScreenElement ||
+            doc.msFullscreenElement;
+
+        if (isActive) {
+            const exit =
+                doc.exitFullscreen ||
+                doc.webkitExitFullscreen ||
+                doc.mozCancelFullScreen ||
+                doc.msExitFullscreen;
+            try {
+                exit?.call(doc);
+            } catch (_error) {}
+            return;
+        }
+
+        try {
+            request?.call(element);
+        } catch (_error) {}
+    }, [supportsNativeFullscreen]);
 
     const idleVideoUrl =
         agentIdleVideoUrl ??
@@ -448,7 +543,10 @@ export const AvatarPageClient = ({
     return (
         <div className="na-main-layout">
             <div className="na-avatar-section">
-                <div className="na-avatar-container" ref={stageRef}>
+                <div
+                    className={`na-avatar-container ${isPseudoFullscreen ? "na-avatar-container--pseudo-fullscreen" : ""}`}
+                    ref={stageRef}
+                >
                     <div className="na-status-badge">
                         <span className={`na-status-indicator ${agentStatus}`}></span>
                         <span>{getStatusText()}</span>
@@ -467,12 +565,12 @@ export const AvatarPageClient = ({
                             {isFullscreen ? (
                                 // biome-ignore lint/a11y/noSvgWithoutTitle: 1
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                    <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/>
                                 </svg>
                             ) : (
                                 // biome-ignore lint/a11y/noSvgWithoutTitle: 1
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/>
+                                    <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
                                 </svg>
                             )}
                         </button>
@@ -484,6 +582,7 @@ export const AvatarPageClient = ({
                         idleImageUrl={idleImageUrl}
                         backgroundUrl={activeBackgroundUrl}
                         backgroundKeyColor={backgroundKeyColor}
+                        mobileVideoOffsetPx={mobileVideoOffsetPx}
                         agentName={agentName ?? agent?.name ?? "Neil Avatar"}
                         agentDescription={agentDescription ?? agent?.description ?? ""}
                         isStreamReady={isVideoPlaying}

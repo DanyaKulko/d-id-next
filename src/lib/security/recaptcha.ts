@@ -1,5 +1,3 @@
-// TODO: Enable reCAPTCHA verification for production use
-
 export async function verifyRecaptcha(token: string, ip?: string) {
   if (process.env.NODE_ENV !== "production")
     return { ok: true as const };

@@ -5,6 +5,7 @@ import {Fragment, type FormEvent, useState, useTransition} from "react";
 import toast from "react-hot-toast";
 
 import {
+    checkAzureConnectionAction,
     checkDidConnectionAction,
     saveAdminCredentialsAction,
     saveAuthRequirementAction,
@@ -24,15 +25,7 @@ import type {SettingsTabId} from "./settings.tabs";
 type SettingsClientProps = {
     initialTab: SettingsTabId;
     initialUsers?: UserRow[];
-    initialIntegrationConfig?: { apiKey: string };
-    initialExternalSourcesConfig?: {
-        textLink: string;
-        textCron: string;
-        textAccessKey: string;
-        videoLink: string;
-        videoCron: string;
-        videoAccessKey: string;
-    };
+    initialIntegrationConfig?: { apiKey: string; azureRegion?: string };
     initialAuthRequired?: boolean;
     initialAdminEmail?: string;
     initialSessions?: SessionPage;
@@ -42,20 +35,10 @@ type SettingsClientProps = {
     initialErrorLogFilters?: ErrorLogFilters;
 };
 
-const emptyExternalSources = {
-    textLink: "",
-    textCron: "",
-    textAccessKey: "",
-    videoLink: "",
-    videoCron: "",
-    videoAccessKey: "",
-};
-
 export default function SettingsClient({
                                            initialTab,
                                            initialUsers,
                                            initialIntegrationConfig,
-                                           initialExternalSourcesConfig,
                                            initialAuthRequired,
                                            initialAdminEmail,
                                            initialSessions,
@@ -81,14 +64,13 @@ export default function SettingsClient({
     );
     const [users, setUsers] = useState<UserRow[]>(initialUsers ?? []);
     const [integrationConfig] = useState(
-        initialIntegrationConfig ?? {apiKey: ""},
-    );
-    const [externalSourcesConfig] = useState(
-        initialExternalSourcesConfig ?? emptyExternalSources,
+        initialIntegrationConfig ?? {apiKey: "", azureRegion: ""},
     );
     const [adminEmail, setAdminEmail] = useState(initialAdminEmail ?? "");
     const [didStatus, setDidStatus] = useState<"idle" | "ok" | "error">("idle");
+    const [azureStatus, setAzureStatus] = useState<"idle" | "ok" | "error">("idle");
     const [isSaving, startSaving] = useTransition();
+    const [isCheckingAzure, startCheckingAzure] = useTransition();
     const [showAddUser, setShowAddUser] = useState(false);
     const [newUserEmail, setNewUserEmail] = useState("");
     const [newUserPassword, setNewUserPassword] = useState("");
@@ -427,6 +409,60 @@ export default function SettingsClient({
                                 disabled={isSaving}
                             >
                                 {isSaving ? "Checking..." : "🔍 Check Connection"}
+                            </button>
+                        </form>
+
+                        <form
+                            className="api-card"
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                setAzureStatus("idle");
+                                startCheckingAzure(async () => {
+                                    await checkAzureConnectionAction()
+                                        .then(() => {
+                                            setAzureStatus("ok");
+                                            toast.success("Azure Speech service is available");
+                                        })
+                                        .catch(() => {
+                                            setAzureStatus("error");
+                                            toast.error("Azure Speech service is unreachable");
+                                        });
+                                });
+                            }}
+                        >
+                            <h3>Azure Speech</h3>
+
+                            <div
+                                className={`health-status ${azureStatus === "error" ? "error" : "healthy"}`}
+                            >
+                <span className="icon">
+                  {azureStatus === "error" ? "⚠️" : "✅"}
+                </span>
+                                <span>
+                  {azureStatus === "error"
+                      ? "Service Unavailable"
+                      : "Service Available"}
+                </span>
+                            </div>
+
+                            <div className="input-group">
+                                <label htmlFor={"azureRegion"}>Region</label>
+                                <input
+                                    id="azureRegion"
+                                    name="azureRegion"
+                                    type="text"
+                                    value={integrationConfig.azureRegion ?? ""}
+                                    disabled={true}
+                                    placeholder="AZURE_SPEECH_REGION"
+                                />
+                            </div>
+
+                            <button
+                                type="submit"
+                                className="btn btn-primary btn-small"
+                                disabled={isCheckingAzure}
+                            >
+                                {isCheckingAzure ? "Checking..." : "🔍 Check Connection"}
                             </button>
                         </form>
                     </div>

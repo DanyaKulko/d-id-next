@@ -16,6 +16,7 @@ import {
     deleteRoleAction,
     saveRoleSettingsAction,
     syncAgentFromDidAction,
+    updateAgentOrderAction,
 } from "@/app/admin/(protected)/actions";
 import type {
     AgentKey,
@@ -85,6 +86,9 @@ export default function RolesClient({
     const [newAgentDescription, setNewAgentDescription] = useState("");
     const [newAgentId, setNewAgentId] = useState("");
     const [isAdding, startAdding] = useTransition();
+    const [isReordering, startReordering] = useTransition();
+    const [draggedKey, setDraggedKey] = useState<AgentKey | null>(null);
+    const [dragOverKey, setDragOverKey] = useState<AgentKey | null>(null);
 
     useEffect(() => {
         setAgents(initialAgents);
@@ -319,6 +323,61 @@ export default function RolesClient({
         });
     };
 
+    const reorderAgents = (
+        list: AgentListItem[],
+        sourceKey: AgentKey,
+        targetKey: AgentKey,
+    ) => {
+        const sourceIndex = list.findIndex((agent) => agent.key === sourceKey);
+        const targetIndex = list.findIndex((agent) => agent.key === targetKey);
+        if (sourceIndex < 0 || targetIndex < 0) return list;
+        const next = [...list];
+        const [moved] = next.splice(sourceIndex, 1);
+        next.splice(targetIndex, 0, moved);
+        return next;
+    };
+
+    const persistAgentOrder = (
+        nextAgents: AgentListItem[],
+        snapshot: AgentListItem[],
+    ) => {
+        startReordering(async () => {
+            try {
+                const order = nextAgents.map((agent) => agent.key);
+                const result = await updateAgentOrderAction(order);
+                if (!result?.ok) {
+                    setAgents(snapshot);
+                    toast.error("Failed to save agent order");
+                    return;
+                }
+                toast.success("Agent order saved");
+            } catch (_error) {
+                setAgents(snapshot);
+                toast.error("Failed to save agent order");
+            }
+        });
+    };
+
+    const handleRoleDrop = (targetKey: AgentKey, sourceKey?: string | null) => {
+        const source = sourceKey?.trim() || draggedKey;
+        if (!source || source === targetKey) {
+            setDraggedKey(null);
+            setDragOverKey(null);
+            return;
+        }
+        const snapshot = agents;
+        const next = reorderAgents(agents, source, targetKey);
+        if (next === agents) {
+            setDraggedKey(null);
+            setDragOverKey(null);
+            return;
+        }
+        setAgents(next);
+        setDraggedKey(null);
+        setDragOverKey(null);
+        persistAgentOrder(next, snapshot);
+    };
+
     const breadcrumbRole = useMemo(() => {
         const current = agents.find((agent) => agent.key === activeAgentKey);
         return current?.displayName ?? "Roles";
@@ -331,7 +390,36 @@ export default function RolesClient({
                     <button
                         key={agent.key}
                         type="button"
-                        className={`role-tab ${activeAgentKey === agent.key ? "active" : ""}`}
+                        className={`role-tab ${activeAgentKey === agent.key ? "active" : ""} ${draggedKey === agent.key ? "is-dragging" : ""} ${dragOverKey === agent.key ? "is-drop-target" : ""}`}
+                        draggable={!isReordering}
+                        onDragStart={(event) => {
+                            setDraggedKey(agent.key);
+                            setDragOverKey(null);
+                            event.dataTransfer.effectAllowed = "move";
+                            event.dataTransfer.setData("text/plain", agent.key);
+                        }}
+                        onDragOver={(event) => {
+                            if (draggedKey === agent.key) return;
+                            event.preventDefault();
+                            setDragOverKey(agent.key);
+                            event.dataTransfer.dropEffect = "move";
+                        }}
+                        onDragLeave={() => {
+                            if (dragOverKey === agent.key) {
+                                setDragOverKey(null);
+                            }
+                        }}
+                        onDrop={(event) => {
+                            event.preventDefault();
+                            handleRoleDrop(
+                                agent.key,
+                                event.dataTransfer?.getData("text/plain"),
+                            );
+                        }}
+                        onDragEnd={() => {
+                            setDraggedKey(null);
+                            setDragOverKey(null);
+                        }}
                         onClick={() => {
                             if (agent.key === activeAgentKey) return;
                             router.push(`/admin/roles/${agent.key}`);
@@ -677,6 +765,20 @@ function RoleContent({
                         name="description"
                         defaultValue={defaults?.description ?? ""}
                         placeholder="Enter description"
+                    />
+                </div>
+
+                <div className="input-group form-full">
+                    <TooltipLabel
+                        title="Mobile video offset (px)"
+                        text="Shift the avatar video left/right on mobile. Use negative values to move left, positive to move right."
+                    />
+                    <input
+                        name="mobileVideoOffsetPx"
+                        type="number"
+                        step="1"
+                        defaultValue={defaults?.mobileVideoOffsetPx ?? 0}
+                        placeholder="0"
                     />
                 </div>
             </div>

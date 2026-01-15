@@ -20,6 +20,7 @@ const Schema = z.object({
 export async function loginStart(input: unknown) {
   const parsed = Schema.safeParse(input);
   if (!parsed.success) {
+      console.log('Login input validation failed:', parsed.error);
     return { ok: false as const, step: "login" as const };
   }
   const { email, password, recaptchaToken } = parsed.data;
@@ -28,6 +29,7 @@ export async function loginStart(input: unknown) {
   const ip = rawHeaders.get("x-forwarded-for")?.split(",")[0]?.trim();
   const ua = rawHeaders.get("user-agent") ?? undefined;
 
+    console.log({ email, password, recaptchaToken })
   if (process.env.NODE_ENV === "production") {
     const r = await verifyRecaptcha(recaptchaToken ?? "", ip);
     if (!r.ok) {
@@ -54,6 +56,7 @@ export async function loginStart(input: unknown) {
       isActive: true,
     },
   });
+    console.log('user fetched for email', email, ':', user);
   if (!user) {
     await auditAuth({
       type: "LOGIN_PASSWORD",
@@ -66,8 +69,9 @@ export async function loginStart(input: unknown) {
     console.log(`Login failed: user not found for email ${email}`);
     return { ok: false as const, step: "login" as const };
   }
-
+    console.log(123123123)
   if (!user.isActive) {
+      console.log('User inactive:', email);
     await auditAuth({
       type: "LOGIN_PASSWORD",
       success: false,
@@ -79,8 +83,9 @@ export async function loginStart(input: unknown) {
     });
     return { ok: false as const, step: "login" as const };
   }
-
+    console.log(1)
   const okPwd = await verifyPassword(user.passwordHash, password);
+    console.log('Password verification result for', email, ':', okPwd);
   await auditAuth({
     type: "LOGIN_PASSWORD",
     success: okPwd,

@@ -4,7 +4,6 @@ import {
     type ErrorLogPage,
     fetchAuthRequirement,
     fetchErrorLogs,
-    fetchExternalSourcesConfig,
     fetchIntegrationConfig,
     fetchSessionRecords,
     fetchSessionRoles,
@@ -24,9 +23,6 @@ type SettingsTabPageProps = {
 };
 
 type IntegrationConfig = Awaited<ReturnType<typeof fetchIntegrationConfig>>;
-type ExternalSourcesConfig = Awaited<
-    ReturnType<typeof fetchExternalSourcesConfig>
->;
 
 const parseNumber = (
     value: string | string[] | undefined,
@@ -61,7 +57,6 @@ export default async function SettingsTabPage({
 
     let users: UserRow[] | undefined;
     let integrationConfig: IntegrationConfig | undefined;
-    let externalSourcesConfig: ExternalSourcesConfig | undefined;
     let authRequired: boolean | undefined;
     let adminEmail: string | undefined;
     let sessionsPage: SessionPage | undefined;
@@ -72,10 +67,6 @@ export default async function SettingsTabPage({
 
     if (tab === "integrations") {
         integrationConfig = await fetchIntegrationConfig();
-    }
-
-    if (tab === "external-sources") {
-        externalSourcesConfig = await fetchExternalSourcesConfig();
     }
 
     if (tab === "admin") {
@@ -124,7 +115,6 @@ export default async function SettingsTabPage({
             initialTab={tab}
             initialUsers={users}
             initialIntegrationConfig={integrationConfig}
-            initialExternalSourcesConfig={externalSourcesConfig}
             initialAuthRequired={authRequired}
             initialAdminEmail={adminEmail}
             initialSessions={sessionsPage}

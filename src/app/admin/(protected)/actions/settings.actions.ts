@@ -5,6 +5,7 @@ import { hashPassword, verifyPassword } from "@/lib/auth/passwords";
 import { prisma } from "@/lib/db/prisma";
 import { externalSourcesSeeds } from "@/lib/external-sources/config";
 import { didService } from "@/lib/services/did.service";
+import { getAzureSpeechToken } from "@/app/actions/azure.actions";
 import {
   authRequiredKey,
   getOptionalString,
@@ -17,6 +18,15 @@ export async function checkDidConnectionAction() {
   await requireAdmin();
   await withDidLogging("Check Status", () => didService.checkStatus());
   return { ok: true };
+}
+
+export async function checkAzureConnectionAction() {
+  await requireAdmin();
+  const result = await getAzureSpeechToken();
+  if (!result || "error" in result || !result.token) {
+    throw new Error(result?.error ?? "Azure Speech token failed");
+  }
+  return { ok: true, region: result.region };
 }
 
 export async function saveExternalSourcesConfigAction(formData: FormData) {

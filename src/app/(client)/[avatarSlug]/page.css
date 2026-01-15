@@ -20,6 +20,24 @@
   aspect-ratio: 16 / 9;
 }
 
+.na-avatar-container--pseudo-fullscreen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  border-radius: 0;
+  aspect-ratio: auto;
+  z-index: 9999;
+  background: #000;
+}
+
+body.na-body-pseudo-fullscreen {
+  overflow: hidden;
+  overscroll-behavior: contain;
+  touch-action: none;
+}
+
 .na-mic-overlay {
   position: absolute;
   inset: 0;
@@ -188,6 +206,11 @@
   width: 100%;
   height: 100%;
   aspect-ratio: auto;
+}
+
+.na-avatar-container:fullscreen .na-stage-wrapper,
+.na-avatar-container--pseudo-fullscreen .na-stage-wrapper {
+  height: 100%;
 }
 
 /* Watermark - 100% bigger */
@@ -502,7 +525,7 @@
   }
 
   .na-watermark img {
-    height: 80px;
-    max-width: 80px;
+    height: 110px;
+    max-width: 110px;
   }
 }

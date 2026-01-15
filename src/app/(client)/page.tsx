@@ -18,7 +18,9 @@ export default async function Home() {
       <header className="na-header">
         <div className="na-container">
           <div className="na-header-content">
-            <div className="na-logo-text">NEIL AVATAR</div>
+            <Link href="/" className="na-logo-text">
+              NEIL AVATAR
+            </Link>
             <div className="na-header-title">
               <h1 className="na-title-display na-glow">
                 Choose Your Neil Avatar Role
@@ -47,6 +49,8 @@ export default async function Home() {
                   loop
                   muted
                   playsInline
+                  preload="auto"
+                  poster={avatar.imageUrl || undefined}
                 >
                   <source src={avatar.videoUrl} type="video/mp4" />
                 </video>

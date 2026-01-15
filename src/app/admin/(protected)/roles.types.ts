@@ -21,6 +21,7 @@ export type AgentSettings = {
   systemPrompt: string;
   personalityStyle: string;
   voiceId: string;
+  mobileVideoOffsetPx: number;
   backgroundsEnabled: boolean;
   backgroundKeyColor?: BackgroundKeyColor;
   backgrounds: BackgroundItem[];
@@ -30,4 +31,3 @@ export type AgentListItem = {
   key: AgentKey;
   displayName: string;
 };
-

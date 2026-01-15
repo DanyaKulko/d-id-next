@@ -7,6 +7,7 @@
   border-radius: 15px;
   overflow: hidden;
   /*background: #000;*/
+  --na-mobile-offset-x: 0px;
 }
 
 /* Общий класс для всех видео слоев */
@@ -17,6 +18,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: 50% 50%;
   transition: opacity 0.5s ease-in-out; /* Плавный переход */
 }
 
@@ -28,6 +30,13 @@
 /* Слой stream (верхний) */
 .na-layer-stream {
   z-index: 2;
+}
+
+.na-stage-wrapper.is-loading .na-layer-background,
+.na-stage-wrapper.is-loading .na-layer-idle,
+.na-stage-wrapper.is-loading .na-layer-stream,
+.na-stage-wrapper.is-loading canvas {
+  filter: blur(6px);
 }
 
 /* Оверлеи (поверх всего) */
@@ -63,5 +72,16 @@
   }
   100% {
     transform: rotate(360deg);
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .na-stage-wrapper .na-avatar-video,
+  .na-stage-wrapper img.na-avatar-video {
+    object-position: calc(50% + var(--na-mobile-offset-x)) 50%;
+  }
+
+  .na-stage-wrapper canvas {
+    transform: translateX(var(--na-mobile-offset-x));
   }
 }

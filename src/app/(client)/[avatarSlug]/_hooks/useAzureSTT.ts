@@ -18,6 +18,8 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
   const recognizerRef = useRef<SpeechSDK.SpeechRecognizer | null>(null);
   const tokenCacheRef = useRef<CachedToken | null>(null);
   const isStoppedRef = useRef(false);
+  const listeningRef = useRef(false);
+  const startGuardRef = useRef(false);
 
   const getOrFetchToken = useCallback(async () => {
     const now = Date.now();
@@ -55,9 +57,21 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
     [],
   );
 
+  useEffect(() => {
+    listeningRef.current = listening;
+  }, [listening]);
+
   const startListening = useCallback(
     async (lang: string) => {
-      if (recognizerRef.current) return;
+      if (startGuardRef.current) return;
+      if (recognizerRef.current) {
+        if (listeningRef.current) return;
+        try {
+          recognizerRef.current.close();
+        } catch (_error) {}
+        recognizerRef.current = null;
+      }
+      startGuardRef.current = true;
       isStoppedRef.current = false;
       try {
         console.log("🎤 Starting Azure STT...");
@@ -73,7 +87,11 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
 
         speechConfig.setProperty(
           SpeechSDK.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs,
-          "1500",
+          "3000",
+        );
+        speechConfig.setProperty(
+          SpeechSDK.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs,
+          "10000",
         );
 
         const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
@@ -112,13 +130,19 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
               { reason: e.reason },
             );
           }
-          if (!isStoppedRef.current) setListening(false);
+          if (!isStoppedRef.current) {
+            setListening(false);
+          }
+          setInterimTranscript("");
           recognizerRef.current = null;
         };
 
         recognizer.sessionStopped = () => {
           console.log("STT Session Stopped");
-          if (!isStoppedRef.current) setListening(false);
+          if (!isStoppedRef.current) {
+            setListening(false);
+          }
+          setInterimTranscript("");
           recognizerRef.current = null;
         };
 
@@ -133,6 +157,8 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
           { lang },
         );
         setListening(false);
+      } finally {
+        startGuardRef.current = false;
       }
     },
     [onFinalTranscript, getOrFetchToken, logSttError],
@@ -140,6 +166,7 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
 
   const stopListening = useCallback(() => {
     isStoppedRef.current = true;
+    startGuardRef.current = false;
     setListening(false);
     setInterimTranscript("");
 

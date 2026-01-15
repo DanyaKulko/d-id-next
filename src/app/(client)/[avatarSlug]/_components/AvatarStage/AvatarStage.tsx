@@ -64,7 +64,11 @@ export function useWhiteKeyWebGL(opts: {
     `;
 
         const fsSrc = `
+      #ifdef GL_FRAGMENT_PRECISION_HIGH
+      precision highp float;
+      #else
       precision mediump float;
+      #endif
       varying vec2 v_uv;
       uniform sampler2D u_video;
       // uniform sampler2D u_bg;
@@ -302,6 +306,7 @@ interface AvatarStageProps {
     idleImageUrl?: string;
     backgroundUrl?: string;
     backgroundKeyColor?: "white" | "green";
+    mobileVideoOffsetPx?: number;
     isStreamReady: boolean;
     onStreamReady: () => void;
     connectionStatus: string;
@@ -318,6 +323,7 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
                                                             idleImageUrl,
                                                             backgroundUrl,
                                                             backgroundKeyColor,
+                                                            mobileVideoOffsetPx,
                                                             isStreamReady,
                                                             onStreamReady,
                                                             connectionStatus,
@@ -326,10 +332,12 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
                                                             showError,
                                                             isTimedOut,
                                                             onRestart,
-                                                        }) => {
-    const [isIdleLoaded, setIsIdleLoaded] = useState(false);
+}) => {
+    const [isIdleVideoLoaded, setIsIdleVideoLoaded] = useState(false);
     const [idleFailed, setIdleFailed] = useState(false);
     const [keyingAvailable, setKeyingAvailable] = useState(true);
+    const [isMobile, setIsMobile] = useState(false);
+    const idleRef = useRef<HTMLVideoElement | null>(null);
 
     useEffect(() => {
         if (backgroundUrl) {
@@ -338,10 +346,42 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
     }, [backgroundUrl]);
 
     useEffect(() => {
-        if ((!idleVideoUrl && !idleImageUrl) || (idleFailed && !idleImageUrl)) {
-            setIsIdleLoaded(true);
+        if (typeof window === "undefined") return;
+        const widthQuery = window.matchMedia("(max-width: 768px)");
+        const coarseQuery = window.matchMedia("(pointer: coarse)");
+        const update = () =>
+            setIsMobile(widthQuery.matches || coarseQuery.matches);
+        update();
+
+        const attach = (query: MediaQueryList, listener: () => void) => {
+            if (query.addEventListener) {
+                query.addEventListener("change", listener);
+                return () => query.removeEventListener("change", listener);
+            }
+            query.addListener(listener);
+            return () => query.removeListener(listener);
+        };
+
+        const detachWidth = attach(widthQuery, update);
+        const detachCoarse = attach(coarseQuery, update);
+        return () => {
+            detachWidth();
+            detachCoarse();
+        };
+    }, []);
+
+    useEffect(() => {
+        setIsIdleVideoLoaded(false);
+        setIdleFailed(false);
+    }, [idleVideoUrl]);
+
+    useEffect(() => {
+        const video = idleRef.current;
+        if (!video) return;
+        if (video.readyState >= 2) {
+            setIsIdleVideoLoaded(true);
         }
-    }, [idleVideoUrl, idleImageUrl, idleFailed]);
+    }, [idleVideoUrl]);
 
     let viewMode: "ERROR" | "LOADING" | "STREAM" | "IDLE";
 
@@ -364,7 +404,9 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
 
     const showIdleVideo = viewMode !== "STREAM";
     const showIdleImage =
-        showIdleVideo && Boolean(idleImageUrl) && (!idleVideoUrl || idleFailed);
+        showIdleVideo &&
+        Boolean(idleImageUrl) &&
+        (!idleVideoUrl || idleFailed || !isIdleVideoLoaded);
 
     const showLoader = viewMode === "LOADING";
 
@@ -372,18 +414,37 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
 
     const showErrorLayer = viewMode === "ERROR";
 
-    const idleRef = useRef<HTMLVideoElement | null>(null);
+    const keyingParams = useMemo(() => {
+        const base = {
+            videoContrast: 1.0,
+            videoBrightness: 1.0,
+        };
+        if (!isMobile) {
+            return {
+                ...base,
+                threshold: 0.6,
+                softness: 0.15,
+            };
+        }
+        if (backgroundKeyColor === "green") {
+            return {
+                ...base,
+                threshold: 0.72,
+                softness: 0.2,
+            };
+        }
+        return {
+            ...base,
+            threshold: 0.66,
+            softness: 0.18,
+        };
+    }, [isMobile, backgroundKeyColor]);
 
     const {canvasRef} = useWhiteKeyWebGL({
         sourceVideoRef: videoRef,
         enabled: enableKeying,
         // enabled: true, // можно и true всегда, если нужно
-        params: {
-            threshold: 0.6,
-            softness: 0.15,
-            videoContrast: 1.0,
-            videoBrightness: 1.0,
-        },
+        params: keyingParams,
         keyColor: backgroundKeyColor ?? "white",
         onError: () => setKeyingAvailable(false),
     });
@@ -392,12 +453,13 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
 
     return (
         <div
-            className="na-stage-wrapper"
+            className={`na-stage-wrapper ${showLoader ? "is-loading" : ""}`}
             style={{
                 position: "relative",
                 width: "100%",
                 height: "100%",
                 overflow: "hidden",
+                ["--na-mobile-offset-x" as string]: `${mobileVideoOffsetPx ?? 0}px`,
             }}
         >
             <div
@@ -425,7 +487,11 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
                     loop
                     muted
                     playsInline
-                    onLoadedData={() => setIsIdleLoaded(true)}
+                    poster={idleImageUrl || undefined}
+                    onLoadedData={() => setIsIdleVideoLoaded(true)}
+                    onLoadedMetadata={() => setIsIdleVideoLoaded(true)}
+                    onCanPlay={() => setIsIdleVideoLoaded(true)}
+                    onPlaying={() => setIsIdleVideoLoaded(true)}
                     onError={() => setIdleFailed(true)}
                     style={{
                         opacity: showIdleVideo ? 1 : 0,
@@ -437,8 +503,6 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
                         objectFit: "cover",
                         transition: "opacity 0.5s ease",
                         zIndex: 10,
-                        // Если сверху лоадер — немного размываем видео для акцента
-                        filter: showLoader ? "blur(5px) brightness(0.7)" : "none",
                     }}
                 />
             )}
@@ -452,13 +516,12 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
                     unoptimized
                     className="na-avatar-video na-layer-idle"
                     style={{
-                        opacity: showIdleVideo ? 1 : 0,
+                        opacity: showIdleImage ? 1 : 0,
+                        visibility: showIdleImage ? "visible" : "hidden",
                         objectFit: "cover",
                         transition: "opacity 0.5s ease",
-                        zIndex: 10,
+                        zIndex: 11,
                     }}
-                    onLoad={() => setIsIdleLoaded(true)}
-                    onError={() => setIsIdleLoaded(true)}
                 />
             )}
 
@@ -531,7 +594,7 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
                     justifyContent: "center",
                     zIndex: 31,
                     pointerEvents: showLoader ? "all" : "none",
-                    background: showLoader ? "rgba(0,0,0,0.7)" : "transparent",
+                    background: "transparent",
                 }}
             >
                 <div className="na-spinner"></div>

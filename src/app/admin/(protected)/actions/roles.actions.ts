@@ -112,6 +112,11 @@ export async function addAgentFromDidAction(formData: FormData) {
     (await resolveUniqueSlug(previewName || agentId)) ??
     null;
 
+  const maxOrder = await prisma.agent.aggregate({
+    _max: { sortOrder: true },
+  });
+  const nextSortOrder = (maxOrder._max.sortOrder ?? 0) + 1;
+
   const created = await prisma.agent.create({
     data: {
       agentId,
@@ -126,6 +131,7 @@ export async function addAgentFromDidAction(formData: FormData) {
       backgroundEnabled: false,
       idleVideoUrl: idleVideoUrl || null,
       avatarImageUrl: avatarImageUrl || null,
+      sortOrder: nextSortOrder,
     },
   });
 
@@ -254,6 +260,10 @@ export async function saveRoleSettingsAction(formData: FormData) {
     getString(formData.get("personalityStyle")),
   );
   const voiceIdInput = getOptionalString(formData.get("voiceId"));
+  const mobileOffsetRaw = getOptionalString(formData.get("mobileVideoOffsetPx"));
+  const mobileVideoOffsetPx = Number.isFinite(Number(mobileOffsetRaw))
+    ? Math.trunc(Number(mobileOffsetRaw))
+    : 0;
 
   if (!displayName || !agentName) {
     throw new Error("Missing required fields");
@@ -296,6 +306,7 @@ export async function saveRoleSettingsAction(formData: FormData) {
       instructions: systemPrompt,
       personality: personalityStyle,
       voiceID: voiceId,
+      mobileVideoOffsetPx,
       backgroundEnabled: backgroundsEnabled,
       backgroundKeyColor: normalizedBackgroundKeyColor,
     },
@@ -320,6 +331,43 @@ export async function saveRoleSettingsAction(formData: FormData) {
   revalidatePath("/");
   revalidateTag("agents", {expire: 0});
   revalidateTag(`agent:${agentKey}`, {expire: 0});
+  return { ok: true };
+}
+
+export async function updateAgentOrderAction(order: AgentKey[]) {
+  await requireAdmin();
+  if (!Array.isArray(order) || order.length === 0) {
+    return { ok: false };
+  }
+
+  const agents = await prisma.agent.findMany({
+    select: { id: true, slug: true, agentId: true },
+  });
+
+  const keyToId = new Map(
+    agents.map((agent) => [agent.slug ?? agent.agentId ?? agent.id, agent.id]),
+  );
+
+  const updates = order.flatMap((key, index) => {
+    const id = keyToId.get(key);
+    if (!id) return [];
+    return [
+      prisma.agent.update({
+        where: { id },
+        data: { sortOrder: index },
+      }),
+    ];
+  });
+
+  if (updates.length === 0) {
+    return { ok: false };
+  }
+
+  await prisma.$transaction(updates);
+
+  revalidatePath("/admin/roles");
+  revalidatePath("/");
+  revalidateTag("agents", { expire: 0 });
   return { ok: true };
 }
 

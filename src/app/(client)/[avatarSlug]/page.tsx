@@ -27,8 +27,10 @@ export default async function AvatarPage({ params }: AvatarPageProps) {
     <>
       <header className="na-header">
         <div className="na-container">
-          <div className="na-header-content">
-            <div className="na-logo-text">NEIL AVATAR</div>
+            <div className="na-header-content">
+            <Link href="/" className="na-logo-text">
+              NEIL AVATAR
+            </Link>
             <Link href="/" className="na-back-link">
               ← Back to Roles
             </Link>
@@ -50,6 +52,7 @@ export default async function AvatarPage({ params }: AvatarPageProps) {
           backgrounds={agentRecord?.backgrounds ?? []}
           backgroundsEnabled={agentRecord?.backgroundEnabled ?? false}
           backgroundKeyColor={backgroundKeyColor}
+          mobileVideoOffsetPx={agentRecord?.mobileVideoOffsetPx ?? 0}
         />
 
         <div className="na-brand-logo">
