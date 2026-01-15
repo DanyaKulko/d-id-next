@@ -107,15 +107,55 @@ export const AvatarPageClient = ({
     }, [backgroundOptions, selectedBackgroundId]);
 
     useEffect(() => {
-        setCanFullscreen(Boolean(document.fullscreenEnabled));
-        const handleFullscreenChange = () => {
-            setIsFullscreen(Boolean(document.fullscreenElement));
+        if (typeof document === "undefined") return;
+
+        const doc = document as Document & {
+            webkitFullscreenEnabled?: boolean;
+            webkitFullscreenElement?: Element | null;
+            mozFullScreenEnabled?: boolean;
+            mozFullScreenElement?: Element | null;
+            msFullscreenEnabled?: boolean;
+            msFullscreenElement?: Element | null;
         };
-        document.addEventListener("fullscreenchange", handleFullscreenChange);
+
+        const isEnabled = Boolean(
+            doc.fullscreenEnabled ||
+            doc.webkitFullscreenEnabled ||
+            doc.mozFullScreenEnabled ||
+            doc.msFullscreenEnabled
+        );
+
+        setCanFullscreen(isEnabled);
+
+        const getFullscreenElement = () =>
+            doc.fullscreenElement ||
+            doc.webkitFullscreenElement ||
+            doc.mozFullScreenElement ||
+            doc.msFullscreenElement ||
+            null;
+
+        const handleChange = () => {
+            setIsFullscreen(Boolean(getFullscreenElement()));
+        };
+
+        // современное + вендорные
+        const events = [
+            "fullscreenchange",
+            "webkitfullscreenchange",
+            "mozfullscreenchange",
+            "MSFullscreenChange",
+        ] as const;
+
+        // biome-ignore lint/suspicious/useIterableCallbackReturn: <explanation>
+        events.forEach((e) => document.addEventListener(e, handleChange));
+        handleChange();
+
         return () => {
-            document.removeEventListener("fullscreenchange", handleFullscreenChange);
+            // biome-ignore lint/suspicious/useIterableCallbackReturn: <explanation>
+            events.forEach((e) => document.removeEventListener(e, handleChange));
         };
     }, []);
+
 
     useEffect(() => {
         const checkPermission = async () => {
@@ -424,7 +464,17 @@ export const AvatarPageClient = ({
                             }
                             title={isFullscreen ? "Exit full screen" : "Enter full screen"}
                         >
-                            {isFullscreen ? "⤡" : "⤢"}
+                            {isFullscreen ? (
+                                // biome-ignore lint/a11y/noSvgWithoutTitle: 1
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                </svg>
+                            ) : (
+                                // biome-ignore lint/a11y/noSvgWithoutTitle: 1
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/>
+                                </svg>
+                            )}
                         </button>
                     )}
 

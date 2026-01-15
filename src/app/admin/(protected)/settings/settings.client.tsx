@@ -461,7 +461,7 @@ export default function SettingsClient({
                                 id="textLink"
                                 name="textLink"
                                 type="url"
-                                defaultValue={externalSourcesConfig.textLink}
+                                defaultValue={'https://www.dondemineilstravels.com'}
                                 placeholder="https://www.dondemineilstravels.com"
                                 disabled={true}
                             />
@@ -511,7 +511,7 @@ export default function SettingsClient({
                             id="textCron"
                             name="textCron"
                             type="text"
-                            defaultValue={externalSourcesConfig.textCron}
+                            defaultValue={'0 0 * * *'}
                             placeholder="0 0 * * * (every day at midnight)"
                             disabled={true}
                         />
