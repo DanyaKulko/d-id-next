@@ -377,6 +377,19 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
     }, [backgroundUrl]);
 
     useEffect(() => {
+        if (typeof window === "undefined") return;
+        const query = window.matchMedia("(hover: none) and (pointer: coarse)");
+        const update = () => setIsTouchLike(query.matches);
+        update();
+        if (query.addEventListener) {
+            query.addEventListener("change", update);
+            return () => query.removeEventListener("change", update);
+        }
+        query.addListener(update);
+        return () => query.removeListener(update);
+    }, []);
+
+    useEffect(() => {
         setIsIdleVideoLoaded(false);
         setIdleFailed(false);
     }, [idleVideoUrl]);
@@ -633,15 +646,3 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
         </div>
     );
 };
-    useEffect(() => {
-        if (typeof window === "undefined") return;
-        const query = window.matchMedia("(hover: none) and (pointer: coarse)");
-        const update = () => setIsTouchLike(query.matches);
-        update();
-        if (query.addEventListener) {
-            query.addEventListener("change", update);
-            return () => query.removeEventListener("change", update);
-        }
-        query.addListener(update);
-        return () => query.removeListener(update);
-    }, []);
