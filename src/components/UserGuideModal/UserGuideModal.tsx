@@ -4,6 +4,11 @@ import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./UserGuideModal.module.css";
 import logo from "@/assets/img/neil_avatar_logo.png";
+import firstSlide from "@/assets/img/user-guide/img.png";
+import secondSlide from "@/assets/img/user-guide/img_1.png";
+import thirdSlide_1 from "@/assets/img/user-guide/img_2.png";
+import thirdSlide_2 from "@/assets/img/user-guide/img_3.png";
+import fourthSlide from "@/assets/img/user-guide/img_4.png";
 
 const SLIDES_DATA = [
   {
@@ -70,16 +75,10 @@ const SLIDES_DATA = [
         </div>
         <div className={styles["na-slide-images-modal"]}>
           <Image
-            src="https://roliki.ua/s/unimmunised1050.png"
+            src={firstSlide}
             alt="Role Selection Example 1"
-            width={640}
-            height={360}
-          />
-          <Image
-            src="https://roliki.ua/s/preloaded1554.png"
-            alt="Role Selection Example 2"
-            width={640}
-            height={360}
+            width={1280}
+            height={720}
           />
         </div>
       </>
@@ -103,8 +102,9 @@ const SLIDES_DATA = [
         </div>
         <div className={styles["na-slide-screenshot-modal"]}>
           <Image
-            src="https://roliki.ua/s/scooch2235.png"
+            src={secondSlide}
             alt="Avatar Status"
+            style={{maxWidth: '40%'}}
             width={800}
             height={450}
           />
@@ -127,13 +127,13 @@ const SLIDES_DATA = [
         </div>
         <div className={styles["na-slide-screenshots-modal"]}>
           <Image
-            src="https://roliki.ua/s/flashbulb1343.png"
+            src={thirdSlide_1}
             alt="Language Selection"
             width={640}
             height={360}
           />
           <Image
-            src="https://roliki.ua/s/locating1540.png"
+            src={thirdSlide_2}
             alt="Start Conversation Button"
             width={640}
             height={360}
@@ -161,7 +161,7 @@ const SLIDES_DATA = [
         </div>
         <div className={styles["na-slide-screenshot-modal"]}>
           <Image
-            src="https://roliki.ua/s/tribesfolk2051.png"
+            src={fourthSlide}
             alt="Interrupt Button"
             width={800}
             height={450}

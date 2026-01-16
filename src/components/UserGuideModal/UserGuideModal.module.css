@@ -141,7 +141,7 @@
 }
 
 .na-slide-images-modal img {
-  max-width: 48%;
+  max-width: 100%;
   height: auto;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(39, 70, 99, 0.1);
@@ -327,7 +327,7 @@
   }
 
   .na-slide-images-modal img {
-    max-width: 48%;
+    max-width: 100%;
     max-height: 150px;
     object-fit: cover;
   }
