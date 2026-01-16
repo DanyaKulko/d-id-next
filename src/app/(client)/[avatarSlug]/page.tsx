@@ -1,9 +1,8 @@
 import "./page.css";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AvatarPageClient } from "@/app/(client)/[avatarSlug]/page.client";
-import logo from "@/assets/img/neil_avatar_logo.png";
+import LottieLogo from "@/components/LottieLogo/LottieLogo";
 import { findAgentByKey } from "@/lib/agents/agents.db";
 import { enforceClientAuth } from "@/lib/auth/client-access";
 
@@ -28,8 +27,8 @@ export default async function AvatarPage({ params }: AvatarPageProps) {
       <header className="na-header">
         <div className="na-container">
             <div className="na-header-content">
-            <Link href="/" className="na-logo-text">
-              NEIL AVATAR
+            <Link href="/" className="na-logo-text" aria-label="Neil Avatar">
+              <LottieLogo className="na-logo-anim" />
             </Link>
             <Link href="/" className="na-back-link">
               ← Back to Roles
@@ -55,8 +54,8 @@ export default async function AvatarPage({ params }: AvatarPageProps) {
           mobileVideoOffsetPx={agentRecord?.mobileVideoOffsetPx ?? 0}
         />
 
-        <div className="na-brand-logo">
-          <Image src={logo} alt={"logo"} />
+        <div className="na-brand-logo" aria-hidden="true">
+          <LottieLogo className="na-logo-anim na-logo-anim--footer" />
         </div>
       </main>
     </>

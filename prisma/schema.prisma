@@ -118,6 +118,9 @@ model Agent {
   personality     String?
 
   voiceID             String
+  voiceLanguage       String?
+  llmModel            String?
+  llmTemplate         String?
   sortOrder           Int                 @default(0)
   mobileVideoOffsetPx Int                 @default(0)
   backgroundEnabled   Boolean             @default(false)

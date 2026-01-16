@@ -80,6 +80,7 @@ export function useWhiteKeyWebGL(opts: {
       uniform vec3 u_keyColor;
       uniform vec2 u_uvScale;
       uniform vec2 u_uvOffset;
+      uniform float u_isGreen;
 
       vec3 applyBC(vec3 c) {
         c = (c - 0.5) * u_contrast + 0.5;
@@ -89,6 +90,7 @@ export function useWhiteKeyWebGL(opts: {
 
       void main() {
         vec2 uv = (v_uv - 0.5) * u_uvScale + 0.5 + u_uvOffset;
+        uv = clamp(uv, vec2(0.0), vec2(1.0));
         vec4 v = texture2D(u_video, uv);
         vec3 vc = applyBC(v.rgb);
     
@@ -98,6 +100,12 @@ export function useWhiteKeyWebGL(opts: {
         
         a *= v.a;
     
+        if (u_isGreen > 0.5) {
+          float maxRB = max(vc.r, vc.b);
+          float spill = smoothstep(0.0, 0.6, vc.g - maxRB);
+          vc.g = mix(vc.g, maxRB, spill * (1.0 - a) * 0.8);
+        }
+
         gl_FragColor = vec4(vc, a); 
       }
     `;
@@ -151,6 +159,16 @@ export function useWhiteKeyWebGL(opts: {
         // biome-ignore lint/correctness/useHookAtTopLevel: WebGL API is not a React hook.
         gl.useProgram(program);
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        gl.disable(gl.DITHER);
+        const colorSpaceConversion = (
+            gl as WebGLRenderingContext & {
+                UNPACK_COLORSPACE_CONVERSION_WEBGL?: number;
+            }
+        ).UNPACK_COLORSPACE_CONVERSION_WEBGL;
+        if (typeof colorSpaceConversion === "number") {
+            gl.pixelStorei(colorSpaceConversion, gl.NONE);
+        }
 
         // fullscreen quad
         const posLoc = gl.getAttribLocation(program, "a_pos");
@@ -198,6 +216,7 @@ export function useWhiteKeyWebGL(opts: {
         const uKeyColor = gl.getUniformLocation(program, "u_keyColor");
         const uUvScale = gl.getUniformLocation(program, "u_uvScale");
         const uUvOffset = gl.getUniformLocation(program, "u_uvOffset");
+        const uIsGreen = gl.getUniformLocation(program, "u_isGreen");
 
         // if (opts.backgroundUrl) {
         //     bgImg.onload = () => {
@@ -259,6 +278,9 @@ export function useWhiteKeyWebGL(opts: {
             gl.uniform1f(uContrast, params.videoContrast);
             if (uKeyColor) {
                 gl.uniform3f(uKeyColor, keyColorRgb[0], keyColorRgb[1], keyColorRgb[2]);
+            }
+            if (uIsGreen) {
+                gl.uniform1f(uIsGreen, params.keyColor === "green" ? 1 : 0);
             }
 
             // update video texture
@@ -435,8 +457,6 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
 
     const keyingParams = useMemo(
         () => ({
-            threshold: 0.6,
-            softness: 0.15,
             videoContrast: 1.0,
             videoBrightness: 1.0,
         }),

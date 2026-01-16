@@ -1,7 +1,8 @@
 import "./page.css";
 import Image from "next/image";
 import Link from "next/link";
-import logo from "@/assets/img/neil_avatar_logo.png";
+import HomeMediaPrefetch from "@/components/HomeMediaPrefetch";
+import LottieLogo from "@/components/LottieLogo/LottieLogo";
 import UserGuideModal from "@/components/UserGuideModal/UserGuideModal";
 import { fetchHomeAgents } from "@/lib/agents/agents.db";
 import { enforceClientAuth } from "@/lib/auth/client-access";
@@ -11,15 +12,18 @@ export const dynamic = 'force-dynamic';
 export default async function Home() {
   await enforceClientAuth("/");
   const avatars = await fetchHomeAgents();
+  const mediaUrls = avatars.flatMap((avatar) =>
+    [avatar.videoUrl, avatar.imageUrl].filter(Boolean),
+  );
   return (
     <>
-      {/*<UserAgreementModal/>*/}
       <UserGuideModal />
+      <HomeMediaPrefetch urls={mediaUrls} />
       <header className="na-header">
         <div className="na-container">
           <div className="na-header-content">
-            <Link href="/" className="na-logo-text">
-              NEIL AVATAR
+            <Link href="/" className="na-logo-text" aria-label="Neil Avatar">
+              <LottieLogo className="na-logo-anim" />
             </Link>
             <div className="na-header-title">
               <h1 className="na-title-display na-glow">
@@ -76,8 +80,8 @@ export default async function Home() {
           ))}
         </div>
 
-        <div className="na-brand-logo">
-          <Image src={logo} alt={"logo"} />
+        <div className="na-brand-logo" aria-hidden="true">
+          <LottieLogo className="na-logo-anim na-logo-anim--footer" />
         </div>
       </main>
     </>

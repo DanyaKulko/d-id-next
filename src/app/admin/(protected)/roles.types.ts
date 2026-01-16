@@ -21,6 +21,9 @@ export type AgentSettings = {
   systemPrompt: string;
   personalityStyle: string;
   voiceId: string;
+  voiceLanguage?: string;
+  llmModel?: string;
+  llmTemplate?: string;
   mobileVideoOffsetPx: number;
   backgroundsEnabled: boolean;
   backgroundKeyColor?: BackgroundKeyColor;

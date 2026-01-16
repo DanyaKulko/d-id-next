@@ -25,11 +25,20 @@
   inset: 0;
   width: 100vw;
   height: 100vh;
-  height: 100dvh;
+  min-height: 100vh;
+  max-width: none;
+  max-height: none;
   border-radius: 0;
   aspect-ratio: auto;
   z-index: 9999;
   background: #000;
+}
+
+@supports (height: 100dvh) {
+  .na-avatar-container--pseudo-fullscreen {
+    height: 100dvh;
+    min-height: 100dvh;
+  }
 }
 
 .na-avatar-container--pseudo-fullscreen .na-watermark {
@@ -40,6 +49,11 @@ body.na-body-pseudo-fullscreen {
   overflow: hidden;
   overscroll-behavior: contain;
   touch-action: none;
+}
+
+body.na-body-pseudo-fullscreen .na-header,
+body.na-body-pseudo-fullscreen .na-brand-logo {
+  display: none;
 }
 
 .na-mic-overlay {
@@ -460,10 +474,22 @@ body.na-body-pseudo-fullscreen {
   }
 }
 
+@media (max-width: 1080px) and (min-width: 769px) {
+  .na-controls {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 768px) {
   .na-avatar-container {
     aspect-ratio: auto;
     height: min(70vh, 520px);
+  }
+
+  .na-avatar-container--pseudo-fullscreen {
+    height: 100vh;
+    min-height: 100vh;
   }
 
   .na-fullscreen-btn {
@@ -499,6 +525,11 @@ body.na-body-pseudo-fullscreen {
   .na-language-select,
   .na-btn {
     width: 100%;
+  }
+
+  .na-language-select {
+    text-align: center;
+    text-align-last: center;
   }
 
   .na-status-badge {

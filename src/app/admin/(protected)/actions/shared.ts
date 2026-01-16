@@ -114,6 +114,40 @@ export const extractVoiceId = (agent: Record<string, unknown>) => {
   );
 };
 
+export const extractVoiceLanguage = (agent: Record<string, unknown>) => {
+  const presenter = agent.presenter;
+  if (presenter && typeof presenter === "object") {
+    const presenterVoice = (presenter as Record<string, unknown>).voice;
+    if (presenterVoice && typeof presenterVoice === "object") {
+      return resolveString(
+        (presenterVoice as Record<string, unknown>).language,
+        "",
+      );
+    }
+  }
+  const voice = agent.voice;
+  if (voice && typeof voice === "object") {
+    return resolveString((voice as Record<string, unknown>).language, "");
+  }
+  return resolveString(agent.language, "");
+};
+
+export const extractLlmModel = (agent: Record<string, unknown>) => {
+  const llm = agent.llm;
+  if (llm && typeof llm === "object") {
+    return resolveString((llm as Record<string, unknown>).model, "");
+  }
+  return "";
+};
+
+export const extractLlmTemplate = (agent: Record<string, unknown>) => {
+  const llm = agent.llm;
+  if (llm && typeof llm === "object") {
+    return resolveString((llm as Record<string, unknown>).template, "");
+  }
+  return "";
+};
+
 export const extractIdleVideoUrl = (agent: Record<string, unknown>) => {
   const presenter = agent.presenter;
   if (!presenter || typeof presenter !== "object") return "";
@@ -173,6 +207,9 @@ export async function updateDidAgentFromRole(
     safetyRules: string;
     personalityStyle: string;
     voiceId?: string;
+    voiceLanguage?: string;
+    llmModel?: string;
+    llmTemplate?: string;
   },
 ) {
   const existing = await withDidLogging("Get Agent", () =>
@@ -232,7 +269,13 @@ export async function updateDidAgentFromRole(
     llmPayload.prompt_customization = promptCustomization;
   }
 
-  llmPayload.template = 'rag-ungrounded'
+  if (input.llmModel) {
+    llmPayload.model = input.llmModel;
+  }
+
+  if (input.llmTemplate) {
+    llmPayload.template = input.llmTemplate;
+  }
 
   if (Object.keys(llmPayload).length > 0) {
     payload.llm = llmPayload;
@@ -240,12 +283,17 @@ export async function updateDidAgentFromRole(
 
   delete llmPayload.prompt_customization;
 
-  if (input.voiceId) {
+  if (input.voiceId || input.voiceLanguage) {
     const existingVoice =
       presenterPayload.voice && typeof presenterPayload.voice === "object"
         ? ({ ...presenterPayload.voice } as Record<string, unknown>)
         : {};
-    existingVoice.voice_id = input.voiceId;
+    if (input.voiceId) {
+      existingVoice.voice_id = input.voiceId;
+    }
+    if (input.voiceLanguage) {
+      existingVoice.language = input.voiceLanguage;
+    }
     presenterPayload.voice = existingVoice;
   }
 

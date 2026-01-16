@@ -57,6 +57,22 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
     [],
   );
 
+  const resumeAudioContext = useCallback(async () => {
+    if (typeof window === "undefined") return;
+    const AudioCtx =
+      window.AudioContext ||
+      (window as typeof window & { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (!AudioCtx) return;
+    try {
+      const ctx = new AudioCtx();
+      if (ctx.state === "suspended") {
+        await ctx.resume();
+      }
+      await ctx.close();
+    } catch (_error) {}
+  }, []);
+
   useEffect(() => {
     listeningRef.current = listening;
   }, [listening]);
@@ -79,19 +95,27 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
 
         if (isStoppedRef.current) return;
 
+        await resumeAudioContext();
+
         const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(
           token,
           region,
         );
         speechConfig.speechRecognitionLanguage = lang;
 
+        const isAppleMobile =
+          typeof navigator !== "undefined" &&
+          (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+            (navigator.userAgent.includes("Mac") &&
+              navigator.maxTouchPoints > 1));
+
         speechConfig.setProperty(
           SpeechSDK.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs,
-          "3000",
+          isAppleMobile ? "5000" : "3000",
         );
         speechConfig.setProperty(
           SpeechSDK.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs,
-          "10000",
+          isAppleMobile ? "30000" : "15000",
         );
 
         const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
@@ -161,7 +185,7 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
         startGuardRef.current = false;
       }
     },
-    [onFinalTranscript, getOrFetchToken, logSttError],
+    [onFinalTranscript, getOrFetchToken, logSttError, resumeAudioContext],
   );
 
   const stopListening = useCallback(() => {

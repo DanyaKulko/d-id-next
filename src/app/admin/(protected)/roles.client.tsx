@@ -40,6 +40,34 @@ const personalityOptions = [
     {value: "Confident and Persuasive", label: "Confident and Persuasive"},
 ];
 
+const llmModelOptions = [
+    "gpt-4o-global",
+    "gpt-4o-mini",
+    "gpt-4.1",
+    "gpt-4.1-mini",
+    "gpt-4.1-nano",
+];
+
+const llmTemplateOptions = [
+    "rag-grounded",
+    "rag-ungrounded",
+    "assistant",
+];
+
+const voiceLanguageSuggestions = [
+    "Multilingual",
+    "English",
+    "Russian",
+    "Spanish",
+    "French",
+    "German",
+    "Italian",
+    "Portuguese",
+    "Chinese",
+    "Japanese",
+    "Korean",
+];
+
 const personalityAliases: Record<string, string> = {
     friendly: "Friendly and Professional",
     fun: "Fun and Engaging",
@@ -738,6 +766,11 @@ function RoleContent({
                          isSaving,
                          isSyncing,
                      }: RoleContentProps) {
+    const currentVoiceLanguage = (defaults?.voiceLanguage ?? "").trim() || "Multilingual";
+    const voiceLanguageOptions = voiceLanguageSuggestions.includes(currentVoiceLanguage)
+        ? voiceLanguageSuggestions
+        : [currentVoiceLanguage, ...voiceLanguageSuggestions];
+
     return (
         <form className="section" onSubmit={onSubmit}>
             <h2 className="section-title">Display Settings</h2>
@@ -843,6 +876,48 @@ function RoleContent({
                     defaultValue={defaults?.voiceId ?? ""}
                     placeholder="voice_neil_basic"
                 />
+            </div>
+            <div className="input-group">
+                <label htmlFor="voiceLanguage">Voice Language</label>
+                <select
+                    id="voiceLanguage"
+                    name="voiceLanguage"
+                    defaultValue={currentVoiceLanguage}
+                >
+                    {voiceLanguageOptions.map((option) => (
+                        <option key={option} value={option}>
+                            {option}
+                        </option>
+                    ))}
+                </select>
+            </div>
+            <div className="input-group">
+                <label htmlFor="llmModel">LLM Model</label>
+                <select
+                    id="llmModel"
+                    name="llmModel"
+                    defaultValue={defaults?.llmModel ?? "gpt-4o-mini"}
+                >
+                    {llmModelOptions.map((option) => (
+                        <option key={option} value={option}>
+                            {option}
+                        </option>
+                    ))}
+                </select>
+            </div>
+            <div className="input-group">
+                <label htmlFor="llmTemplate">LLM Template</label>
+                <select
+                    id="llmTemplate"
+                    name="llmTemplate"
+                    defaultValue={defaults?.llmTemplate ?? "rag-ungrounded"}
+                >
+                    {llmTemplateOptions.map((option) => (
+                        <option key={option} value={option}>
+                            {option}
+                        </option>
+                    ))}
+                </select>
             </div>
             <div className="input-group">
                 <TooltipLabel

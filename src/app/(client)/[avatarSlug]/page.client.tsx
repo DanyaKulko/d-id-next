@@ -159,7 +159,7 @@ export const AvatarPageClient = ({
         const isEnabled = nativeFlag === false ? false : elementSupports;
 
         setSupportsNativeFullscreen(isEnabled);
-        setCanFullscreen(true);
+        setCanFullscreen(Boolean(element));
 
         const getFullscreenElement = () =>
             doc.fullscreenElement ||
@@ -228,8 +228,6 @@ export const AvatarPageClient = ({
             setMicError("");
         }
     }, [micPermission]);
-    console.log('micPermission', micPermission);
-    console.log('showMicPrompt', showMicPrompt);
 
     const toggleFullscreen = useCallback(() => {
         const element = stageRef.current as
@@ -249,12 +247,26 @@ export const AvatarPageClient = ({
             mozCancelFullScreen?: () => Promise<void>;
             msExitFullscreen?: () => Promise<void>;
         };
+        const root = document.documentElement as HTMLElement & {
+            webkitRequestFullscreen?: () => Promise<void>;
+            mozRequestFullScreen?: () => Promise<void>;
+            msRequestFullscreen?: () => Promise<void>;
+        };
 
-        const request =
+        const requestElement =
             element.requestFullscreen ||
             element.webkitRequestFullscreen ||
             element.mozRequestFullScreen ||
             element.msRequestFullscreen;
+        const requestRoot =
+            root.requestFullscreen ||
+            root.webkitRequestFullscreen ||
+            root.mozRequestFullScreen ||
+            root.msRequestFullscreen;
+        const request = requestElement || requestRoot;
+
+        //@ts-ignore
+        const requestTarget = requestElement ? element : root;
 
         const hasNativeFullscreen =
             supportsNativeFullscreen !== false && Boolean(request);
@@ -283,7 +295,7 @@ export const AvatarPageClient = ({
         }
 
         try {
-            request?.call(element);
+            request?.call(requestTarget);
         } catch (_error) {}
     }, [supportsNativeFullscreen]);
 

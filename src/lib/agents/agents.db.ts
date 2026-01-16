@@ -77,6 +77,9 @@ const toAgentSettings = (
     instructions: string | null;
     personality: string | null;
     voiceID: string;
+    voiceLanguage: string | null;
+    llmModel: string | null;
+    llmTemplate: string | null;
     mobileVideoOffsetPx?: number | null;
     backgroundEnabled: boolean;
     backgroundKeyColor: string | null;
@@ -105,6 +108,9 @@ const toAgentSettings = (
     systemPrompt: agent.instructions ?? "",
     personalityStyle: agent.personality ?? "Friendly and Professional",
     voiceId: agent.voiceID ?? "",
+    voiceLanguage: agent.voiceLanguage ?? "",
+    llmModel: agent.llmModel ?? "",
+    llmTemplate: agent.llmTemplate ?? "",
     mobileVideoOffsetPx: agent.mobileVideoOffsetPx ?? 0,
     backgroundsEnabled: agent.backgroundEnabled ?? false,
     backgroundKeyColor: agent.backgroundKeyColor
@@ -152,11 +158,18 @@ export async function fetchAgentSettingsFromDb(
     throw new Error("Agent not found");
   }
 
+  let didAgent: Record<string, unknown> | null = null;
+
+  if (agent.agentId) {
+    didAgent = (await didService.getAgent(agent.agentId).catch(() => null)) as
+      | Record<string, unknown>
+      | null;
+  }
+
   if (
-    agent.agentId &&
+    didAgent &&
     (!agent.voiceID || !agent.voiceID.trim() || !agent.avatarImageUrl)
   ) {
-    const didAgent = await didService.getAgent(agent.agentId).catch(() => null);
     const voiceId = extractVoiceId(didAgent);
     const avatarImageUrl = extractAvatarImageUrl(didAgent);
     const updateData: { voiceID?: string; avatarImageUrl?: string } = {};

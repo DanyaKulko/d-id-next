@@ -11,7 +11,10 @@ import type { AgentKey } from "../roles.types";
 import {
   extractAvatarImageUrl,
   extractIdleVideoUrl,
+  extractLlmModel,
+  extractLlmTemplate,
   extractVoiceId,
+  extractVoiceLanguage,
   getOptionalString,
   getString,
   normalizePersonalityStyle,
@@ -55,6 +58,20 @@ const resolveUniqueSlug = async (value: string) => {
   }
   return candidate;
 };
+
+const allowedLlmModels = new Set([
+  "gpt-4o-global",
+  "gpt-4o-mini",
+  "gpt-4.1",
+  "gpt-4.1-mini",
+  "gpt-4.1-nano",
+]);
+
+const allowedLlmTemplates = new Set([
+  "rag-grounded",
+  "rag-ungrounded",
+  "assistant",
+]);
 
 export async function addAgentFromDidAction(formData: FormData) {
   await requireAdmin();
@@ -104,8 +121,11 @@ export async function addAgentFromDidAction(formData: FormData) {
   const instructions = stripSafetyRulesFromPrompt(instructionsRaw);
 
   const voiceId = extractVoiceId(didAgent);
+  const voiceLanguage = extractVoiceLanguage(didAgent);
   const idleVideoUrl = extractIdleVideoUrl(didAgent);
   const avatarImageUrl = extractAvatarImageUrl(didAgent);
+  const llmModel = extractLlmModel(didAgent);
+  const llmTemplate = extractLlmTemplate(didAgent);
 
   const slug =
     (await resolveUniqueSlug(displayName)) ??
@@ -128,6 +148,9 @@ export async function addAgentFromDidAction(formData: FormData) {
       instructions: instructions || null,
       personality: personality || null,
       voiceID: voiceId || "",
+      voiceLanguage: voiceLanguage || null,
+      llmModel: llmModel || null,
+      llmTemplate: llmTemplate || null,
       backgroundEnabled: false,
       idleVideoUrl: idleVideoUrl || null,
       avatarImageUrl: avatarImageUrl || null,
@@ -170,6 +193,7 @@ export async function syncAgentFromDidAction(agentKey: AgentKey) {
   const didAgentRaw = await withDidLogging("Get Agent", () =>
     didService.getAgent(agent.agentId),
   );
+    console.log('didAgentRaw', didAgentRaw)
   if (!didAgentRaw || typeof didAgentRaw !== "object") {
     throw new Error("D-ID agent not found");
   }
@@ -191,6 +215,9 @@ export async function syncAgentFromDidAction(agentKey: AgentKey) {
     instructions?: string;
     personality?: string;
     voiceID?: string;
+    voiceLanguage?: string;
+    llmModel?: string;
+    llmTemplate?: string;
     idleVideoUrl?: string;
     avatarImageUrl?: string;
   } = {};
@@ -219,6 +246,15 @@ export async function syncAgentFromDidAction(agentKey: AgentKey) {
 
   const voiceId = extractVoiceId(didAgent);
   if (voiceId) updateData.voiceID = voiceId;
+
+  const voiceLanguage = extractVoiceLanguage(didAgent);
+  if (voiceLanguage) updateData.voiceLanguage = voiceLanguage;
+
+  const llmModel = extractLlmModel(didAgent);
+  if (llmModel) updateData.llmModel = llmModel;
+
+  const llmTemplate = extractLlmTemplate(didAgent);
+  if (llmTemplate) updateData.llmTemplate = llmTemplate;
 
   const idleVideoUrl = extractIdleVideoUrl(didAgent);
   if (idleVideoUrl) updateData.idleVideoUrl = idleVideoUrl;
@@ -260,6 +296,9 @@ export async function saveRoleSettingsAction(formData: FormData) {
     getString(formData.get("personalityStyle")),
   );
   const voiceIdInput = getOptionalString(formData.get("voiceId"));
+  const llmModelRaw = getOptionalString(formData.get("llmModel"));
+  const llmTemplateRaw = getOptionalString(formData.get("llmTemplate"));
+  const voiceLanguageRaw = getOptionalString(formData.get("voiceLanguage"));
   const mobileOffsetRaw = getOptionalString(formData.get("mobileVideoOffsetPx"));
   const mobileVideoOffsetPx = Number.isFinite(Number(mobileOffsetRaw))
     ? Math.trunc(Number(mobileOffsetRaw))
@@ -291,6 +330,19 @@ export async function saveRoleSettingsAction(formData: FormData) {
   const voiceId = voiceIdInput?.trim()
     ? voiceIdInput.trim()
     : (agent.voiceID ?? "");
+  const llmModel = llmModelRaw?.trim()
+    ? allowedLlmModels.has(llmModelRaw.trim())
+      ? llmModelRaw.trim()
+      : undefined
+    : undefined;
+  const llmTemplate = llmTemplateRaw?.trim()
+    ? allowedLlmTemplates.has(llmTemplateRaw.trim())
+      ? llmTemplateRaw.trim()
+      : undefined
+    : undefined;
+  const voiceLanguage = voiceLanguageRaw?.trim()
+    ? voiceLanguageRaw.trim()
+    : undefined;
   const safetySetting = await prisma.appSetting.findUnique({
     where: { key: safetyRulesKey },
   });
@@ -306,6 +358,9 @@ export async function saveRoleSettingsAction(formData: FormData) {
       instructions: systemPrompt,
       personality: personalityStyle,
       voiceID: voiceId,
+      voiceLanguage: voiceLanguage ?? null,
+      llmModel: llmModel ?? null,
+      llmTemplate: llmTemplate ?? null,
       mobileVideoOffsetPx,
       backgroundEnabled: backgroundsEnabled,
       backgroundKeyColor: normalizedBackgroundKeyColor,
@@ -321,6 +376,9 @@ export async function saveRoleSettingsAction(formData: FormData) {
       safetyRules,
       personalityStyle,
       voiceId,
+      voiceLanguage,
+      llmModel,
+      llmTemplate,
     });
   } else {
   }
