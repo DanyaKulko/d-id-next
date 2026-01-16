@@ -222,6 +222,26 @@ export default function UserGuideModal() {
   }, [isOpen]);
 
   useEffect(() => {
+    if (!isOpen || typeof window === "undefined") return;
+    const root = document.documentElement;
+    const updateViewport = () => {
+      const height =
+        window.visualViewport?.height ?? window.innerHeight;
+      root.style.setProperty("--na-vh", `${height * 0.01}px`);
+    };
+    updateViewport();
+    window.addEventListener("resize", updateViewport);
+    window.visualViewport?.addEventListener("resize", updateViewport);
+    window.visualViewport?.addEventListener("scroll", updateViewport);
+    return () => {
+      window.removeEventListener("resize", updateViewport);
+      window.visualViewport?.removeEventListener("resize", updateViewport);
+      window.visualViewport?.removeEventListener("scroll", updateViewport);
+      root.style.removeProperty("--na-vh");
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {

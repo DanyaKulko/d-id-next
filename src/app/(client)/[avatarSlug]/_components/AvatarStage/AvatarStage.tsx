@@ -27,8 +27,8 @@ export function useWhiteKeyWebGL(opts: {
     const params = useMemo(() => {
         const p = opts.params ?? {};
         const keyColor = opts.keyColor ?? p.keyColor ?? "white";
-        const thresholdDefault = keyColor === "green" ? 0.4 : 0.28;
-        const softnessDefault = keyColor === "green" ? 0.18 : 0.1;
+        const thresholdDefault = keyColor === "green" ? 0.24 : 0.28;
+        const softnessDefault = keyColor === "green" ? 0.2 : 0.1;
         return {
             threshold: p.threshold ?? thresholdDefault,
             softness: p.softness ?? softnessDefault,
@@ -93,20 +93,24 @@ export function useWhiteKeyWebGL(opts: {
         uv = clamp(uv, vec2(0.0), vec2(1.0));
         vec4 v = texture2D(u_video, uv);
         vec3 vc = applyBC(v.rgb);
-    
-        float distToWhite = distance(vc, u_keyColor);
-    
-        float a = smoothstep(u_threshold, u_threshold + u_softness, distToWhite);
-        
-        a *= v.a;
-    
+        float a = 1.0;
+
         if (u_isGreen > 0.5) {
           float maxRB = max(vc.r, vc.b);
-          float spill = smoothstep(0.0, 0.6, vc.g - maxRB);
-          vc.g = mix(vc.g, maxRB, spill * (1.0 - a) * 0.8);
+          float greenDiff = vc.g - maxRB;
+          float bg = smoothstep(u_threshold, u_threshold + u_softness, greenDiff);
+          a = 1.0 - bg;
+
+          // Aggressive despill on edges to avoid green tint on iOS.
+          float spill = smoothstep(0.0, u_threshold + u_softness, greenDiff);
+          vc.g = mix(vc.g, maxRB, spill * 0.9);
+        } else {
+          float distToWhite = distance(vc, u_keyColor);
+          a = smoothstep(u_threshold, u_threshold + u_softness, distToWhite);
         }
 
-        gl_FragColor = vec4(vc, a); 
+        a *= v.a;
+        gl_FragColor = vec4(vc, a);
       }
     `;
 
