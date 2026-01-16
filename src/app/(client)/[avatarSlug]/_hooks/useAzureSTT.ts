@@ -22,6 +22,7 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
   const listeningRef = useRef(false);
   const startGuardRef = useRef(false);
   const isAppleMobileRef = useRef(false);
+  const recognizerRunningRef = useRef(false);
 
   const getOrFetchToken = useCallback(async () => {
     const now = Date.now();
@@ -120,7 +121,10 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
         const sameLanguage = activeLangRef.current === lang;
 
         if (recognizerRef.current && sameLanguage) {
-          await startRecognition(recognizerRef.current);
+          if (!recognizerRunningRef.current) {
+            await startRecognition(recognizerRef.current);
+            recognizerRunningRef.current = true;
+          }
           setListening(true);
           return;
         }
@@ -158,13 +162,14 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
         );
 
         recognizer.recognizing = (_s, e) => {
-          if (!isStoppedRef.current && e.result.text) {
+          if (!listeningRef.current || isStoppedRef.current) return;
+          if (e.result.text) {
             setInterimTranscript(e.result.text);
           }
         };
 
         recognizer.recognized = (_s, e) => {
-          if (isStoppedRef.current) return;
+          if (!listeningRef.current || isStoppedRef.current) return;
 
           if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
             const text = e.result.text;
@@ -193,6 +198,7 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
           setInterimTranscript("");
           recognizerRef.current = null;
           activeLangRef.current = null;
+          recognizerRunningRef.current = false;
         };
 
         recognizer.sessionStopped = () => {
@@ -203,12 +209,14 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
           setInterimTranscript("");
           recognizerRef.current = null;
           activeLangRef.current = null;
+          recognizerRunningRef.current = false;
         };
 
         await startRecognition(recognizer);
         setListening(true);
         recognizerRef.current = recognizer;
         activeLangRef.current = lang;
+        recognizerRunningRef.current = true;
       } catch (error) {
         console.error("STT Start Error:", error);
         void logSttError(
@@ -240,6 +248,9 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
     if (recognizerRef.current) {
       const r = recognizerRef.current;
       console.log("🛑 Stopping Azure STT...");
+      if (isAppleMobileRef.current && !dispose) {
+        return;
+      }
       r.stopContinuousRecognitionAsync(
         () => {
           if (dispose || !isAppleMobileRef.current) {
@@ -248,6 +259,7 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
             } catch (_error) {}
             recognizerRef.current = null;
             activeLangRef.current = null;
+            recognizerRunningRef.current = false;
           }
         },
         () => {
@@ -257,6 +269,7 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
             } catch (_error) {}
             recognizerRef.current = null;
             activeLangRef.current = null;
+            recognizerRunningRef.current = false;
           }
         },
       );
@@ -267,5 +280,11 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
     return () => stopListening(true);
   }, [stopListening]);
 
-  return { listening, startListening, stopListening, interimTranscript };
+  return {
+    listening,
+    startListening,
+    stopListening,
+    interimTranscript,
+    warmupAudio: resumeAudioContext,
+  };
 };

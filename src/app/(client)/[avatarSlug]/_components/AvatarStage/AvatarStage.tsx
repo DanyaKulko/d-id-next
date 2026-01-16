@@ -8,6 +8,8 @@ type KeyingParams = {
     threshold?: number; // пример 0.20..0.35
     // мягкость перехода (0..1), чтобы не было рваных краёв
     softness?: number; // пример 0.05..0.15
+    // сужение альфы для устранения зеленого ореола
+    alphaChoke?: number; // пример 0.0..0.3
     // чуть затемнить/осветлить итог
     videoBrightness?: number; // 1.0 = без изменений
     videoContrast?: number; // 1.0 = без изменений
@@ -32,6 +34,7 @@ export function useWhiteKeyWebGL(opts: {
         return {
             threshold: p.threshold ?? thresholdDefault,
             softness: p.softness ?? softnessDefault,
+            alphaChoke: p.alphaChoke ?? 0,
             videoBrightness: p.videoBrightness ?? 1.0,
             videoContrast: p.videoContrast ?? 1.0,
             keyColor,
@@ -75,6 +78,7 @@ export function useWhiteKeyWebGL(opts: {
       // uniform sampler2D u_bg;
       uniform float u_threshold;
       uniform float u_softness;
+      uniform float u_alphaChoke;
       uniform float u_brightness;
       uniform float u_contrast;
       uniform vec3 u_keyColor;
@@ -109,8 +113,9 @@ export function useWhiteKeyWebGL(opts: {
           a = smoothstep(u_threshold, u_threshold + u_softness, distToWhite);
         }
 
+        a = smoothstep(u_alphaChoke, 1.0, a);
         a *= v.a;
-        gl_FragColor = vec4(vc, a);
+        gl_FragColor = vec4(vc * a, a);
       }
     `;
 
@@ -215,6 +220,7 @@ export function useWhiteKeyWebGL(opts: {
 
         const uThreshold = gl.getUniformLocation(program, "u_threshold");
         const uSoftness = gl.getUniformLocation(program, "u_softness");
+        const uAlphaChoke = gl.getUniformLocation(program, "u_alphaChoke");
         const uBrightness = gl.getUniformLocation(program, "u_brightness");
         const uContrast = gl.getUniformLocation(program, "u_contrast");
         const uKeyColor = gl.getUniformLocation(program, "u_keyColor");
@@ -278,6 +284,9 @@ export function useWhiteKeyWebGL(opts: {
             // uniforms
             gl.uniform1f(uThreshold, params.threshold);
             gl.uniform1f(uSoftness, params.softness);
+            if (uAlphaChoke) {
+                gl.uniform1f(uAlphaChoke, params.alphaChoke);
+            }
             gl.uniform1f(uBrightness, params.videoBrightness);
             gl.uniform1f(uContrast, params.videoContrast);
             if (uKeyColor) {
@@ -394,6 +403,7 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
         if (typeof window === "undefined") return false;
         return window.matchMedia("(hover: none) and (pointer: coarse)").matches;
     });
+    const [isIOS, setIsIOS] = useState(false);
     const idleRef = useRef<HTMLVideoElement | null>(null);
 
     useEffect(() => {
@@ -413,6 +423,15 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
         }
         query.addListener(update);
         return () => query.removeListener(update);
+    }, []);
+
+    useEffect(() => {
+        if (typeof navigator === "undefined") return;
+        const ua = navigator.userAgent || "";
+        setIsIOS(
+            /iPad|iPhone|iPod/.test(ua) ||
+                (ua.includes("Mac") && navigator.maxTouchPoints > 1),
+        );
     }, []);
 
     useEffect(() => {
@@ -459,13 +478,21 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
 
     const showErrorLayer = viewMode === "ERROR";
 
-    const keyingParams = useMemo(
-        () => ({
+    const keyingParams = useMemo(() => {
+        if (backgroundKeyColor === "green" && isIOS) {
+            return {
+                threshold: 0.06,
+                softness: 0.08,
+                alphaChoke: 0.2,
+                videoContrast: 1.0,
+                videoBrightness: 1.0,
+            };
+        }
+        return {
             videoContrast: 1.0,
             videoBrightness: 1.0,
-        }),
-        [],
-    );
+        };
+    }, [backgroundKeyColor, isIOS]);
 
     const {canvasRef} = useWhiteKeyWebGL({
         sourceVideoRef: videoRef,

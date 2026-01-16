@@ -68,6 +68,7 @@ export const AvatarPageClient = ({
     const videoRef = useRef<HTMLVideoElement>(null);
     const hasGreetedRef = useRef(false);
     const stageRef = useRef<HTMLDivElement | null>(null);
+    const startingRef = useRef(false);
 
     const [isVideoPlaying, setIsVideoPlaying] = useState(false);
     const [showError, setShowError] = useState(false);
@@ -114,80 +115,6 @@ export const AvatarPageClient = ({
         }
     }, [backgroundOptions, selectedBackgroundId]);
 
-    useEffect(() => {
-        if (typeof document === "undefined") return;
-
-        const doc = document as Document & {
-            webkitFullscreenEnabled?: boolean;
-            webkitFullscreenElement?: Element | null;
-            mozFullScreenEnabled?: boolean;
-            mozFullScreenElement?: Element | null;
-            msFullscreenEnabled?: boolean;
-            msFullscreenElement?: Element | null;
-        };
-
-        const element = stageRef.current as
-            | (HTMLElement & {
-                  webkitRequestFullscreen?: () => Promise<void>;
-                  mozRequestFullScreen?: () => Promise<void>;
-                  msRequestFullscreen?: () => Promise<void>;
-              })
-            | null;
-        const root = document.documentElement as HTMLElement & {
-            webkitRequestFullscreen?: () => Promise<void>;
-            mozRequestFullScreen?: () => Promise<void>;
-            msRequestFullscreen?: () => Promise<void>;
-        };
-
-        const nativeFlag =
-            doc.fullscreenEnabled ??
-            doc.webkitFullscreenEnabled ??
-            doc.mozFullScreenEnabled ??
-            doc.msFullscreenEnabled;
-
-        const elementSupports = Boolean(
-            element?.requestFullscreen ||
-            element?.webkitRequestFullscreen ||
-            element?.mozRequestFullScreen ||
-            element?.msRequestFullscreen ||
-            root.requestFullscreen ||
-            root.webkitRequestFullscreen ||
-            root.mozRequestFullScreen ||
-            root.msRequestFullscreen,
-        );
-
-        const isEnabled = nativeFlag === false ? false : elementSupports;
-
-        setSupportsNativeFullscreen(isEnabled);
-        setCanFullscreen(Boolean(element));
-
-        const getFullscreenElement = () =>
-            doc.fullscreenElement ||
-            doc.webkitFullscreenElement ||
-            doc.mozFullScreenElement ||
-            doc.msFullscreenElement ||
-            null;
-
-        const handleChange = () => {
-            setIsNativeFullscreen(Boolean(getFullscreenElement()));
-        };
-
-        const events = [
-            "fullscreenchange",
-            "webkitfullscreenchange",
-            "mozfullscreenchange",
-            "MSFullscreenChange",
-        ] as const;
-
-        // biome-ignore lint/suspicious/useIterableCallbackReturn: <explanation>
-        events.forEach((e) => document.addEventListener(e, handleChange));
-        handleChange();
-
-        return () => {
-            // biome-ignore lint/suspicious/useIterableCallbackReturn: <explanation>
-            events.forEach((e) => document.removeEventListener(e, handleChange));
-        };
-    }, []);
 
     useEffect(() => {
         if (typeof document === "undefined") return;
@@ -206,21 +133,6 @@ export const AvatarPageClient = ({
         }
     }, [isNativeFullscreen, isPseudoFullscreen]);
 
-
-    useEffect(() => {
-        const checkPermission = async () => {
-            if (!navigator.permissions?.query) return;
-            try {
-                const status = await navigator.permissions.query({
-                    // PermissionName does not include "microphone" in TS lib yet.
-                    name: "microphone" as PermissionName,
-                });
-                setMicPermission(status.state);
-            } catch (_error) {
-            }
-        };
-        void checkPermission();
-    }, []);
 
     useEffect(() => {
         if (micPermission === "granted") {
@@ -335,6 +247,9 @@ export const AvatarPageClient = ({
 
     const handleUserSpeech = useCallback(
         (text: string) => {
+            if (connectionStatus !== "connected") {
+                return;
+            }
             setAgentStatus("thinking");
             resetTimer();
             void speak(text, language).then((res) => {
@@ -344,11 +259,102 @@ export const AvatarPageClient = ({
                 }
             });
         },
-        [speak, resetTimer, language],
+        [speak, resetTimer, language, connectionStatus],
     );
 
-    const {listening, startListening, stopListening, interimTranscript} =
+    const {listening, startListening, stopListening, interimTranscript, warmupAudio} =
         useAzureSTT(handleUserSpeech);
+
+
+    useEffect(() => {
+        if (typeof document === "undefined") return;
+
+        const doc = document as Document & {
+            webkitFullscreenEnabled?: boolean;
+            webkitFullscreenElement?: Element | null;
+            mozFullScreenEnabled?: boolean;
+            mozFullScreenElement?: Element | null;
+            msFullscreenEnabled?: boolean;
+            msFullscreenElement?: Element | null;
+        };
+
+        const element = stageRef.current as
+            | (HTMLElement & {
+            webkitRequestFullscreen?: () => Promise<void>;
+            mozRequestFullScreen?: () => Promise<void>;
+            msRequestFullscreen?: () => Promise<void>;
+        })
+            | null;
+        const root = document.documentElement as HTMLElement & {
+            webkitRequestFullscreen?: () => Promise<void>;
+            mozRequestFullScreen?: () => Promise<void>;
+            msRequestFullscreen?: () => Promise<void>;
+        };
+
+        const nativeFlag =
+            doc.fullscreenEnabled ??
+            doc.webkitFullscreenEnabled ??
+            doc.mozFullScreenEnabled ??
+            doc.msFullscreenEnabled;
+
+        const elementSupports = Boolean(
+            element?.requestFullscreen ||
+            element?.webkitRequestFullscreen ||
+            element?.mozRequestFullScreen ||
+            element?.msRequestFullscreen ||
+            root.requestFullscreen ||
+            root.webkitRequestFullscreen ||
+            root.mozRequestFullScreen ||
+            root.msRequestFullscreen,
+        );
+
+        const isEnabled = nativeFlag === false ? false : elementSupports;
+
+        setSupportsNativeFullscreen(isEnabled);
+        setCanFullscreen(Boolean(element));
+
+        const getFullscreenElement = () =>
+            doc.fullscreenElement ||
+            doc.webkitFullscreenElement ||
+            doc.mozFullScreenElement ||
+            doc.msFullscreenElement ||
+            null;
+
+        const handleChange = () => {
+            setIsNativeFullscreen(Boolean(getFullscreenElement()));
+        };
+
+        const events = [
+            "fullscreenchange",
+            "webkitfullscreenchange",
+            "mozfullscreenchange",
+            "MSFullscreenChange",
+        ] as const;
+
+        // biome-ignore lint/suspicious/useIterableCallbackReturn: <explanation>
+        events.forEach((e) => document.addEventListener(e, handleChange));
+        handleChange();
+
+        return () => {
+            // biome-ignore lint/suspicious/useIterableCallbackReturn: <explanation>
+            events.forEach((e) => document.removeEventListener(e, handleChange));
+        };
+    }, [warmupAudio]);
+    useEffect(() => {
+        const checkPermission = async () => {
+            if (!navigator.permissions?.query) return;
+            try {
+                const status = await navigator.permissions.query({
+                    // PermissionName does not include "microphone" in TS lib yet.
+                    name: "microphone" as PermissionName,
+                });
+                setMicPermission(status.state);
+            } catch (_error) {
+            }
+        };
+        void checkPermission();
+    }, [warmupAudio]);
+
 
     const requestMicrophoneAccess = useCallback(async () => {
         setMicError("");
@@ -359,6 +365,7 @@ export const AvatarPageClient = ({
         }
         setMicRequesting(true);
         try {
+            await warmupAudio();
             const stream = await navigator.mediaDevices.getUserMedia({audio: true});
             for (const track of stream.getTracks()) {
                 track.stop();
@@ -408,6 +415,10 @@ export const AvatarPageClient = ({
             return;
         }
         setPendingStart(false);
+        if (!listening) {
+            startingRef.current = true;
+            startListening(language);
+        }
         await startConversation();
     };
 
@@ -421,20 +432,22 @@ export const AvatarPageClient = ({
         if (agentStatus === "timed_out") return;
         if (connectionStatus === "error") {
             setShowError(true);
+            startingRef.current = false;
+            if (listening) stopListening(true);
             return;
         }
-        if (connectionStatus !== "connected") {
-            if (listening) stopListening();
-            if (connectionStatus === "idle" && !showError) {
+        if (connectionStatus === "idle") {
+            if (startingRef.current) {
+                return;
+            }
+            if (listening) stopListening(true);
+            if (!showError) {
                 setAgentStatus("idle");
                 setIsVideoPlaying(false);
             }
             return;
         }
-
-        if (!hasGreetedRef.current) {
-            return;
-        }
+        startingRef.current = false;
 
         if (isAgentSpeaking) {
             setAgentStatus("speaking");
@@ -442,7 +455,8 @@ export const AvatarPageClient = ({
             if (
                 agentStatus === "speaking" ||
                 agentStatus === "thinking" ||
-                agentStatus === "idle"
+                agentStatus === "idle" ||
+                agentStatus === "preparing"
             ) {
                 setAgentStatus("listening");
             }
@@ -474,10 +488,11 @@ export const AvatarPageClient = ({
 
     useEffect(() => {
         const shouldListen =
-            agentStatus === "listening" &&
-            connectionStatus === "connected" &&
+            connectionStatus !== "idle" &&
+            connectionStatus !== "error" &&
             !showError &&
-            micPermission === "granted";
+            micPermission === "granted" &&
+            !isAgentSpeaking;
 
         if (shouldListen) {
             if (!listening) {
@@ -490,7 +505,6 @@ export const AvatarPageClient = ({
             }
         }
     }, [
-        agentStatus,
         listening,
         startListening,
         stopListening,
@@ -498,6 +512,7 @@ export const AvatarPageClient = ({
         showError,
         connectionStatus,
         micPermission,
+        isAgentSpeaking,
     ]);
 
     useEffect(() => {
@@ -521,6 +536,10 @@ export const AvatarPageClient = ({
         }
         if (connectionStatus === "idle" || pendingStart) {
             setPendingStart(false);
+            if (!listening) {
+                startingRef.current = true;
+                startListening(language);
+            }
             await startConversation();
         }
     }, [
@@ -670,7 +689,7 @@ export const AvatarPageClient = ({
                                 const nextLang = e.target.value;
                                 setLanguage(nextLang);
                                 if (listening) {
-                                    stopListening();
+                                    stopListening(true);
                                     if (micPermission === "granted") {
                                         setTimeout(() => {
                                             startListening(nextLang);
