@@ -34,13 +34,10 @@
 
 .na-canvas-layer {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: auto;
-  height: auto;
-  min-width: 100%;
-  min-height: 100%;
-  transform: translate(-50%, -50%);
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .na-stage-wrapper.is-loading .na-layer-background,
@@ -90,9 +87,5 @@
   .na-stage-wrapper .na-avatar-video,
   .na-stage-wrapper img.na-avatar-video {
     object-position: calc(50% + var(--na-mobile-offset-x)) 50%;
-  }
-
-  .na-stage-wrapper .na-canvas-layer {
-    transform: translate(-50%, -50%) translateX(var(--na-mobile-offset-x));
   }
 }

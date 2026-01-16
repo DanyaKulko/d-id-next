@@ -32,6 +32,10 @@
   background: #000;
 }
 
+.na-avatar-container--pseudo-fullscreen .na-watermark {
+  display: none;
+}
+
 body.na-body-pseudo-fullscreen {
   overflow: hidden;
   overscroll-behavior: contain;

@@ -19,6 +19,7 @@ export function useWhiteKeyWebGL(opts: {
     enabled: boolean;
     params?: KeyingParams;
     keyColor?: "white" | "green";
+    offsetPx?: number;
     onError?: () => void;
 }) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -77,6 +78,8 @@ export function useWhiteKeyWebGL(opts: {
       uniform float u_brightness;
       uniform float u_contrast;
       uniform vec3 u_keyColor;
+      uniform vec2 u_uvScale;
+      uniform vec2 u_uvOffset;
 
       vec3 applyBC(vec3 c) {
         c = (c - 0.5) * u_contrast + 0.5;
@@ -85,7 +88,8 @@ export function useWhiteKeyWebGL(opts: {
       }
 
       void main() {
-        vec4 v = texture2D(u_video, v_uv);
+        vec2 uv = (v_uv - 0.5) * u_uvScale + 0.5 + u_uvOffset;
+        vec4 v = texture2D(u_video, uv);
         vec3 vc = applyBC(v.rgb);
     
         float distToWhite = distance(vc, u_keyColor);
@@ -192,6 +196,8 @@ export function useWhiteKeyWebGL(opts: {
         const uBrightness = gl.getUniformLocation(program, "u_brightness");
         const uContrast = gl.getUniformLocation(program, "u_contrast");
         const uKeyColor = gl.getUniformLocation(program, "u_keyColor");
+        const uUvScale = gl.getUniformLocation(program, "u_uvScale");
+        const uUvOffset = gl.getUniformLocation(program, "u_uvOffset");
 
         // if (opts.backgroundUrl) {
         //     bgImg.onload = () => {
@@ -211,9 +217,9 @@ export function useWhiteKeyWebGL(opts: {
         let raf = 0;
         const keyColorRgb = params.keyColor === "green" ? [0, 1, 0] : [1, 1, 1];
 
-        const resizeToVideo = () => {
-            const w = video.videoWidth || canvas.clientWidth || 1280;
-            const h = video.videoHeight || canvas.clientHeight || 720;
+        const resizeToCanvas = () => {
+            const w = canvas.clientWidth || video.videoWidth || 1280;
+            const h = canvas.clientHeight || video.videoHeight || 720;
             if (canvas.width !== w || canvas.height !== h) {
                 canvas.width = w;
                 canvas.height = h;
@@ -223,7 +229,28 @@ export function useWhiteKeyWebGL(opts: {
 
         const drawFrame = () => {
             if (stopped) return;
-            resizeToVideo();
+            resizeToCanvas();
+
+            const canvasW = canvas.width || 1;
+            const canvasH = canvas.height || 1;
+            const videoW = video.videoWidth || canvasW;
+            const videoH = video.videoHeight || canvasH;
+            const canvasAspect = canvasW / canvasH;
+            const videoAspect = videoW / videoH;
+            let scaleX = 1;
+            let scaleY = 1;
+            if (videoAspect > canvasAspect) {
+                scaleX = canvasAspect / videoAspect;
+            } else if (videoAspect < canvasAspect) {
+                scaleY = videoAspect / canvasAspect;
+            }
+            if (uUvScale) {
+                gl.uniform2f(uUvScale, scaleX, scaleY);
+            }
+            if (uUvOffset) {
+                const offsetX = (opts.offsetPx ?? 0) / canvasW;
+                gl.uniform2f(uUvOffset, offsetX, 0);
+            }
 
             // uniforms
             gl.uniform1f(uThreshold, params.threshold);
@@ -294,6 +321,7 @@ export function useWhiteKeyWebGL(opts: {
         params.videoBrightness,
         params.videoContrast,
         params.keyColor,
+        opts.offsetPx,
         opts.onError,
     ]);
 
@@ -336,6 +364,10 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
     const [isIdleVideoLoaded, setIsIdleVideoLoaded] = useState(false);
     const [idleFailed, setIdleFailed] = useState(false);
     const [keyingAvailable, setKeyingAvailable] = useState(true);
+    const [isTouchLike, setIsTouchLike] = useState(() => {
+        if (typeof window === "undefined") return false;
+        return window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+    });
     const idleRef = useRef<HTMLVideoElement | null>(null);
 
     useEffect(() => {
@@ -404,6 +436,7 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
         // enabled: true, // можно и true всегда, если нужно
         params: keyingParams,
         keyColor: backgroundKeyColor ?? "white",
+        offsetPx: isTouchLike ? mobileVideoOffsetPx ?? 0 : 0,
         onError: () => setKeyingAvailable(false),
     });
 
@@ -600,3 +633,15 @@ export const AvatarStage: React.FC<AvatarStageProps> = ({
         </div>
     );
 };
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const query = window.matchMedia("(hover: none) and (pointer: coarse)");
+        const update = () => setIsTouchLike(query.matches);
+        update();
+        if (query.addEventListener) {
+            query.addEventListener("change", update);
+            return () => query.removeEventListener("change", update);
+        }
+        query.addListener(update);
+        return () => query.removeListener(update);
+    }, []);
