@@ -69,6 +69,9 @@ export const AvatarPageClient = ({
     const hasGreetedRef = useRef(false);
     const stageRef = useRef<HTMLDivElement | null>(null);
     const startingRef = useRef(false);
+    const pendingTranscriptRef = useRef<string | null>(null);
+    const lastSentRef = useRef<{ text: string; time: number } | null>(null);
+    const sendInFlightRef = useRef(false);
 
     const [isVideoPlaying, setIsVideoPlaying] = useState(false);
     const [showError, setShowError] = useState(false);
@@ -245,21 +248,58 @@ export const AvatarPageClient = ({
         onTimeout: handleIdleTimeout,
     });
 
-    const handleUserSpeech = useCallback(
-        (text: string) => {
-            if (connectionStatus !== "connected") {
+    const normalizeTranscript = useCallback((text: string) => {
+        return text.trim().replace(/\s+/g, " ");
+    }, []);
+
+    const sendTranscript = useCallback(
+        async (text: string) => {
+            const normalized = normalizeTranscript(text);
+            if (!normalized) return;
+
+            const last = lastSentRef.current;
+            if (
+                last &&
+                last.text === normalized &&
+                Date.now() - last.time < 1500
+            ) {
                 return;
             }
+
+            if (sendInFlightRef.current) {
+                pendingTranscriptRef.current = normalized;
+                return;
+            }
+
+            sendInFlightRef.current = true;
+            lastSentRef.current = { text: normalized, time: Date.now() };
             setAgentStatus("thinking");
             resetTimer();
-            void speak(text, language).then((res) => {
-                if (!res?.success) {
-                    setShowError(true);
-                    setAgentStatus("idle");
-                }
-            });
+
+            const res = await speak(normalized, language);
+            if (!res?.success) {
+                setShowError(true);
+                setAgentStatus("idle");
+            }
+
+            sendInFlightRef.current = false;
         },
-        [speak, resetTimer, language, connectionStatus],
+        [normalizeTranscript, resetTimer, speak, language],
+    );
+
+    const handleUserSpeech = useCallback(
+        (text: string) => {
+            const normalized = normalizeTranscript(text);
+            if (!normalized) return;
+
+            if (connectionStatus !== "connected") {
+                pendingTranscriptRef.current = normalized;
+                return;
+            }
+
+            void sendTranscript(normalized);
+        },
+        [connectionStatus, normalizeTranscript, sendTranscript],
     );
 
     const {listening, startListening, stopListening, interimTranscript, warmupAudio} =
@@ -340,6 +380,7 @@ export const AvatarPageClient = ({
             events.forEach((e) => document.removeEventListener(e, handleChange));
         };
     }, [warmupAudio]);
+
     useEffect(() => {
         const checkPermission = async () => {
             if (!navigator.permissions?.query) return;
@@ -354,7 +395,6 @@ export const AvatarPageClient = ({
         };
         void checkPermission();
     }, [warmupAudio]);
-
 
     const requestMicrophoneAccess = useCallback(async () => {
         setMicError("");
@@ -514,6 +554,21 @@ export const AvatarPageClient = ({
         micPermission,
         isAgentSpeaking,
     ]);
+
+    useEffect(() => {
+        if (
+            connectionStatus !== "connected" ||
+            isAgentSpeaking ||
+            sendInFlightRef.current
+        ) {
+            return;
+        }
+        const pending = pendingTranscriptRef.current;
+        if (pending) {
+            pendingTranscriptRef.current = null;
+            void sendTranscript(pending);
+        }
+    }, [connectionStatus, isAgentSpeaking, sendTranscript]);
 
     useEffect(() => {
         if (connectionStatus === "connected" && !hasGreetedRef.current) {
