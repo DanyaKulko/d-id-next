@@ -11,6 +11,8 @@ const parseCategoryIds = (value?: string | null) => {
 
 export async function POST(req: Request) {
     const authHeader = req.headers.get('authorization');
+    console.log('Received cron job request with authorization:', authHeader);
+    console.log('Expected authorization:', `Bearer ${process.env.CRON_SECRET}`);
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
