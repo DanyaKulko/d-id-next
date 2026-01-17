@@ -10,8 +10,9 @@ export const externalSourcesSeeds: ExternalSourceSeed[] = [
     kind: "TEXT",
     label: "Text blog",
     link:
+      process.env.DOND_POSTS_URL ??
       process.env.EXTERNAL_TEXT_LINK ??
-      "https://roliki.ua/s/json_template_s.txt",
+      "https://malinicms.com/api/v2/posts",
     cron: process.env.EXTERNAL_TEXT_CRON ?? "0 2 * * *",
   },
   {

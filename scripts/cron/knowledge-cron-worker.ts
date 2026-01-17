@@ -12,9 +12,16 @@ const REDIS_URL = process.env.REDIS_URL || 'redis://redis:6379';
 const APP_BASE_URL = process.env.APP_BASE_URL || 'http://localhost:3000';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const DID_KNOWLEDGE_BASE_ID = process.env.DID_KNOWLEDGE_BASE_ID;
+const TOKEN_URL =
+  process.env.DOND_OAUTH_URL ||
+  'https://www.dondemineilstravels.com/oauth/token';
+const TOKEN_USERNAME = process.env.DOND_OAUTH_USERNAME;
+const TOKEN_PASSWORD = process.env.DOND_OAUTH_PASSWORD;
+const TOKEN_CLIENT_ID = process.env.DOND_OAUTH_CLIENT_ID || '2';
+const TOKEN_CLIENT_SECRET = process.env.DOND_OAUTH_CLIENT_SECRET;
 
-const DOC_SOURCE_NAME = 'text blog';
-const BUCKET_CHAR_LIMIT = 400000;
+const DOC_SOURCE_NAME = 'Text blog';
+const BUCKET_CHAR_LIMIT = 450000;
 const API_PAGE_LIMIT = 50;
 
 const SYSTEM_PROMPT = `
@@ -39,20 +46,121 @@ You are an editor processing data for an AI avatar of Neil Marathe.
 const redis = new IORedis(REDIS_URL, { maxRetriesPerRequest: null });
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
+const log = (
+    level: "INFO" | "WARN" | "ERROR",
+    message: string,
+    meta?: Record<string, unknown>,
+) => {
+    const payload = meta ? ` ${JSON.stringify(meta)}` : "";
+    const line = `[knowledge-sync][${level}] ${message}${payload}`;
+    if (level === "ERROR") {
+        console.error(line);
+    } else if (level === "WARN") {
+        console.warn(line);
+    } else {
+        console.log(line);
+    }
+};
+
 interface ApiPost {
     id: number;
     title: string;
     introduction: string | null;
     description: string | null;
     video_transcript: string | null;
-    created_at: string;
+    created_at?: string | null;
+    published_at?: string | null;
+    updated_at?: string | null;
 }
 
 // --- ХЕЛПЕРЫ ---
 
+const decodeHtmlEntities = (value: string) =>
+    value
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/&amp;/gi, '&')
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/gi, "'");
+
+const stripHtml = (value: string) => {
+    if (!value) return '';
+    const withoutTags = value.replace(/<[^>]+>/g, ' ');
+    return decodeHtmlEntities(withoutTags).replace(/\s+/g, ' ').trim();
+};
+
+const resolvePostDate = (post: ApiPost) =>
+    post.created_at || post.published_at || post.updated_at || new Date().toISOString();
+
+async function fetchAccessToken() {
+    if (!TOKEN_USERNAME || !TOKEN_PASSWORD || !TOKEN_CLIENT_SECRET) {
+        throw new Error('Missing MALINI OAuth credentials');
+    }
+    const { data } = await axios.post(
+        TOKEN_URL,
+        {
+            username: TOKEN_USERNAME,
+            password: TOKEN_PASSWORD,
+            grant_type: 'password',
+            scope: '*',
+            client_id: TOKEN_CLIENT_ID,
+            client_secret: TOKEN_CLIENT_SECRET,
+        },
+        { headers: { 'Content-Type': 'application/json' } },
+    );
+
+    const token = data?.access_token;
+    if (!token) {
+        throw new Error('No access token returned from OAuth');
+    }
+    return String(token);
+}
+
+const resolvePostsPayload = (data: any): ApiPost[] => {
+    if (!data) return [];
+    if (Array.isArray(data.data)) return data.data;
+    if (Array.isArray(data.posts)) return data.posts;
+    if (Array.isArray(data)) return data;
+    return [];
+};
+
+async function fetchPostsPage(apiUrl: string, token: string, params: Record<string, unknown>) {
+    try {
+        const { data } = await axios.get(apiUrl, {
+            params,
+            headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: 'application/json',
+            },
+        });
+        return resolvePostsPayload(data);
+    } catch (error) {
+        if (axios.isAxiosError(error)) {
+            log("ERROR", "Posts fetch failed", {
+                url: apiUrl,
+                status: error.response?.status,
+                statusText: error.response?.statusText,
+                params,
+            });
+        } else {
+            log("ERROR", "Posts fetch failed", { url: apiUrl, params });
+        }
+        throw error;
+    }
+}
+
 async function cleanWithGPT(post: ApiPost): Promise<string> {
-    const parts = [post.title, post.introduction, post.description, post.video_transcript]
-        .filter(Boolean).join('\n\n');
+    const parts = [
+        post.title,
+        post.introduction,
+        post.description,
+        post.video_transcript,
+    ]
+        .filter(Boolean)
+        .map((value) => stripHtml(String(value)))
+        .filter((value) => value && value.length > 0)
+        .join('\n\n');
 
     if (parts.length < 50) return '';
 
@@ -70,7 +178,10 @@ async function cleanWithGPT(post: ApiPost): Promise<string> {
         if (!cleaned) return '';
         return `\n\n--- DOCUMENT START (ID: ${post.id}) ---\n${cleaned}\n--- DOCUMENT END ---\n`;
     } catch (e) {
-        console.error(`[GPT Error] Post ${post.id}`, e);
+        log("ERROR", "GPT processing failed", {
+            postId: post.id,
+            error: e instanceof Error ? e.message : String(e),
+        });
         return '';
     }
 }
@@ -89,11 +200,15 @@ async function syncDocumentToDid(
     await writeFile(filePath, fullContent, 'utf8');
 
     const publicUrl = `${APP_BASE_URL}/uploads/knowledge/${fileName}`;
-    console.log(`📤 Uploading Part #${partNumber} to D-ID. Size: ${fullContent.length}.`);
+    log("INFO", "Uploading document to D-ID", {
+        partNumber,
+        size: fullContent.length,
+        existingDocId: dIdDocumentId ?? null,
+    });
 
     try {
         if (dIdDocumentId) {
-            console.log(`🗑 Deleting old D-ID doc: ${dIdDocumentId}`);
+            log("INFO", "Deleting old D-ID document", { documentId: dIdDocumentId });
             await didService.deleteKnowledgeDocument(DID_KNOWLEDGE_BASE_ID!, dIdDocumentId)
                 .catch(e => console.warn("Old doc delete skipped:", e.message));
         }
@@ -131,6 +246,11 @@ async function syncDocumentToDid(
             });
         }
 
+        log("INFO", "D-ID document synced", {
+            partNumber,
+            documentId: newDidId,
+            charCount: fullContent.length,
+        });
         return dbRecord;
     } finally {
         setTimeout(() => unlink(filePath).catch(() => {}), 120000);
@@ -140,136 +260,200 @@ async function syncDocumentToDid(
 // --- WORKER ---
 
 const worker = new Worker('knowledge-sync-queue', async (job) => {
-    console.log(`🚀 Sync Job Started`);
-    const { apiUrl, categories } = job.data;
+    const startedAt = Date.now();
+    try {
+        log("INFO", "Sync job started", { jobId: job.id });
+        const { apiUrl, categories } = job.data;
 
-    if (!DID_KNOWLEDGE_BASE_ID) throw new Error("No D-ID Base ID");
-    if (!categories || !Array.isArray(categories)) throw new Error("No categories provided");
+        if (!DID_KNOWLEDGE_BASE_ID) throw new Error("No D-ID Base ID");
+        if (!categories || !Array.isArray(categories)) throw new Error("No categories provided");
 
-    let allNewPosts: ApiPost[] = [];
+        const resolvedApiUrl =
+            apiUrl || process.env.DOND_POSTS_URL || 'https://www.dondemineilstravels.com/api/v2/posts';
+        let accessToken = "";
+        try {
+            accessToken = await fetchAccessToken();
+        } catch (error) {
+            log("ERROR", "OAuth token fetch failed", {
+                error: error instanceof Error ? error.message : String(error),
+            });
+            throw error;
+        }
 
-    for (const catId of categories) {
-        console.log(`🔎 Scanning Category ID: ${catId}`);
-        let page = 1;
-        let keepFetchingCategory = true;
+        let allNewPosts: ApiPost[] = [];
 
-        while (keepFetchingCategory) {
-            const url = `${apiUrl}?category=${catId}&page=${page}&limit=${API_PAGE_LIMIT}&sort=created_at&direction=desc`;
+        for (const catId of categories) {
+            log("INFO", "Scanning category", { categoryId: catId });
+            let page = 1;
+            let keepFetchingCategory = true;
 
-            try {
-                const { data } = await axios.get(url);
-                const posts = data.data;
-
-                if (!posts || posts.length === 0) {
-                    keepFetchingCategory = false;
-                    break;
-                }
-
-                for (const post of posts) {
-                    const exists = await prisma.processedPost.findUnique({
-                        where: { externalId: String(post.id) }
+            while (keepFetchingCategory) {
+                try {
+                    const posts = await fetchPostsPage(resolvedApiUrl, accessToken, {
+                        category: catId,
+                        page,
+                        limit: API_PAGE_LIMIT,
+                        sort: 'date',
+                        direction: 'desc',
+                        status: 1,
                     });
 
-                    if (exists) {
-                        console.log(`🛑 Found known post ${post.id} in Cat ${catId}. Stopping category fetch.`);
+                    if (!posts || posts.length === 0) {
                         keepFetchingCategory = false;
                         break;
                     }
 
-                    const alreadyInBuffer = allNewPosts.find(p => p.id === post.id);
-                    if (!alreadyInBuffer) {
-                        allNewPosts.push(post);
+                    for (const post of posts) {
+                        const exists = await prisma.processedPost.findUnique({
+                            where: { externalId: String(post.id) }
+                        });
+
+                        if (exists) {
+                            log("INFO", "Known post found; stopping category scan", {
+                                postId: post.id,
+                                categoryId: catId,
+                            });
+                            keepFetchingCategory = false;
+                            break;
+                        }
+
+                        const alreadyInBuffer = allNewPosts.find(p => p.id === post.id);
+                        if (!alreadyInBuffer) {
+                            allNewPosts.push(post);
+                        }
                     }
+
+                    if (posts.length < API_PAGE_LIMIT) keepFetchingCategory = false;
+                    page++;
+                    await new Promise(r => setTimeout(r, 5000));
+
+                } catch (e) {
+                    log("ERROR", "Category fetch failed", {
+                        categoryId: catId,
+                        page,
+                        error: e instanceof Error ? e.message : String(e),
+                    });
+                    keepFetchingCategory = false;
                 }
-
-                if (posts.length < API_PAGE_LIMIT) keepFetchingCategory = false;
-                page++;
-                await new Promise(r => setTimeout(r, 5000));
-
-            } catch (e) {
-                console.error(`Error fetching category ${catId} page ${page}:`, e);
-                keepFetchingCategory = false;
             }
         }
-    }
 
-    if (allNewPosts.length === 0) {
-        console.log("✅ No new posts in any category.");
-        return;
-    }
+        if (allNewPosts.length > 0) {
+            log("INFO", "Sorting new posts", { count: allNewPosts.length });
 
-    console.log(`Sorting ${allNewPosts.length} collected posts...`);
+            allNewPosts.sort((a, b) => {
+                return new Date(resolvePostDate(a)).getTime() - new Date(resolvePostDate(b)).getTime();
+            });
 
-    allNewPosts.sort((a, b) => {
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-    });
+            for (const post of allNewPosts) {
+                log("INFO", "Processing post", { postId: post.id });
+                const cleanText = await cleanWithGPT(post);
 
-    let currentDoc = await prisma.knowledgeDocuments.findFirst({
-        where: { isFull: false, source: DOC_SOURCE_NAME },
-        orderBy: { createdAt: 'desc' },
-        include: { posts: { orderBy: { createdAt: 'asc' } } }
-    });
-
-    const totalDocsCount = await prisma.knowledgeDocuments.count({
-        where: { source: DOC_SOURCE_NAME }
-    });
-
-    let currentPartNumber = currentDoc ? totalDocsCount : totalDocsCount + 1;
-
-    let currentDocContent = currentDoc ? currentDoc.posts.map(p => p.content).join("") : "";
-    let currentDocCharCount = currentDoc ? currentDoc.charCount : 0;
-
-    let pendingPosts: { externalId: string, content: string, charCount: number }[] = [];
-
-
-    for (const post of allNewPosts) {
-        console.log(`Processing Post ${post.id}...`);
-        const cleanText = await cleanWithGPT(post);
-
-        if (!cleanText) {
-            await prisma.processedPost.create({
-                data: {
-                    externalId: String(post.id),
-                    content: "",
-                    charCount: 0,
+                if (!cleanText) {
+                    await prisma.processedPost.create({
+                        data: {
+                            externalId: String(post.id),
+                            content: "",
+                            charCount: 0,
+                        }
+                    }).catch(() => {});
+                    continue;
                 }
-            }).catch(() => {});
-            continue;
-        }
 
-        const postLen = cleanText.length;
+                const postLen = cleanText.length;
 
-        // Лимит
-        if ((currentDocCharCount + postLen) > BUCKET_CHAR_LIMIT) {
-
-            if (currentDoc || pendingPosts.length > 0) {
-                await finalizeDocument(currentDoc, pendingPosts, currentDocContent, currentPartNumber);
+                await prisma.processedPost.upsert({
+                    where: { externalId: String(post.id) },
+                    update: { content: cleanText, charCount: postLen },
+                    create: {
+                        externalId: String(post.id),
+                        content: cleanText,
+                        charCount: postLen,
+                    },
+                }).catch(() => {});
             }
-
-            // Новый док
-            currentDoc = null;
-            currentDocContent = "";
-            currentDocCharCount = 0;
-            pendingPosts = [];
-            currentPartNumber++;
         }
 
-        pendingPosts.push({
-            externalId: String(post.id),
-            content: cleanText,
-            charCount: postLen
+        const pendingPosts = await prisma.processedPost.findMany({
+            where: {
+                knowledgeDocumentId: null,
+                charCount: { gt: 0 },
+            },
+            orderBy: { createdAt: 'asc' },
         });
-        currentDocContent += cleanText;
-        currentDocCharCount += postLen;
+
+        if (pendingPosts.length === 0) {
+            log("INFO", "No new posts to process");
+            return;
+        }
+
+        let currentDoc = await prisma.knowledgeDocuments.findFirst({
+            where: {
+                isFull: false,
+                source: { equals: DOC_SOURCE_NAME, mode: 'insensitive' },
+            },
+            orderBy: { createdAt: 'desc' },
+            include: { posts: { orderBy: { createdAt: 'asc' } } }
+        });
+
+        const totalDocsCount = await prisma.knowledgeDocuments.count({
+            where: { source: { equals: DOC_SOURCE_NAME, mode: 'insensitive' } }
+        });
+
+        let currentPartNumber = currentDoc ? totalDocsCount : totalDocsCount + 1;
+
+        let currentDocContent = currentDoc ? currentDoc.posts.map(p => p.content).join("") : "";
+        let currentDocCharCount = currentDocContent.length;
+        let bufferedPosts: { externalId: string, content: string, charCount: number }[] = [];
+
+        for (const post of pendingPosts) {
+            const postLen = post.charCount || post.content.length;
+
+            if ((currentDocCharCount + postLen) > BUCKET_CHAR_LIMIT) {
+                if (bufferedPosts.length > 0) {
+                    await finalizeDocument(currentDoc, bufferedPosts, currentDocContent, currentPartNumber);
+                }
+
+                currentDoc = null;
+                currentDocContent = "";
+                currentDocCharCount = 0;
+                bufferedPosts = [];
+                currentPartNumber++;
+            }
+
+            bufferedPosts.push({
+                externalId: post.externalId,
+                content: post.content,
+                charCount: postLen,
+            });
+            currentDocContent += post.content;
+            currentDocCharCount += postLen;
+        }
+
+        if (bufferedPosts.length > 0) {
+            await finalizeDocument(currentDoc, bufferedPosts, currentDocContent, currentPartNumber);
+        }
+
+        const documents = await prisma.knowledgeDocuments.findMany({
+            where: { source: { equals: DOC_SOURCE_NAME, mode: 'insensitive' } },
+            orderBy: { createdAt: 'asc' },
+        });
+        const docIds = documents
+            .map((doc) => doc.documentId)
+            .filter((docId): docId is string => Boolean(docId));
+        await prisma.externalSource.updateMany({
+            where: { kind: 'TEXT' },
+            data: { documentId: docIds.length > 0 ? JSON.stringify(docIds) : null },
+        });
+
+        log("INFO", "Sync complete", { durationMs: Date.now() - startedAt });
+    } catch (error) {
+        log("ERROR", "Sync job failed", {
+            jobId: job.id,
+            error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
     }
-
-    // === ФАЗА 4: Остатки ===
-    if (pendingPosts.length > 0) {
-        await finalizeDocument(currentDoc, pendingPosts, currentDocContent, currentPartNumber);
-    }
-
-    console.log("✅ Sync Complete.");
-
 }, {
     connection: redis as any,
     concurrency: 1,
@@ -282,7 +466,11 @@ async function finalizeDocument(
     fullContent: string,
     partNumber: number
 ) {
-    console.log(`💾 Finalizing Part #${partNumber}. Posts to add: ${newPosts.length}.`);
+    log("INFO", "Finalizing document", {
+        partNumber,
+        posts: newPosts.length,
+        existingDocId: currentDoc?.documentId ?? null,
+    });
 
     const updatedDocRecord = await syncDocumentToDid(
         currentDoc?.id || null,
@@ -291,25 +479,17 @@ async function finalizeDocument(
         partNumber
     );
 
-    // Transaction для сохранения постов
-    await prisma.$transaction(
-        newPosts.map(post =>
-            prisma.processedPost.create({
-                data: {
-                    externalId: post.externalId,
-                    content: post.content,
-                    charCount: post.charCount,
-                    knowledgeDocumentId: updatedDocRecord.id
-                }
-            })
-        )
-    );
+    const externalIds = newPosts.map((post) => post.externalId);
+    await prisma.processedPost.updateMany({
+        where: { externalId: { in: externalIds } },
+        data: { knowledgeDocumentId: updatedDocRecord.id },
+    });
 
     if (updatedDocRecord.charCount >= BUCKET_CHAR_LIMIT) {
         await prisma.knowledgeDocuments.update({
             where: { id: updatedDocRecord.id },
             data: { isFull: true }
         });
-        console.log(`🔒 Document FULL.`);
+        log("WARN", "Document marked FULL", { documentId: updatedDocRecord.id });
     }
 }
