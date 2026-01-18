@@ -229,7 +229,7 @@ async function syncDocumentToDid(
                     source: DOC_SOURCE_NAME,
                     documentId: String(newDidId),
                     documentUrl: publicUrl,
-                    status: 'READY',
+                    status: 'PROCESSING',
                     charCount: fullContent.length,
                     updatedAt: new Date()
                 }
@@ -240,7 +240,7 @@ async function syncDocumentToDid(
                     source: DOC_SOURCE_NAME,
                     documentId: String(newDidId),
                     documentUrl: publicUrl,
-                    status: 'READY',
+                    status: 'PROCESSING',
                     charCount: fullContent.length
                 }
             });
@@ -253,7 +253,7 @@ async function syncDocumentToDid(
         });
         return dbRecord;
     } finally {
-        setTimeout(() => unlink(filePath).catch(() => {}), 120000);
+        // setTimeout(() => unlink(filePath).catch(() => {}), 120000);
     }
 }
 
