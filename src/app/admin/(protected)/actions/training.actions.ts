@@ -6,6 +6,7 @@ import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
 import { parseStoredDocumentIds } from "@/lib/external-sources/documents";
+import { knowledgeQueue } from "@/lib/external-sources/queue";
 import { resolveBaseUrl } from "@/lib/http/base-url";
 import { didService } from "@/lib/services/did.service";
 import {
@@ -192,6 +193,14 @@ export async function saveManualTrainingAction(formData: FormData) {
   return { ok: true };
 }
 
+const parseCategoryIds = (value?: string | null) => {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((item) => Number(item.trim()))
+    .filter((item) => Number.isFinite(item));
+};
+
 export async function toggleTextBlogKnowledgeAction(formData: FormData) {
   await requireAdmin();
   const enabledValue = getString(formData.get("enabled")).trim();
@@ -254,6 +263,23 @@ export async function toggleTextBlogKnowledgeAction(formData: FormData) {
         data: { documentId: null, filePath: null },
       });
     }
+  } else {
+    const categoryIds = parseCategoryIds(process.env.DOND_POST_CATEGORY_IDS);
+    if (categoryIds.length === 0) {
+      throw new Error("No category IDs configured for blog sync");
+    }
+
+    await knowledgeQueue.add(
+      "knowledge-sync-queue",
+      {
+        apiUrl: process.env.DOND_POSTS_URL || "https://malinicms.com/api/v2/posts",
+        categories: categoryIds,
+      },
+      {
+        removeOnComplete: true,
+        removeOnFail: 10,
+      },
+    );
   }
 
   revalidatePath("/admin/training");

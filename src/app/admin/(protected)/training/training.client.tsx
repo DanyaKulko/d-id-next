@@ -94,23 +94,29 @@ export default function LearningClient({
     formData.set("enabled", String(enabled));
 
     startToggling(async () => {
-      await toggleTextBlogKnowledgeAction(formData)
-        .then(() => {
-          setTextBlogEnabled(enabled);
-          if (!enabled) {
-            setKnowledge((prev) =>
-              prev.filter((item) => item.sourceLabel !== "Text blog"),
-            );
-          }
-          toast.success(
-            enabled
-              ? "Blog knowledge enabled"
-              : "Blog knowledge disabled",
+      const promise = toggleTextBlogKnowledgeAction(formData);
+      await toast.promise(
+        promise,
+        {
+          loading: enabled
+            ? "Enabling blog knowledge..."
+            : "Disabling blog knowledge...",
+          success: enabled
+            ? "Blog knowledge enabled(uploading started)"
+            : "Blog knowledge disabled(removal started)",
+          error: "Failed to update blog knowledge setting",
+        },
+      );
+
+      try {
+        await promise;
+        setTextBlogEnabled(enabled);
+        if (!enabled) {
+          setKnowledge((prev) =>
+            prev.filter((item) => item.sourceLabel !== "Text blog"),
           );
-        })
-        .catch(() =>
-          toast.error("Failed to update blog knowledge setting"),
-        );
+        }
+      } catch (_error) {}
     });
   };
 
