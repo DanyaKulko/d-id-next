@@ -2,9 +2,13 @@ import { Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import axios from 'axios';
 import OpenAI from 'openai';
-import { mkdir, writeFile, unlink } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { prisma } from '@/lib/db/prisma';
+import {
+    normalizeDocumentId,
+    serializeDocumentIds,
+} from '@/lib/external-sources/documents';
 import { didService } from '@/lib/services/did.service';
 
 // --- CONFIG ---
@@ -21,6 +25,7 @@ const TOKEN_CLIENT_ID = process.env.DOND_OAUTH_CLIENT_ID || '2';
 const TOKEN_CLIENT_SECRET = process.env.DOND_OAUTH_CLIENT_SECRET;
 
 const DOC_SOURCE_NAME = 'Text blog';
+const BLOG_ENABLED_KEY = 'textBlogEnabled';
 const BUCKET_CHAR_LIMIT = 450000;
 const API_PAGE_LIMIT = 50;
 
@@ -92,6 +97,14 @@ const stripHtml = (value: string) => {
 
 const resolvePostDate = (post: ApiPost) =>
     post.created_at || post.published_at || post.updated_at || new Date().toISOString();
+
+const isTextBlogEnabled = async () => {
+    const setting = await prisma.appSetting.findUnique({
+        where: { key: BLOG_ENABLED_KEY },
+    });
+    if (!setting?.value) return true;
+    return setting.value === "true";
+};
 
 async function fetchAccessToken() {
     if (!TOKEN_USERNAME || !TOKEN_PASSWORD || !TOKEN_CLIENT_SECRET) {
@@ -186,6 +199,99 @@ async function cleanWithGPT(post: ApiPost): Promise<string> {
     }
 }
 
+async function updateTextSourceDocumentIds() {
+    const documents = await prisma.knowledgeDocuments.findMany({
+        where: { source: { equals: DOC_SOURCE_NAME, mode: 'insensitive' } },
+        orderBy: { createdAt: 'asc' },
+    });
+    const docIds = documents
+        .map((doc) => doc.documentId)
+        .filter((docId): docId is string => Boolean(docId));
+    await prisma.externalSource.updateMany({
+        where: { kind: 'TEXT' },
+        data: { documentId: serializeDocumentIds(docIds) },
+    });
+    return docIds;
+}
+
+async function reconcileTextBlogDocuments() {
+    const localDocs = await prisma.knowledgeDocuments.findMany({
+        where: { source: { equals: DOC_SOURCE_NAME, mode: 'insensitive' } },
+        select: { id: true, documentId: true },
+    });
+    const localDocIds = localDocs.map((doc) => doc.id);
+
+    const orphanCondition =
+        localDocIds.length === 0
+            ? { knowledgeDocumentId: { not: null } }
+            : {
+                  AND: [
+                      { knowledgeDocumentId: { notIn: localDocIds } },
+                      { knowledgeDocumentId: { not: null } },
+                  ],
+              };
+    const orphaned = await prisma.processedPost.updateMany({
+        where: orphanCondition,
+        data: { knowledgeDocumentId: null },
+    });
+    if (orphaned.count > 0) {
+        log("WARN", "Detached orphaned posts", { count: orphaned.count });
+    }
+
+    const docsWithoutDidId = localDocs
+        .filter((doc) => !doc.documentId)
+        .map((doc) => doc.id);
+    if (docsWithoutDidId.length > 0) {
+        await prisma.processedPost.updateMany({
+            where: { knowledgeDocumentId: { in: docsWithoutDidId } },
+            data: { knowledgeDocumentId: null },
+        });
+        await prisma.knowledgeDocuments.deleteMany({
+            where: { id: { in: docsWithoutDidId } },
+        });
+        log("WARN", "Removed documents without D-ID ids", {
+            count: docsWithoutDidId.length,
+        });
+    }
+
+    let didDocumentIds: string[] = [];
+    try {
+        const didDocs = await didService.listKnowledgeDocuments(DID_KNOWLEDGE_BASE_ID!);
+        didDocumentIds = (Array.isArray(didDocs) ? didDocs : [])
+            .map((doc) => String((doc as any)?.id ?? (doc as any)?.document_id ?? (doc as any)?.documentId ?? ""))
+            .filter((id) => id);
+    } catch (error) {
+        log("WARN", "D-ID document list failed", {
+            error: error instanceof Error ? error.message : String(error),
+        });
+        return;
+    }
+
+    const didSet = new Set([
+        ...didDocumentIds,
+        ...didDocumentIds.map((id) => normalizeDocumentId(id)),
+    ]);
+
+    const missingLocal = localDocs.filter((doc) => {
+        if (!doc.documentId) return false;
+        const normalized = normalizeDocumentId(doc.documentId);
+        return !didSet.has(doc.documentId) && !didSet.has(normalized);
+    });
+
+    if (missingLocal.length > 0) {
+        await prisma.processedPost.updateMany({
+            where: { knowledgeDocumentId: { in: missingLocal.map((doc) => doc.id) } },
+            data: { knowledgeDocumentId: null },
+        });
+        await prisma.knowledgeDocuments.deleteMany({
+            where: { id: { in: missingLocal.map((doc) => doc.id) } },
+        });
+        log("WARN", "Local documents missing in D-ID; reset for reupload", {
+            count: missingLocal.length,
+        });
+    }
+}
+
 async function syncDocumentToDid(
     docId: string | null,
     dIdDocumentId: string | null,
@@ -265,8 +371,18 @@ const worker = new Worker('knowledge-sync-queue', async (job) => {
         log("INFO", "Sync job started", { jobId: job.id });
         const { apiUrl, categories } = job.data;
 
+        const blogEnabled = await isTextBlogEnabled();
+        if (!blogEnabled) {
+            log("INFO", "Text blog knowledge disabled; skipping sync", {
+                jobId: job.id,
+            });
+            return;
+        }
+
         if (!DID_KNOWLEDGE_BASE_ID) throw new Error("No D-ID Base ID");
         if (!categories || !Array.isArray(categories)) throw new Error("No categories provided");
+
+        await reconcileTextBlogDocuments();
 
         const resolvedApiUrl =
             apiUrl || process.env.DOND_POSTS_URL || 'https://www.dondemineilstravels.com/api/v2/posts';
@@ -384,6 +500,7 @@ const worker = new Worker('knowledge-sync-queue', async (job) => {
 
         if (pendingPosts.length === 0) {
             log("INFO", "No new posts to process");
+            await updateTextSourceDocumentIds();
             return;
         }
 
@@ -434,17 +551,7 @@ const worker = new Worker('knowledge-sync-queue', async (job) => {
             await finalizeDocument(currentDoc, bufferedPosts, currentDocContent, currentPartNumber);
         }
 
-        const documents = await prisma.knowledgeDocuments.findMany({
-            where: { source: { equals: DOC_SOURCE_NAME, mode: 'insensitive' } },
-            orderBy: { createdAt: 'asc' },
-        });
-        const docIds = documents
-            .map((doc) => doc.documentId)
-            .filter((docId): docId is string => Boolean(docId));
-        await prisma.externalSource.updateMany({
-            where: { kind: 'TEXT' },
-            data: { documentId: docIds.length > 0 ? JSON.stringify(docIds) : null },
-        });
+        await updateTextSourceDocumentIds();
 
         log("INFO", "Sync complete", { durationMs: Date.now() - startedAt });
     } catch (error) {

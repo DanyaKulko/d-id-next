@@ -89,6 +89,7 @@ const safetyRulesKey = "safetyRules";
 const manualTrainingKey = "manualTrainingText";
 const manualTrainingDocKey = "manualTrainingDocId";
 const authRequiredKey = "requireAuthentication";
+const textBlogEnabledKey = "textBlogEnabled";
 const manualTrainingSource = "Manual training";
 const textBlogSource = "Text blog";
 const videoTranscriptsSource = "Video transcripts";
@@ -491,6 +492,14 @@ export async function fetchManualTrainingTemplate(): Promise<string> {
     where: { key: manualTrainingKey },
   });
   return manualSetting?.value?.trim() ? manualSetting.value : "";
+}
+
+export async function fetchTextBlogEnabled(): Promise<boolean> {
+  const setting = await prisma.appSetting.findUnique({
+    where: { key: textBlogEnabledKey },
+  });
+  if (!setting?.value) return true;
+  return setting.value === "true";
 }
 
 const maskCentered = (str: string, unmaskedChars = 4) => {

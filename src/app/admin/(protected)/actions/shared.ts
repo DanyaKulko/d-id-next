@@ -18,6 +18,7 @@ export const manualTrainingKey = "manualTrainingText";
 export const manualTrainingDocKey = "manualTrainingDocId";
 export const manualTrainingFileKey = "manualTrainingFilePath";
 export const authRequiredKey = "requireAuthentication";
+export const textBlogEnabledKey = "textBlogEnabled";
 export const manualTrainingSource = "Manual training";
 export const textBlogSource = "Text blog";
 export const videoTranscriptsSource = "Video transcripts";

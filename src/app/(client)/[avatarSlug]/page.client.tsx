@@ -88,6 +88,9 @@ export const AvatarPageClient = ({
     const isAgentSpeakingRef = useRef(false);
     const greetingPendingRef = useRef(false);
     const greetingStartedRef = useRef(false);
+    const stopListeningRef = useRef<((dispose?: boolean) => void) | null>(null);
+    const responsePendingRef = useRef(false);
+    const responseStartedRef = useRef(false);
 
     const [isVideoPlaying, setIsVideoPlaying] = useState(false);
     const [showError, setShowError] = useState(false);
@@ -262,6 +265,17 @@ export const AvatarPageClient = ({
         isAgentSpeakingRef.current = isAgentSpeaking;
     }, [isAgentSpeaking]);
 
+    useEffect(() => {
+        if (responsePendingRef.current && isAgentSpeaking) {
+            responseStartedRef.current = true;
+            return;
+        }
+        if (responseStartedRef.current && !isAgentSpeaking) {
+            responseStartedRef.current = false;
+            responsePendingRef.current = false;
+        }
+    }, [isAgentSpeaking]);
+
     const handleIdleTimeout = useCallback(() => {
         disconnect();
         setAgentStatus("timed_out");
@@ -297,6 +311,9 @@ export const AvatarPageClient = ({
 
             sendInFlightRef.current = true;
             lastSentRef.current = { text: normalized, time: Date.now() };
+            responsePendingRef.current = true;
+            responseStartedRef.current = false;
+            stopListeningRef.current?.(true);
             setAgentStatus("thinking");
             resetTimer();
 
@@ -304,6 +321,8 @@ export const AvatarPageClient = ({
             if (!res?.success) {
                 setShowError(true);
                 setAgentStatus("idle");
+                responsePendingRef.current = false;
+                responseStartedRef.current = false;
             }
 
             sendInFlightRef.current = false;
@@ -342,6 +361,10 @@ export const AvatarPageClient = ({
 
     const {listening, startListening, stopListening, interimTranscript, warmupAudio} =
         useAzureSTT(handleUserSpeech);
+
+    useEffect(() => {
+        stopListeningRef.current = stopListening;
+    }, [stopListening]);
 
 
     useEffect(() => {
@@ -472,6 +495,7 @@ export const AvatarPageClient = ({
 
     const startConversation = useCallback(async () => {
         setAgentStatus("preparing");
+        startingRef.current = true;
         try {
             await connect({language});
         } catch (e) {
@@ -493,10 +517,6 @@ export const AvatarPageClient = ({
             return;
         }
         setPendingStart(false);
-        if (!listening) {
-            startingRef.current = true;
-            startListening(language);
-        }
         await startConversation();
     };
 
@@ -524,6 +544,8 @@ export const AvatarPageClient = ({
         if (connectionStatus === "error") {
             setShowError(true);
             startingRef.current = false;
+            responsePendingRef.current = false;
+            responseStartedRef.current = false;
             if (listening) stopListening(true);
             return;
         }
@@ -536,6 +558,8 @@ export const AvatarPageClient = ({
                 setAgentStatus("idle");
                 setIsVideoPlaying(false);
             }
+            responsePendingRef.current = false;
+            responseStartedRef.current = false;
             return;
         }
         if (connectionStatus === "connecting") {
@@ -555,7 +579,10 @@ export const AvatarPageClient = ({
                 agentStatus === "idle" ||
                 agentStatus === "preparing"
             ) {
-                if (!greetingPendingRef.current) {
+                if (
+                    !greetingPendingRef.current &&
+                    !responsePendingRef.current
+                ) {
                     setAgentStatus("listening");
                 }
             }
@@ -587,11 +614,13 @@ export const AvatarPageClient = ({
 
     useEffect(() => {
         const shouldListen =
-            connectionStatus !== "idle" &&
-            connectionStatus !== "error" &&
+            connectionStatus === "connected" &&
+            agentStatus === "listening" &&
             !showError &&
             micPermission === "granted" &&
-            !isAgentSpeaking;
+            !isAgentSpeaking &&
+            !sendInFlightRef.current &&
+            !responsePendingRef.current;
 
         if (shouldListen) {
             if (!listening) {
@@ -600,7 +629,7 @@ export const AvatarPageClient = ({
             }
         } else {
             if (listening) {
-                stopListening();
+                stopListening(true);
             }
         }
     }, [
@@ -612,6 +641,7 @@ export const AvatarPageClient = ({
         connectionStatus,
         micPermission,
         isAgentSpeaking,
+        agentStatus,
     ]);
 
     useEffect(() => {
@@ -660,10 +690,6 @@ export const AvatarPageClient = ({
         }
         if (connectionStatus === "idle" || pendingStart) {
             setPendingStart(false);
-            if (!listening) {
-                startingRef.current = true;
-                startListening(language);
-            }
             await startConversation();
         }
     }, [

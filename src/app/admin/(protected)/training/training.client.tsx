@@ -7,6 +7,7 @@ import {
   deleteKnowledgeDocumentAction,
   saveManualTrainingAction,
   saveSafetyInstructionsAction,
+  toggleTextBlogKnowledgeAction,
 } from "@/app/admin/(protected)/actions";
 import type { KnowledgeItem } from "@/app/admin/(protected)/admin-data";
 import type { TrainingTabId } from "./training.tabs";
@@ -16,6 +17,7 @@ type TrainingClientProps = {
   initialKnowledge: KnowledgeItem[];
   initialSafetyRules: string;
   initialManualText: string;
+  initialTextBlogEnabled: boolean;
 };
 
 export default function LearningClient({
@@ -23,13 +25,18 @@ export default function LearningClient({
   initialKnowledge,
   initialSafetyRules,
   initialManualText,
+  initialTextBlogEnabled,
 }: TrainingClientProps) {
   const activeTab = initialTab;
   const [search, setSearch] = useState("");
   const [knowledge, setKnowledge] = useState<KnowledgeItem[]>(initialKnowledge);
   const [safetyRules, setSafetyRules] = useState(initialSafetyRules);
   const [manualText, setManualText] = useState(initialManualText);
+  const [textBlogEnabled, setTextBlogEnabled] = useState(
+    initialTextBlogEnabled,
+  );
   const [isSaving, startSaving] = useTransition();
+  const [isToggling, startToggling] = useTransition();
   const [deleteCandidate, setDeleteCandidate] = useState<KnowledgeItem | null>(
     null,
   );
@@ -53,6 +60,11 @@ export default function LearningClient({
     });
   }, [knowledge, search]);
 
+  const visibleKnowledge = useMemo(() => {
+    if (textBlogEnabled) return filteredKnowledge;
+    return filteredKnowledge.filter((item) => item.sourceLabel !== "Text blog");
+  }, [filteredKnowledge, textBlogEnabled]);
+
   const handleDelete = (item: KnowledgeItem) => {
     setDeleteCandidate(item);
   };
@@ -74,6 +86,31 @@ export default function LearningClient({
           setDeleteCandidate(null);
         })
         .catch(() => toast.error("Failed to delete document"));
+    });
+  };
+
+  const handleTextBlogToggle = (enabled: boolean) => {
+    const formData = new FormData();
+    formData.set("enabled", String(enabled));
+
+    startToggling(async () => {
+      await toggleTextBlogKnowledgeAction(formData)
+        .then(() => {
+          setTextBlogEnabled(enabled);
+          if (!enabled) {
+            setKnowledge((prev) =>
+              prev.filter((item) => item.sourceLabel !== "Text blog"),
+            );
+          }
+          toast.success(
+            enabled
+              ? "Blog knowledge enabled"
+              : "Blog knowledge disabled",
+          );
+        })
+        .catch(() =>
+          toast.error("Failed to update blog knowledge setting"),
+        );
     });
   };
 
@@ -100,6 +137,25 @@ export default function LearningClient({
             avatar&apos;s responses
           </div>
 
+          <div className="toggle-container">
+            <label className="toggle-switch">
+              <input
+                type="checkbox"
+                checked={textBlogEnabled}
+                disabled={isToggling}
+                onChange={(e) => handleTextBlogToggle(e.target.checked)}
+              />
+              <span className="slider" />
+            </label>
+            <div>
+              <div className="toggle-label">Include blog knowledge</div>
+              <div className="toggle-description">
+                When disabled, blog documents are removed from D-ID but the
+                processed text is preserved locally for quick re-enable.
+              </div>
+            </div>
+          </div>
+
           <div
             className="input-group"
             style={{ maxWidth: 600, marginBottom: 25 }}
@@ -114,7 +170,7 @@ export default function LearningClient({
             />
           </div>
 
-          {filteredKnowledge.map((k) => (
+          {visibleKnowledge.map((k) => (
             <div key={k.id} className={`knowledge-item ${k.status}`}>
               <h3>{k.title}</h3>
 

@@ -5,6 +5,7 @@ import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
+import { parseStoredDocumentIds } from "@/lib/external-sources/documents";
 import { resolveBaseUrl } from "@/lib/http/base-url";
 import { didService } from "@/lib/services/did.service";
 import {
@@ -17,6 +18,7 @@ import {
   normalizePersonalityStyle,
   requireAdmin,
   safetyRulesKey,
+  textBlogEnabledKey,
   textBlogSource,
   updateDidAgentFromRole,
   videoTranscriptsSource,
@@ -188,6 +190,75 @@ export async function saveManualTrainingAction(formData: FormData) {
   revalidatePath("/admin/training/archive");
   revalidatePath("/admin/training/manual");
   return { ok: true };
+}
+
+export async function toggleTextBlogKnowledgeAction(formData: FormData) {
+  await requireAdmin();
+  const enabledValue = getString(formData.get("enabled")).trim();
+  const enabled = enabledValue === "true";
+
+  await prisma.appSetting.upsert({
+    where: { key: textBlogEnabledKey },
+    update: { value: enabled ? "true" : "false" },
+    create: { key: textBlogEnabledKey, value: enabled ? "true" : "false" },
+  });
+
+  if (!enabled) {
+    const knowledgeBaseId = process.env.DID_KNOWLEDGE_BASE_ID ?? "";
+    const [textSource, localDocs] = await Promise.all([
+      prisma.externalSource.findUnique({ where: { kind: "TEXT" } }),
+      prisma.knowledgeDocuments.findMany({
+        where: {
+          source: { equals: textBlogSource, mode: "insensitive" },
+        },
+      }),
+    ]);
+
+    const docIds = new Set<string>();
+    for (const docId of parseStoredDocumentIds(textSource?.documentId ?? null)) {
+      if (docId) docIds.add(docId);
+    }
+    for (const doc of localDocs) {
+      if (doc.documentId) docIds.add(doc.documentId);
+    }
+
+    if (knowledgeBaseId && docIds.size > 0) {
+      for (const docId of docIds) {
+        await withDidLogging("Delete Knowledge Document", () =>
+          didService.deleteKnowledgeDocument(knowledgeBaseId, docId),
+        ).catch(() => undefined);
+      }
+    }
+
+    if (localDocs.length > 0) {
+      await prisma.processedPost.updateMany({
+        where: {
+          knowledgeDocumentId: { in: localDocs.map((doc) => doc.id) },
+        },
+        data: { knowledgeDocumentId: null },
+      });
+
+      await prisma.knowledgeDocuments.deleteMany({
+        where: { id: { in: localDocs.map((doc) => doc.id) } },
+      });
+    } else {
+      await prisma.processedPost.updateMany({
+        where: { knowledgeDocumentId: { not: null } },
+        data: { knowledgeDocumentId: null },
+      });
+    }
+
+    if (textSource?.id) {
+      await prisma.externalSource.update({
+        where: { id: textSource.id },
+        data: { documentId: null, filePath: null },
+      });
+    }
+  }
+
+  revalidatePath("/admin/training");
+  revalidatePath("/admin/training/archive");
+  return { ok: true, enabled };
 }
 
 export async function deleteKnowledgeDocumentAction(formData: FormData) {

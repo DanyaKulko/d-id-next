@@ -3,6 +3,7 @@ import {
   fetchKnowledgeArchive,
   fetchManualTrainingTemplate,
   fetchSafetyInstructions,
+  fetchTextBlogEnabled,
   type KnowledgeItem,
 } from "@/app/admin/(protected)/admin-data";
 import TrainingClient from "../training.client";
@@ -24,9 +25,11 @@ export default async function TrainingTabPage({
   let knowledge: KnowledgeItem[] = [];
   let safetyRules = "";
   let manualText = "";
+  let textBlogEnabled = true;
 
   if (tab === "archive") {
     knowledge = await fetchKnowledgeArchive();
+    textBlogEnabled = await fetchTextBlogEnabled();
   }
 
   if (tab === "safety") {
@@ -44,6 +47,7 @@ export default async function TrainingTabPage({
       initialKnowledge={knowledge}
       initialSafetyRules={safetyRules}
       initialManualText={manualText}
+      initialTextBlogEnabled={textBlogEnabled}
     />
   );
 }
