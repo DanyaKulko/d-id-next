@@ -166,7 +166,10 @@ export const useAgent = (
 
         pc.oniceconnectionstatechange = () => {
           console.log("ICE State:", pc.iceConnectionState);
-          if (pc.iceConnectionState === "connected") {
+          if (
+            pc.iceConnectionState === "connected" ||
+            pc.iceConnectionState === "completed"
+          ) {
             if (iceDisconnectTimerRef.current) {
               clearTimeout(iceDisconnectTimerRef.current);
               iceDisconnectTimerRef.current = null;
@@ -183,6 +186,30 @@ export const useAgent = (
             }
           }
           if (pc.iceConnectionState === "failed") {
+            setStatus("error");
+            cleanup();
+          }
+        };
+
+        pc.onconnectionstatechange = () => {
+          console.log("Connection State:", pc.connectionState);
+          if (pc.connectionState === "connected") {
+            if (iceDisconnectTimerRef.current) {
+              clearTimeout(iceDisconnectTimerRef.current);
+              iceDisconnectTimerRef.current = null;
+            }
+            setStatus("connected");
+          }
+          if (pc.connectionState === "disconnected") {
+            if (!iceDisconnectTimerRef.current) {
+              iceDisconnectTimerRef.current = setTimeout(() => {
+                console.warn("Connection disconnected timeout");
+                setStatus("error");
+                cleanup();
+              }, 8000);
+            }
+          }
+          if (pc.connectionState === "failed") {
             setStatus("error");
             cleanup();
           }
