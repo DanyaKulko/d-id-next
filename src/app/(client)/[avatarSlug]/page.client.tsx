@@ -118,6 +118,11 @@ export const AvatarPageClient = ({
     const [sttFlowLog, setSttFlowLog] = useState<
         { ts: string; event: string; detail?: string }[]
     >([]);
+    const isAppleMobileUa = useMemo(() => {
+        if (typeof navigator === "undefined") return false;
+        const ua = navigator.userAgent || "";
+        return /iPad|iPhone|iPod/.test(ua) || (ua.includes("Mac") && navigator.maxTouchPoints > 1);
+    }, []);
 
     const isFullscreen = isNativeFullscreen || isPseudoFullscreen;
 
@@ -288,7 +293,7 @@ export const AvatarPageClient = ({
     }, [disconnect]);
 
     const {resetTimer} = useIdleTimer({
-        isActive: agentStatus === "listening",
+        isActive: agentStatus === "listening" && !isAppleMobileUa,
         onTimeout: handleIdleTimeout,
     });
 
