@@ -114,6 +114,9 @@ export const AvatarPageClient = ({
     const [language, setLanguage] = useState(languages[0].code);
     const [selectedBackgroundId, setSelectedBackgroundId] = useState("default");
     const [showSttDebug, setShowSttDebug] = useState(false);
+    const [sttFlowLog, setSttFlowLog] = useState<
+        { ts: string; event: string; detail?: string }[]
+    >([]);
 
     const isFullscreen = isNativeFullscreen || isPseudoFullscreen;
 
@@ -319,6 +322,12 @@ export const AvatarPageClient = ({
             setAgentStatus("thinking");
             resetTimer();
 
+            const ts = new Date().toISOString().split("T")[1]?.replace("Z", "") ?? "";
+            setSttFlowLog((prev) => [
+                { ts, event: "send_start", detail: normalized },
+                ...prev,
+            ].slice(0, 50));
+
             const res = await speak(normalized, language);
             if (!res?.success) {
                 setShowError(true);
@@ -326,6 +335,15 @@ export const AvatarPageClient = ({
                 responsePendingRef.current = false;
                 responseStartedRef.current = false;
             }
+
+            setSttFlowLog((prev) => [
+                {
+                    ts,
+                    event: "send_done",
+                    detail: res?.success ? "ok" : `fail:${res?.error ?? "unknown"}`,
+                },
+                ...prev,
+            ].slice(0, 50));
 
             sendInFlightRef.current = false;
             const pending = pendingTranscriptRef.current;
@@ -343,20 +361,45 @@ export const AvatarPageClient = ({
 
     const handleUserSpeech = useCallback(
         (text: string) => {
-            if (agentStatus !== "listening") return;
+            const ts = new Date().toISOString().split("T")[1]?.replace("Z", "") ?? "";
+            if (agentStatus !== "listening") {
+                setSttFlowLog((prev) => [
+                    { ts, event: "transcript_drop", detail: `status=${agentStatus}` },
+                    ...prev,
+                ].slice(0, 50));
+                return;
+            }
             const normalized = normalizeTranscript(text);
-            if (!normalized) return;
+            if (!normalized) {
+                setSttFlowLog((prev) => [
+                    { ts, event: "transcript_drop", detail: "empty" },
+                    ...prev,
+                ].slice(0, 50));
+                return;
+            }
 
             if (isAgentSpeakingRef.current) {
+                setSttFlowLog((prev) => [
+                    { ts, event: "transcript_hold", detail: "agent_speaking" },
+                    ...prev,
+                ].slice(0, 50));
                 pendingTranscriptRef.current = normalized;
                 return;
             }
 
             if (connectionStatusRef.current !== "connected") {
+                setSttFlowLog((prev) => [
+                    { ts, event: "transcript_hold", detail: `conn=${connectionStatusRef.current}` },
+                    ...prev,
+                ].slice(0, 50));
                 pendingTranscriptRef.current = normalized;
                 return;
             }
 
+            setSttFlowLog((prev) => [
+                { ts, event: "transcript_ok", detail: normalized },
+                ...prev,
+            ].slice(0, 50));
             void sendTranscript(normalized);
         },
         [normalizeTranscript, sendTranscript, agentStatus],
@@ -1061,6 +1104,14 @@ export const AvatarPageClient = ({
                     {debugLog.length === 0 && <div>No events yet.</div>}
                     {debugLog.map((entry, index) => (
                         <div key={`${entry.ts}-${index}`}>
+                            [{entry.ts}] {entry.event}
+                            {entry.detail ? ` — ${entry.detail}` : ""}
+                        </div>
+                    ))}
+                    <div style={{marginTop: 10, opacity: 0.8}}>Flow</div>
+                    {sttFlowLog.length === 0 && <div>No flow events yet.</div>}
+                    {sttFlowLog.map((entry, index) => (
+                        <div key={`flow-${entry.ts}-${index}`}>
                             [{entry.ts}] {entry.event}
                             {entry.detail ? ` — ${entry.detail}` : ""}
                         </div>
