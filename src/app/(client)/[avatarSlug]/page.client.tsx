@@ -258,6 +258,15 @@ export const AvatarPageClient = ({
         isAgentSpeaking,
     } = useAgent(agent.agentId, videoRef);
 
+    const shouldListenDebug =
+        connectionStatus === "connected" &&
+        agentStatus === "listening" &&
+        !showError &&
+        micPermission === "granted" &&
+        !isAgentSpeaking &&
+        !sendInFlightRef.current &&
+        !responsePendingRef.current;
+
     useEffect(() => {
         connectionStatusRef.current = connectionStatus;
     }, [connectionStatus]);
@@ -993,6 +1002,18 @@ export const AvatarPageClient = ({
                             {lastSentRef.current?.text
                                 ? `"${lastSentRef.current.text}"`
                                 : "—"}
+                        </div>
+                        <div>Mic permission: {micPermission}</div>
+                        <div>Mic requesting: {micRequesting ? "yes" : "no"}</div>
+                        <div>Mic prompt: {showMicPrompt ? "shown" : "hidden"}</div>
+                        <div>Mic error: {micError || "—"}</div>
+                        <div>Should listen: {shouldListenDebug ? "yes" : "no"}</div>
+                        <div>
+                            MediaDevices:{" "}
+                            {typeof navigator !== "undefined" &&
+                            navigator.mediaDevices?.getUserMedia
+                                ? "available"
+                                : "missing"}
                         </div>
                     </div>
                     {debugLog.length === 0 && <div>No events yet.</div>}
