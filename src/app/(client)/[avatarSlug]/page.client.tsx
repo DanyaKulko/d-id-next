@@ -673,6 +673,17 @@ export const AvatarPageClient = ({
     ]);
 
     useEffect(() => {
+        if (isAppleMobile && connectionStatus === "connected") {
+            const timer = setInterval(() => {
+                if (agentStatus === "listening" && micPermission === "granted" && !listening) {
+                    startListening(language);
+                }
+            }, 1500);
+            return () => clearInterval(timer);
+        }
+    }, [isAppleMobile, connectionStatus, agentStatus, micPermission, listening, startListening, language]);
+
+    useEffect(() => {
         if (
             connectionStatus !== "connected" ||
             isAgentSpeaking ||

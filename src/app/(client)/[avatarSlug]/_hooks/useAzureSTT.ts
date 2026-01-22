@@ -98,6 +98,10 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
   }, []);
 
   useEffect(() => {
+    logDebug("hook_init", `ua=${typeof navigator !== "undefined" ? navigator.userAgent : "n/a"}`);
+  }, [logDebug]);
+
+  useEffect(() => {
     listeningRef.current = listening;
   }, [listening]);
 
@@ -372,6 +376,13 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
   useEffect(() => {
     return () => stopListening(true);
   }, [stopListening]);
+
+  useEffect(() => {
+    logDebug(
+      "state",
+      `listening=${listeningRef.current} running=${recognizerRunningRef.current} stopped=${isStoppedRef.current}`,
+    );
+  }, [listening, logDebug]);
 
   return {
     listening,
