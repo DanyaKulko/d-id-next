@@ -300,6 +300,20 @@ export const AvatarPageClient = ({
             const normalized = normalizeTranscript(text);
             if (!normalized) return;
 
+            if (connectionStatusRef.current !== "connected") {
+                pendingTranscriptRef.current = normalized;
+                const ts = new Date().toISOString().split("T")[1]?.replace("Z", "") ?? "";
+                setSttFlowLog((prev) => [
+                    {
+                        ts,
+                        event: "send_hold",
+                        detail: `conn=${connectionStatusRef.current}`,
+                    },
+                    ...prev,
+                ].slice(0, 50));
+                return;
+            }
+
             const last = lastSentRef.current;
             if (
                 last &&
