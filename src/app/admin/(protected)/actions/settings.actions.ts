@@ -102,7 +102,7 @@ export async function saveUserUpdateAction(formData: FormData) {
     });
 
     revalidatePath("/admin/settings");
-    revalidatePath("/admin/settings/admin");
+    revalidatePath("/admin/settings/user-access");
     return { ok: true };
   }
 
@@ -149,7 +149,7 @@ export async function saveUserUpdateAction(formData: FormData) {
     });
 
     revalidatePath("/admin/settings");
-    revalidatePath("/admin/settings/admin");
+    revalidatePath("/admin/settings/user-access");
     return { ok: true };
   }
 
@@ -182,7 +182,7 @@ export async function saveUserUpdateAction(formData: FormData) {
     });
 
     revalidatePath("/admin/settings");
-    revalidatePath("/admin/settings/admin");
+    revalidatePath("/admin/settings/user-access");
     return { ok: true };
   }
 
@@ -212,7 +212,7 @@ export async function saveUserUpdateAction(formData: FormData) {
     });
 
     revalidatePath("/admin/settings");
-    revalidatePath("/admin/settings/admin");
+    revalidatePath("/admin/settings/user-access");
     return { ok: true };
   }
 
@@ -229,7 +229,7 @@ export async function saveAuthRequirementAction(formData: FormData) {
   });
 
   revalidatePath("/admin/settings");
-  revalidatePath("/admin/settings/admin");
+  revalidatePath("/admin/settings/user-access");
   return { ok: true };
 }
 
@@ -272,6 +272,6 @@ export async function saveAdminCredentialsAction(formData: FormData) {
   }
 
   revalidatePath("/admin/settings");
-  revalidatePath("/admin/settings/admin");
+  revalidatePath("/admin/settings/admin-credentials");
   return { ok: true };
 }

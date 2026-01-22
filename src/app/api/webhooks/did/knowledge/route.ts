@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { parseStoredDocumentIds } from "@/lib/external-sources/documents";
 
 export const runtime = "nodejs";
 
@@ -99,35 +100,32 @@ export async function POST(request: Request) {
       manualTrainingSource,
     );
   }
-  if (textDoc?.documentId) {
-    knownDocMap.set(textDoc.documentId, textBlogSource);
-    knownDocMap.set(normalizeDidDocumentId(textDoc.documentId), textBlogSource);
+  for (const docId of parseStoredDocumentIds(textDoc?.documentId ?? null)) {
+    knownDocMap.set(docId, textBlogSource);
+    knownDocMap.set(normalizeDidDocumentId(docId), textBlogSource);
   }
-  if (videoDoc?.documentId) {
-    knownDocMap.set(videoDoc.documentId, videoTranscriptsSource);
-    knownDocMap.set(
-      normalizeDidDocumentId(videoDoc.documentId),
-      videoTranscriptsSource,
-    );
+  for (const docId of parseStoredDocumentIds(videoDoc?.documentId ?? null)) {
+    knownDocMap.set(docId, videoTranscriptsSource);
+    knownDocMap.set(normalizeDidDocumentId(docId), videoTranscriptsSource);
   }
 
-  const expectedDocIdBySourceKey = new Map<string, string>();
+  const expectedDocIdBySourceKey = new Map<string, string[]>();
   if (manualDoc?.value) {
     expectedDocIdBySourceKey.set(
       manualTrainingSource.toLowerCase(),
-      manualDoc.value,
+      [manualDoc.value],
     );
   }
   if (textDoc?.documentId) {
     expectedDocIdBySourceKey.set(
       textBlogSource.toLowerCase(),
-      textDoc.documentId,
+      parseStoredDocumentIds(textDoc.documentId),
     );
   }
   if (videoDoc?.documentId) {
     expectedDocIdBySourceKey.set(
       videoTranscriptsSource.toLowerCase(),
-      videoDoc.documentId,
+      parseStoredDocumentIds(videoDoc.documentId),
     );
   }
 
@@ -136,12 +134,14 @@ export async function POST(request: Request) {
     knownSources.get(sourceKey) ??
     normalizedSource;
 
-  const expectedDocId = expectedDocIdBySourceKey.get(sourceKey);
-  if (
-    expectedDocId &&
-    !matchesDidDocumentId(String(documentId), expectedDocId)
-  ) {
-    return NextResponse.json({ ok: true });
+  const expectedDocIds = expectedDocIdBySourceKey.get(sourceKey);
+  if (expectedDocIds && expectedDocIds.length > 0) {
+    const matches = expectedDocIds.some((docId) =>
+      matchesDidDocumentId(String(documentId), docId),
+    );
+    if (!matches) {
+      return NextResponse.json({ ok: true });
+    }
   }
 
   const status = mapStatus((record.status ?? payload.status) as string);

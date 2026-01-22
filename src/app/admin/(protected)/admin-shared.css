@@ -335,6 +335,11 @@ textarea {
   color: #2f855a;
 }
 
+.status-badge.disabled {
+  background: #e2e8f0;
+  color: #4a5568;
+}
+
 .tooltip-text {
   visibility: hidden;
   opacity: 0;

@@ -69,11 +69,14 @@ export default async function SettingsTabPage({
         integrationConfig = await fetchIntegrationConfig();
     }
 
-    if (tab === "admin") {
+    if (tab === "user-access") {
         [users, authRequired] = await Promise.all([
             fetchUsers(),
             fetchAuthRequirement(),
         ]);
+    }
+
+    if (tab === "admin-credentials") {
         const session = await getCurrentUser();
         adminEmail = session?.user.email ?? "";
     }

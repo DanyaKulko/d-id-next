@@ -7,6 +7,7 @@ import {
   deleteKnowledgeDocumentAction,
   saveManualTrainingAction,
   saveSafetyInstructionsAction,
+  toggleKnowledgeDocumentEnabledAction,
   toggleTextBlogKnowledgeAction,
 } from "@/app/admin/(protected)/actions";
 import type { KnowledgeItem } from "@/app/admin/(protected)/admin-data";
@@ -67,6 +68,36 @@ export default function LearningClient({
 
   const handleDelete = (item: KnowledgeItem) => {
     setDeleteCandidate(item);
+  };
+
+  const handleToggleKnowledge = (item: KnowledgeItem, enabled: boolean) => {
+    const formData = new FormData();
+    formData.set("documentId", item.id);
+    formData.set("enabled", String(enabled));
+
+    startSaving(async () => {
+      const promise = toggleKnowledgeDocumentEnabledAction(formData);
+      toast.promise(promise, {
+        loading: enabled ? "Enabling knowledge..." : "Disabling knowledge...",
+        success: enabled ? "Knowledge enabled" : "Knowledge disabled",
+        error: "Failed to update knowledge status",
+      });
+
+      try {
+        await promise;
+        setKnowledge((prev) =>
+          prev.map((doc) =>
+            doc.id === item.id
+              ? {
+                  ...doc,
+                  isEnabled: enabled,
+                  status: enabled ? "processing" : doc.status,
+                }
+              : doc,
+          ),
+        );
+      } catch (_error) {}
+    });
   };
 
   const confirmDelete = () => {
@@ -175,7 +206,10 @@ export default function LearningClient({
           </div>
 
           {visibleKnowledge.map((k) => (
-            <div key={k.id} className={`knowledge-item ${k.status}`}>
+            <div
+              key={k.id}
+              className={`knowledge-item ${k.isEnabled ? k.status : "disabled"}`}
+            >
               <h3>{k.title}</h3>
 
               <div className="knowledge-meta">
@@ -186,29 +220,41 @@ export default function LearningClient({
                 <span>
                   📅 Created: <strong>{k.created}</strong>
                 </span>
-                <span className={`status-badge ${k.status}`}>
-                  {k.status === "processing"
-                    ? "Training"
-                    : k.status === "error"
-                      ? "Error"
-                      : "Active"}
+                <span
+                  className={`status-badge ${k.isEnabled ? k.status : "disabled"}`}
+                >
+                  {!k.isEnabled
+                    ? "Disabled"
+                    : k.status === "processing"
+                      ? "Training"
+                      : k.status === "error"
+                        ? "Error"
+                        : "Active"}
                 </span>
               </div>
 
               <div className="btn-group">
-                {/*<button*/}
-                {/*  type="button"*/}
-                {/*  className="btn btn-primary"*/}
-                {/*  onClick={() => {*/}
-                {/*    if (k.url) {*/}
-                {/*      window.open(k.url, "_blank", "noopener,noreferrer");*/}
-                {/*    } else {*/}
-                {/*      toast.error("Document URL is missing");*/}
-                {/*    }*/}
-                {/*  }}*/}
-                {/*>*/}
-                {/*  👁️ View / Edit*/}
-                {/*</button>*/}
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    if (k.url) {
+                      window.open(k.url, "_blank", "noopener,noreferrer");
+                    } else {
+                      toast.error("Document URL is missing");
+                    }
+                  }}
+                >
+                  👁️ View / Edit
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => handleToggleKnowledge(k, !k.isEnabled)}
+                  disabled={isSaving}
+                >
+                  {k.isEnabled ? "🚫 Disable" : "✅ Enable"}
+                </button>
                 <button
                   type="button"
                   className="btn btn-danger"

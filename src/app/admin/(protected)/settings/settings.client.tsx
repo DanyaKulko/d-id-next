@@ -896,7 +896,7 @@ export default function SettingsClient({
                 </div>
             )}
 
-            {activeTab === "admin" && (
+            {activeTab === "user-access" && (
                 <div className="section">
                     <h2 className="section-title">User Access Management</h2>
 
@@ -947,10 +947,12 @@ export default function SettingsClient({
                             <tbody>{usersRows}</tbody>
                         </table>
                     </div>
+                </div>
+            )}
 
-                    <h2 className="section-title" style={{marginTop: 50}}>
-                        Administrator Credentials
-                    </h2>
+            {activeTab === "admin-credentials" && (
+                <div className="section">
+                    <h2 className="section-title">Administrator Credentials</h2>
 
                     <form
                         style={{maxWidth: 600}}
