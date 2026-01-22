@@ -363,13 +363,6 @@ export const AvatarPageClient = ({
     const handleUserSpeech = useCallback(
         (text: string) => {
             const ts = new Date().toISOString().split("T")[1]?.replace("Z", "") ?? "";
-            if (agentStatus !== "listening") {
-                setSttFlowLog((prev) => [
-                    { ts, event: "transcript_drop", detail: `status=${agentStatus}` },
-                    ...prev,
-                ].slice(0, 50));
-                return;
-            }
             const normalized = normalizeTranscript(text);
             if (!normalized) {
                 setSttFlowLog((prev) => [
@@ -398,7 +391,11 @@ export const AvatarPageClient = ({
             }
 
             setSttFlowLog((prev) => [
-                { ts, event: "transcript_ok", detail: normalized },
+                {
+                    ts,
+                    event: "transcript_ok",
+                    detail: `${normalized} (status=${agentStatus})`,
+                },
                 ...prev,
             ].slice(0, 50));
             void sendTranscript(normalized);
