@@ -340,6 +340,7 @@ export const AvatarPageClient = ({
                 {
                     ts,
                     event: "send_done",
+                    // @ts-ignore
                     detail: res?.success ? "ok" : `fail:${res?.error ?? "unknown"}`,
                 },
                 ...prev,
