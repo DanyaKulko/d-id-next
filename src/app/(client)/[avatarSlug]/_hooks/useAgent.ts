@@ -24,6 +24,9 @@ export const useAgent = (
     sessionId: string;
     chatId: string;
   } | null>(null);
+  const iceDisconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const currentVideoIdRef = useRef<string | null>(null);
   const lastAssistantRef = useRef<string | null>(null);
 
@@ -49,6 +52,10 @@ export const useAgent = (
     if (dcRef.current) {
       dcRef.current.close();
       dcRef.current = null;
+    }
+    if (iceDisconnectTimerRef.current) {
+      clearTimeout(iceDisconnectTimerRef.current);
+      iceDisconnectTimerRef.current = null;
     }
     if (videoRef.current) {
       videoRef.current.srcObject = null;
@@ -159,11 +166,23 @@ export const useAgent = (
 
         pc.oniceconnectionstatechange = () => {
           console.log("ICE State:", pc.iceConnectionState);
-          if (pc.iceConnectionState === "connected") setStatus("connected");
-          if (
-            pc.iceConnectionState === "failed" ||
-            pc.iceConnectionState === "disconnected"
-          ) {
+          if (pc.iceConnectionState === "connected") {
+            if (iceDisconnectTimerRef.current) {
+              clearTimeout(iceDisconnectTimerRef.current);
+              iceDisconnectTimerRef.current = null;
+            }
+            setStatus("connected");
+          }
+          if (pc.iceConnectionState === "disconnected") {
+            if (!iceDisconnectTimerRef.current) {
+              iceDisconnectTimerRef.current = setTimeout(() => {
+                console.warn("ICE disconnected timeout");
+                setStatus("error");
+                cleanup();
+              }, 8000);
+            }
+          }
+          if (pc.iceConnectionState === "failed") {
             setStatus("error");
             cleanup();
           }
