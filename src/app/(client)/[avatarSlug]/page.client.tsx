@@ -91,6 +91,7 @@ export const AvatarPageClient = ({
     const stopListeningRef = useRef<((dispose?: boolean) => void) | null>(null);
     const responsePendingRef = useRef(false);
     const responseStartedRef = useRef(false);
+    const preconnectListeningRef = useRef(false);
 
     const [isVideoPlaying, setIsVideoPlaying] = useState(false);
     const [showError, setShowError] = useState(false);
@@ -258,15 +259,6 @@ export const AvatarPageClient = ({
         isAgentSpeaking,
     } = useAgent(agent.agentId, videoRef);
 
-    const shouldListenDebug =
-        connectionStatus === "connected" &&
-        agentStatus === "listening" &&
-        !showError &&
-        micPermission === "granted" &&
-        !isAgentSpeaking &&
-        !sendInFlightRef.current &&
-        !responsePendingRef.current;
-
     useEffect(() => {
         connectionStatusRef.current = connectionStatus;
     }, [connectionStatus]);
@@ -379,6 +371,15 @@ export const AvatarPageClient = ({
         clearDebug,
         isAppleMobile,
     } = useAzureSTT(handleUserSpeech);
+
+    const shouldListenDebug =
+        ((connectionStatus === "connected" && agentStatus === "listening") ||
+            (isAppleMobile && preconnectListeningRef.current)) &&
+        !showError &&
+        micPermission === "granted" &&
+        !isAgentSpeaking &&
+        !sendInFlightRef.current &&
+        !responsePendingRef.current;
 
     useEffect(() => {
         stopListeningRef.current = stopListening;
@@ -528,6 +529,7 @@ export const AvatarPageClient = ({
         setAgentStatus("idle");
         setIsVideoPlaying(false);
         hasGreetedRef.current = false;
+        preconnectListeningRef.current = false;
         const hasMic = await ensureMicrophoneAccess();
         if (!hasMic) {
             setPendingStart(true);
@@ -535,6 +537,10 @@ export const AvatarPageClient = ({
             return;
         }
         setPendingStart(false);
+        if (isAppleMobile && !listening) {
+            preconnectListeningRef.current = true;
+            startListening(language);
+        }
         await startConversation();
     };
 
@@ -564,6 +570,7 @@ export const AvatarPageClient = ({
             startingRef.current = false;
             responsePendingRef.current = false;
             responseStartedRef.current = false;
+            preconnectListeningRef.current = false;
             if (listening) stopListening();
             return;
         }
@@ -578,6 +585,7 @@ export const AvatarPageClient = ({
             }
             responsePendingRef.current = false;
             responseStartedRef.current = false;
+            preconnectListeningRef.current = false;
             return;
         }
         if (connectionStatus === "connecting") {
@@ -587,6 +595,7 @@ export const AvatarPageClient = ({
             return;
         }
         startingRef.current = false;
+        preconnectListeningRef.current = false;
 
         if (isAgentSpeaking) {
             setAgentStatus("speaking");
@@ -632,8 +641,8 @@ export const AvatarPageClient = ({
 
     useEffect(() => {
         const shouldListen =
-            connectionStatus === "connected" &&
-            agentStatus === "listening" &&
+            ((connectionStatus === "connected" && agentStatus === "listening") ||
+                (isAppleMobile && preconnectListeningRef.current)) &&
             !showError &&
             micPermission === "granted" &&
             !isAgentSpeaking &&
@@ -660,6 +669,7 @@ export const AvatarPageClient = ({
         micPermission,
         isAgentSpeaking,
         agentStatus,
+        isAppleMobile,
     ]);
 
     useEffect(() => {
@@ -708,6 +718,10 @@ export const AvatarPageClient = ({
         }
         if (connectionStatus === "idle" || pendingStart) {
             setPendingStart(false);
+            if (isAppleMobile && !listening) {
+                preconnectListeningRef.current = true;
+                startListening(language);
+            }
             await startConversation();
         }
     }, [
@@ -719,6 +733,7 @@ export const AvatarPageClient = ({
         language,
         pendingStart,
         startConversation,
+        isAppleMobile,
     ]);
 
     const getStatusText = () => {
@@ -820,7 +835,7 @@ export const AvatarPageClient = ({
                         </div>
                     )}
 
-                    {listening && interimTranscript && (
+                    {agentStatus === "listening" && listening && interimTranscript && (
                         <div
                             className="na-transcript-overlay"
                             style={{
@@ -1008,6 +1023,10 @@ export const AvatarPageClient = ({
                         <div>Mic prompt: {showMicPrompt ? "shown" : "hidden"}</div>
                         <div>Mic error: {micError || "—"}</div>
                         <div>Should listen: {shouldListenDebug ? "yes" : "no"}</div>
+                        <div>
+                            Preconnect listening:{" "}
+                            {preconnectListeningRef.current ? "yes" : "no"}
+                        </div>
                         <div>
                             MediaDevices:{" "}
                             {typeof navigator !== "undefined" &&
