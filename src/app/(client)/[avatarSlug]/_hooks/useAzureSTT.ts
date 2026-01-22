@@ -147,8 +147,14 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
 
   const startListening = useCallback(
     async (lang: string) => {
-      if (startGuardRef.current) return;
-      if (listeningRef.current) return;
+      if (startGuardRef.current) {
+        logDebug("start_skip_guard");
+        return;
+      }
+      if (listeningRef.current) {
+        logDebug("start_skip_listening");
+        return;
+      }
       startGuardRef.current = true;
       isStoppedRef.current = false;
       try {
@@ -158,10 +164,35 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
 
         if (isStoppedRef.current) return;
 
-        await resumeAudioContext();
-        logDebug("audio_context_ready");
+        const isAppleMobile =
+          isAppleMobileRef.current ||
+          (typeof navigator !== "undefined" &&
+            (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+              (navigator.userAgent.includes("Mac") &&
+                navigator.maxTouchPoints > 1)));
+        logDebug("device_check", `apple=${isAppleMobile ? "yes" : "no"}`);
 
-        const isAppleMobile = isAppleMobileRef.current;
+        const resumeTimeoutMs = 4000;
+        let resumeTimeout: ReturnType<typeof setTimeout> | null = null;
+        try {
+          await Promise.race([
+            resumeAudioContext(),
+            new Promise<never>((_resolve, reject) => {
+              resumeTimeout = setTimeout(
+                () => reject(new Error("audio_context_timeout")),
+                resumeTimeoutMs,
+              );
+            }),
+          ]);
+          logDebug("audio_context_ready");
+        } catch (error) {
+          logDebug(
+            "audio_context_error",
+            error instanceof Error ? error.message : String(error),
+          );
+        } finally {
+          if (resumeTimeout) clearTimeout(resumeTimeout);
+        }
         const sameLanguage = activeLangRef.current === lang;
 
         if (recognizerRef.current && sameLanguage) {
@@ -205,8 +236,18 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
           logDebug("getusermedia_request");
           try {
             if (!mediaStreamRef.current) {
-              mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({
-                audio: true,
+              const gumTimeoutMs = 6000;
+              let gumTimeout: ReturnType<typeof setTimeout> | null = null;
+              mediaStreamRef.current = await Promise.race([
+                navigator.mediaDevices.getUserMedia({ audio: true }),
+                new Promise<never>((_resolve, reject) => {
+                  gumTimeout = setTimeout(
+                    () => reject(new Error("getusermedia_timeout")),
+                    gumTimeoutMs,
+                  );
+                }),
+              ]).finally(() => {
+                if (gumTimeout) clearTimeout(gumTimeout);
               });
             }
             audioConfig = SpeechSDK.AudioConfig.fromStreamInput(
