@@ -112,6 +112,7 @@ export const AvatarPageClient = ({
     >("idle");
     const [language, setLanguage] = useState(languages[0].code);
     const [selectedBackgroundId, setSelectedBackgroundId] = useState("default");
+    const [showSttDebug, setShowSttDebug] = useState(false);
 
     const isFullscreen = isNativeFullscreen || isPseudoFullscreen;
 
@@ -359,8 +360,16 @@ export const AvatarPageClient = ({
         [normalizeTranscript, sendTranscript],
     );
 
-    const {listening, startListening, stopListening, interimTranscript, warmupAudio} =
-        useAzureSTT(handleUserSpeech);
+    const {
+        listening,
+        startListening,
+        stopListening,
+        interimTranscript,
+        warmupAudio,
+        debugLog,
+        clearDebug,
+        isAppleMobile,
+    } = useAzureSTT(handleUserSpeech);
 
     useEffect(() => {
         stopListeningRef.current = stopListening;
@@ -922,8 +931,79 @@ export const AvatarPageClient = ({
               Click if you want to interrupt the avatar
             </span>
                     </div>
+
+                    <div className="na-control-group">
+                        <button
+                            type="button"
+                            className="na-btn na-btn--secondary"
+                            onClick={() => setShowSttDebug((prev) => !prev)}
+                        >
+                            {showSttDebug ? "Hide STT Debug" : "Show STT Debug"}
+                        </button>
+                        <span className="na-control-hint">
+              Show microphone / STT debug log (iOS troubleshooting)
+            </span>
+                    </div>
                 </div>
             </div>
+
+            {showSttDebug && (
+                <div
+                    className="na-stt-debug"
+                    style={{
+                        position: "fixed",
+                        right: 20,
+                        bottom: 20,
+                        width: 360,
+                        maxWidth: "90vw",
+                        maxHeight: "50vh",
+                        overflow: "auto",
+                        background: "rgba(0,0,0,0.85)",
+                        color: "#fff",
+                        padding: 12,
+                        borderRadius: 12,
+                        zIndex: 9999,
+                        fontSize: 12,
+                    }}
+                >
+                    <div style={{display: "flex", justifyContent: "space-between", marginBottom: 8}}>
+                        <strong>STT Debug</strong>
+                        <button
+                            type="button"
+                            className="na-btn na-btn--secondary"
+                            onClick={clearDebug}
+                            style={{padding: "4px 8px", fontSize: 11}}
+                        >
+                            Clear
+                        </button>
+                    </div>
+                    <div style={{marginBottom: 8}}>
+                        <div>Device: {isAppleMobile ? "Apple mobile" : "Other"}</div>
+                        <div>Listening: {listening ? "yes" : "no"}</div>
+                        <div>Status: {agentStatus}</div>
+                        <div>Connection: {connectionStatus}</div>
+                        <div>Agent speaking: {isAgentSpeaking ? "yes" : "no"}</div>
+                        <div>Send in flight: {sendInFlightRef.current ? "yes" : "no"}</div>
+                        <div>
+                            Pending transcript:{" "}
+                            {pendingTranscriptRef.current ? "yes" : "no"}
+                        </div>
+                        <div>
+                            Last sent:{" "}
+                            {lastSentRef.current?.text
+                                ? `"${lastSentRef.current.text}"`
+                                : "—"}
+                        </div>
+                    </div>
+                    {debugLog.length === 0 && <div>No events yet.</div>}
+                    {debugLog.map((entry, index) => (
+                        <div key={`${entry.ts}-${index}`}>
+                            [{entry.ts}] {entry.event}
+                            {entry.detail ? ` — ${entry.detail}` : ""}
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 };
