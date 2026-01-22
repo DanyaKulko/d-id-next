@@ -32,6 +32,7 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
   const recognizerRunningRef = useRef(false);
   const partialBufferRef = useRef("");
   const partialTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
 
   const getOrFetchToken = useCallback(async () => {
     const now = Date.now();
@@ -113,14 +114,23 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
       (ua.includes("Mac") && navigator.maxTouchPoints > 1);
   }, []);
 
-  const startRecognition = useCallback((recognizer: SpeechSDK.SpeechRecognizer) => {
-    return new Promise<void>((resolve, reject) => {
-      recognizer.startContinuousRecognitionAsync(
-        () => resolve(),
-        (error) => reject(error),
-      );
-    });
-  }, []);
+  const startRecognition = useCallback(
+    (recognizer: SpeechSDK.SpeechRecognizer) => {
+      return new Promise<void>((resolve, reject) => {
+        recognizer.startContinuousRecognitionAsync(
+          () => {
+            logDebug("start_async_ok");
+            resolve();
+          },
+          (error) => {
+            logDebug("start_async_err", String(error));
+            reject(error);
+          },
+        );
+      });
+    },
+    [logDebug],
+  );
 
   const stopRecognition = useCallback((recognizer: SpeechSDK.SpeechRecognizer) => {
     return new Promise<void>((resolve) => {
@@ -144,10 +154,12 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
       try {
         logDebug("start", `lang=${lang}`);
         const { token, region } = await getOrFetchToken();
+        logDebug("token_ok", `region=${region}`);
 
         if (isStoppedRef.current) return;
 
         await resumeAudioContext();
+        logDebug("audio_context_ready");
 
         const isAppleMobile = isAppleMobileRef.current;
         const sameLanguage = activeLangRef.current === lang;
@@ -188,7 +200,29 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
           isAppleMobile ? "30000" : "15000",
         );
 
-        const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+        let audioConfig: SpeechSDK.AudioConfig;
+        if (isAppleMobile) {
+          logDebug("getusermedia_request");
+          try {
+            if (!mediaStreamRef.current) {
+              mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+              });
+            }
+            audioConfig = SpeechSDK.AudioConfig.fromStreamInput(
+              mediaStreamRef.current,
+            );
+            logDebug("getusermedia_ok");
+          } catch (error) {
+            logDebug(
+              "getusermedia_err",
+              error instanceof Error ? error.message : String(error),
+            );
+            throw error;
+          }
+        } else {
+          audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+        }
         const recognizer = new SpeechSDK.SpeechRecognizer(
           speechConfig,
           audioConfig,
@@ -289,7 +323,18 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
           recognizerRunningRef.current = false;
         };
 
-        await startRecognition(recognizer);
+        const startTimeoutMs = 6000;
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        await Promise.race([
+          startRecognition(recognizer),
+          new Promise<never>((_resolve, reject) => {
+            timeoutId = setTimeout(() => {
+              reject(new Error("start_timeout"));
+            }, startTimeoutMs);
+          }),
+        ]).finally(() => {
+          if (timeoutId) clearTimeout(timeoutId);
+        });
         setListening(true);
         recognizerRef.current = recognizer;
         activeLangRef.current = lang;
@@ -297,6 +342,10 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
         logDebug("started", `lang=${lang}`);
       } catch (error) {
         console.error("STT Start Error:", error);
+        logDebug(
+          "start_error_full",
+          error instanceof Error ? error.message : "start failed",
+        );
         logDebug(
           "start_error",
           error instanceof Error ? error.message : "start failed",
@@ -371,6 +420,14 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
         },
       );
     }
+
+    if (dispose && mediaStreamRef.current) {
+      for (const track of mediaStreamRef.current.getTracks()) {
+        track.stop();
+      }
+      mediaStreamRef.current = null;
+      logDebug("media_stream_closed");
+    }
   }, [clearPartialTimer]);
 
   useEffect(() => {
@@ -393,5 +450,6 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
     debugLog,
     clearDebug: () => setDebugLog([]),
     isAppleMobile: isAppleMobileRef.current,
+    mediaStreamActive: Boolean(mediaStreamRef.current),
   };
 };

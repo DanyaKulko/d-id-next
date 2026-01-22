@@ -370,6 +370,7 @@ export const AvatarPageClient = ({
         debugLog,
         clearDebug,
         isAppleMobile,
+        mediaStreamActive,
     } = useAzureSTT(handleUserSpeech);
 
     const shouldListenDebug =
@@ -1037,6 +1038,9 @@ export const AvatarPageClient = ({
                         <div>
                             Preconnect listening:{" "}
                             {preconnectListeningRef.current ? "yes" : "no"}
+                        </div>
+                        <div>
+                            MediaStream: {mediaStreamActive ? "active" : "none"}
                         </div>
                         <div>
                             MediaDevices:{" "}
