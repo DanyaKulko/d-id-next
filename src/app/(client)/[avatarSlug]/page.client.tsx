@@ -357,6 +357,7 @@ export const AvatarPageClient = ({
             const res = await speak(normalized, language);
             if (!res?.success) {
                 const errorMessage =
+                    //@ts-ignore
                     "error" in (res ?? {}) ? String(res?.error ?? "") : "";
                 if (errorMessage.toLowerCase().includes("not connected")) {
                     pendingTranscriptRef.current = normalized;
