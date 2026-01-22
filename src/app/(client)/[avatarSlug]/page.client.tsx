@@ -92,6 +92,7 @@ export const AvatarPageClient = ({
     const responsePendingRef = useRef(false);
     const responseStartedRef = useRef(false);
     const preconnectListeningRef = useRef(false);
+    const reconnectingRef = useRef(false);
 
     const [isVideoPlaying, setIsVideoPlaying] = useState(false);
     const [showError, setShowError] = useState(false);
@@ -291,6 +292,17 @@ export const AvatarPageClient = ({
         onTimeout: handleIdleTimeout,
     });
 
+    const ensureConnection = useCallback(async () => {
+        if (reconnectingRef.current) return;
+        reconnectingRef.current = true;
+        setAgentStatus("preparing");
+        try {
+            await connect({language});
+        } finally {
+            reconnectingRef.current = false;
+        }
+    }, [connect, language]);
+
     const normalizeTranscript = useCallback((text: string) => {
         return text.trim().replace(/\s+/g, " ");
     }, []);
@@ -344,6 +356,13 @@ export const AvatarPageClient = ({
 
             const res = await speak(normalized, language);
             if (!res?.success) {
+                if (res?.error?.toLowerCase?.().includes("not connected")) {
+                    pendingTranscriptRef.current = normalized;
+                    responsePendingRef.current = false;
+                    responseStartedRef.current = false;
+                    await ensureConnection();
+                    return;
+                }
                 setShowError(true);
                 setAgentStatus("idle");
                 responsePendingRef.current = false;
@@ -371,7 +390,7 @@ export const AvatarPageClient = ({
                 void sendTranscript(pending);
             }
         },
-        [normalizeTranscript, resetTimer, speak, language],
+        [normalizeTranscript, resetTimer, speak, language, ensureConnection],
     );
 
     const handleUserSpeech = useCallback(
@@ -628,6 +647,7 @@ export const AvatarPageClient = ({
             responsePendingRef.current = false;
             responseStartedRef.current = false;
             preconnectListeningRef.current = false;
+            reconnectingRef.current = false;
             if (listening) stopListening();
             return;
         }
@@ -643,6 +663,7 @@ export const AvatarPageClient = ({
             responsePendingRef.current = false;
             responseStartedRef.current = false;
             preconnectListeningRef.current = false;
+            reconnectingRef.current = false;
             return;
         }
         if (connectionStatus === "connecting") {
@@ -653,6 +674,7 @@ export const AvatarPageClient = ({
         }
         startingRef.current = false;
         preconnectListeningRef.current = false;
+        reconnectingRef.current = false;
 
         if (isAgentSpeaking) {
             setAgentStatus("speaking");
