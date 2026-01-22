@@ -313,7 +313,7 @@ export const AvatarPageClient = ({
             lastSentRef.current = { text: normalized, time: Date.now() };
             responsePendingRef.current = true;
             responseStartedRef.current = false;
-            stopListeningRef.current?.(true);
+            stopListeningRef.current?.();
             setAgentStatus("thinking");
             resetTimer();
 
@@ -546,14 +546,14 @@ export const AvatarPageClient = ({
             startingRef.current = false;
             responsePendingRef.current = false;
             responseStartedRef.current = false;
-            if (listening) stopListening(true);
+            if (listening) stopListening();
             return;
         }
         if (connectionStatus === "idle") {
             if (startingRef.current) {
                 return;
             }
-            if (listening) stopListening(true);
+            if (listening) stopListening();
             if (!showError) {
                 setAgentStatus("idle");
                 setIsVideoPlaying(false);
@@ -629,7 +629,7 @@ export const AvatarPageClient = ({
             }
         } else {
             if (listening) {
-                stopListening(true);
+                stopListening();
             }
         }
     }, [

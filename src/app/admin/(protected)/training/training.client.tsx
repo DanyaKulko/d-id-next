@@ -94,22 +94,20 @@ export default function LearningClient({
     formData.set("enabled", String(enabled));
 
     startToggling(async () => {
-      const promise = toggleTextBlogKnowledgeAction(formData);
-      await toast.promise(
-        promise,
-        {
-          loading: enabled
-            ? "Enabling blog knowledge..."
-            : "Disabling blog knowledge...",
-          success: enabled
-            ? "Blog knowledge enabled(uploading started)"
-            : "Blog knowledge disabled(removal started)",
-          error: "Failed to update blog knowledge setting",
-        },
-      );
+        try {
+          await toast.promise(
+            toggleTextBlogKnowledgeAction(formData),
+            {
+              loading: enabled
+                ? "Enabling blog knowledge..."
+                : "Disabling blog knowledge...",
+              success: enabled
+                ? "Blog knowledge enabled(uploading started)"
+                : "Blog knowledge disabled(removal started)",
+              error: "Failed to update blog knowledge setting",
+            },
+          );
 
-      try {
-        await promise;
         setTextBlogEnabled(enabled);
         if (!enabled) {
           setKnowledge((prev) =>

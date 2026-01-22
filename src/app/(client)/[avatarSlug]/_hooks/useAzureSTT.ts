@@ -23,6 +23,8 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
   const startGuardRef = useRef(false);
   const isAppleMobileRef = useRef(false);
   const recognizerRunningRef = useRef(false);
+  const partialBufferRef = useRef("");
+  const partialTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const getOrFetchToken = useCallback(async () => {
     const now = Date.now();
@@ -103,6 +105,13 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
     });
   }, []);
 
+  const clearPartialTimer = useCallback(() => {
+    if (partialTimerRef.current) {
+      clearTimeout(partialTimerRef.current);
+      partialTimerRef.current = null;
+    }
+  }, []);
+
   const startListening = useCallback(
     async (lang: string) => {
       if (startGuardRef.current) return;
@@ -165,6 +174,17 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
           if (!listeningRef.current || isStoppedRef.current) return;
           if (e.result.text) {
             setInterimTranscript(e.result.text);
+            partialBufferRef.current = e.result.text;
+            clearPartialTimer();
+            partialTimerRef.current = setTimeout(() => {
+              if (!listeningRef.current || isStoppedRef.current) return;
+              const fallbackText = partialBufferRef.current.trim();
+              if (fallbackText) {
+                onFinalTranscript(fallbackText);
+              }
+              partialBufferRef.current = "";
+              setInterimTranscript("");
+            }, 1400);
           }
         };
 
@@ -179,6 +199,8 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
               // Не останавливаем здесь! Пусть родитель решит остановить,
               // когда перейдет в статус 'thinking'.
             }
+            clearPartialTimer();
+            partialBufferRef.current = "";
             setInterimTranscript("");
           }
         };
@@ -196,6 +218,8 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
             setListening(false);
           }
           setInterimTranscript("");
+          clearPartialTimer();
+          partialBufferRef.current = "";
           recognizerRef.current = null;
           activeLangRef.current = null;
           recognizerRunningRef.current = false;
@@ -207,6 +231,8 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
             setListening(false);
           }
           setInterimTranscript("");
+          clearPartialTimer();
+          partialBufferRef.current = "";
           recognizerRef.current = null;
           activeLangRef.current = null;
           recognizerRunningRef.current = false;
@@ -244,13 +270,12 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
     startGuardRef.current = false;
     setListening(false);
     setInterimTranscript("");
+    clearPartialTimer();
+    partialBufferRef.current = "";
 
     if (recognizerRef.current) {
       const r = recognizerRef.current;
       console.log("🛑 Stopping Azure STT...");
-      if (isAppleMobileRef.current && !dispose) {
-        return;
-      }
       r.stopContinuousRecognitionAsync(
         () => {
           if (dispose || !isAppleMobileRef.current) {
@@ -260,6 +285,8 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
             recognizerRef.current = null;
             activeLangRef.current = null;
             recognizerRunningRef.current = false;
+          } else {
+            recognizerRunningRef.current = false;
           }
         },
         () => {
@@ -270,11 +297,13 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
             recognizerRef.current = null;
             activeLangRef.current = null;
             recognizerRunningRef.current = false;
+          } else {
+            recognizerRunningRef.current = false;
           }
         },
       );
     }
-  }, []);
+  }, [clearPartialTimer]);
 
   useEffect(() => {
     return () => stopListening(true);
