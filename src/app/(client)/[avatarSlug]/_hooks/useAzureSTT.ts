@@ -318,6 +318,17 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
   );
 
   const stopListening = useCallback((dispose?: boolean) => {
+    const keepAlive = isAppleMobileRef.current && !dispose;
+    if (keepAlive) {
+      startGuardRef.current = false;
+      setListening(false);
+      setInterimTranscript("");
+      clearPartialTimer();
+      partialBufferRef.current = "";
+      logDebug("stop", "pause_ios_keepalive");
+      return;
+    }
+
     isStoppedRef.current = true;
     startGuardRef.current = false;
     setListening(false);
