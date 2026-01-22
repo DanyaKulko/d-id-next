@@ -343,6 +343,7 @@ export const AvatarPageClient = ({
 
     const handleUserSpeech = useCallback(
         (text: string) => {
+            if (agentStatus !== "listening") return;
             const normalized = normalizeTranscript(text);
             if (!normalized) return;
 
@@ -358,7 +359,7 @@ export const AvatarPageClient = ({
 
             void sendTranscript(normalized);
         },
-        [normalizeTranscript, sendTranscript],
+        [normalizeTranscript, sendTranscript, agentStatus],
     );
 
     const {
@@ -676,13 +677,20 @@ export const AvatarPageClient = ({
     useEffect(() => {
         if (isAppleMobile && connectionStatus === "connected") {
             const timer = setInterval(() => {
-                if (agentStatus === "listening" && micPermission === "granted" && !listening) {
+                if (shouldListenDebug && !listening) {
                     startListening(language);
                 }
             }, 1500);
             return () => clearInterval(timer);
         }
-    }, [isAppleMobile, connectionStatus, agentStatus, micPermission, listening, startListening, language]);
+    }, [
+        isAppleMobile,
+        connectionStatus,
+        shouldListenDebug,
+        listening,
+        startListening,
+        language,
+    ]);
 
     useEffect(() => {
         if (
