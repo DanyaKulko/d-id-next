@@ -1011,7 +1011,7 @@ export const AvatarPageClient = ({
                         <div>
                             MediaDevices:{" "}
                             {typeof navigator !== "undefined" &&
-                            navigator.mediaDevices?.getUserMedia
+                            Boolean(navigator.mediaDevices?.getUserMedia)
                                 ? "available"
                                 : "missing"}
                         </div>
