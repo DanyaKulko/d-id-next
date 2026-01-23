@@ -235,7 +235,7 @@ export const useAgent = (
 
   const speak = useCallback(
     async (text: string, language?: string) => {
-      if (status !== "connected" || !idsRef.current) {
+      if (!idsRef.current) {
         return { success: false, error: "Not connected" };
       }
 
@@ -247,7 +247,7 @@ export const useAgent = (
         language,
       });
     },
-    [status, agentId],
+    [agentId],
   );
 
   const interrupt = useCallback(() => {
