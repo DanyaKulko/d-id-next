@@ -26,26 +26,53 @@ const TOKEN_CLIENT_SECRET = process.env.DOND_OAUTH_CLIENT_SECRET;
 
 const DOC_SOURCE_NAME = 'Text blog';
 const BLOG_ENABLED_KEY = 'textBlogEnabled';
-const BUCKET_CHAR_LIMIT = 450000;
+const BUCKET_CHAR_LIMIT = 470000;
 const API_PAGE_LIMIT = 50;
 
 const SYSTEM_PROMPT = `
 <goal>  
-Process existing text for future AI model training. It is important that the text:  
+Process existing text for subsequent training of an LLM model (the LLM’s task is to create a complete digital copy of Neil). We are processing Neil’s blog-diary. It is important that the final text:  
 — sounds like Neil’s direct speech (first person);  
-— contains no noise, external context, or other people’s voices.  
+— contains no noise, external context, or other people’s voices;  
+— is compact and substantive;  
+— preserves Neil’s style, manner, narrative quirks, and distinctive voice.  
 </goal>
 
 <response_format>
+What is important to preserve in the text:
+— Neil’s personal observations about people, places, phenomena, and events.
+— His opinions, evaluations, and judgments (do not soften or “correct” them).
+— Irony, dry humor, and characteristic intonations — if they are present in the source.
+— Facts — only those that Neil explicitly states or clearly interprets himself.
+— Preserve Neil’s temporal perspective if he indicates it.
+
 Response format:
-— Clean Markdown.
-— The text must be self-contained.
-— Output only the final processed text.
+— Clean, classic Markdown.
+— The text must be self-contained and read as a coherent line of reasoning, even if the source consisted of fragments.
+— Output only the final processed text. No comments, no notes like “removed/edited,” no explanations of the process. No additional headings such as “Here is the result” — only the text itself.
 </response_format>
 
+<warnings>  
+What must be completely removed (without exceptions)
+
+Universal for all sources:
+— Remove everything that is not part of Neil’s personal experience and carries no meaningful value.
+— Empty phrases, vague or “watery” constructions, filler words, excessive repetition, bureaucratic language.
+— Greetings and farewells.
+— Quotes from other people, news excerpts.
+— Calls to subscribe.
+— Avoid generalizations and universal formulations; the text must sound like personal experience, not conclusions “for everyone.”
+
+Additionally, for video and audio transcriptions, remove:
+— Timecodes, timestamps, segment numbers.
+— Any references to the recording/filming process: “I’m filming,” “camera,” “microphone,” “I’ll record,” “on camera,” “you see,” “listen.”
+— Speech noise and fillers: “uh,” “um,” “like,” false starts, self-corrections, stutters, placeholder phrases.
+— Technical speech-recognition notes: [laughter], [noise], [pause], [inaudible] (unless they are critical to meaning or humor). </warnings>
+
 <context>  
-You are an editor processing data for an AI avatar of Neil Marathe.
-</context>
+We are creating a digital copy of the personality Anil (Neil) Marathe. Our task is to process his materials (written blogs and video subtitles) and turn them into high-quality training data for his digital copy in the form of an AI avatar.
+
+You are an editor and preprocessor of training data. Your task is to transform raw material into clean, coherent, self-contained first-person text suitable for training an LLM model that accurately reproduces Neil’s personality, thinking style, tone, humor, mannerisms, and personal observations. </context>
 `;
 
 const redis = new IORedis(REDIS_URL, { maxRetriesPerRequest: null });
@@ -189,7 +216,7 @@ async function cleanWithGPT(post: ApiPost): Promise<string> {
 
         const cleaned = completion.choices[0]?.message?.content?.trim();
         if (!cleaned) return '';
-        return `\n\n--- DOCUMENT START (ID: ${post.id}) ---\n${cleaned}\n--- DOCUMENT END ---\n`;
+        return `\n\n# DOCUMENT TYPE: <JOURNAL_RECORD>\n--- DOCUMENT START (ID: ${post.id}) ---\n${cleaned}\n--- DOCUMENT END ---\n`;
     } catch (e) {
         log("ERROR", "GPT processing failed", {
             postId: post.id,
