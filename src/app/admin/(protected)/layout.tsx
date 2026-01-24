@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import AdminNavbar from "@/app/admin/(protected)/_components/AdminNavbar";
+import DevModeGate from "@/app/admin/(protected)/_components/DevModeGate";
 import { hasRole } from "@/lib/auth/rbac";
 import { getCurrentUser } from "@/lib/auth/require";
 import { UserProvider } from "@/lib/auth/user-context";
@@ -29,6 +30,7 @@ export default async function AdminLayout({
     <UserProvider user={session.user}>
       <AdminNavbar />
       {children}
+      <DevModeGate />
     </UserProvider>
   );
 }

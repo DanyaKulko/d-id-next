@@ -2,9 +2,9 @@ import "./page.css";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AvatarPageClient } from "@/app/(client)/[avatarSlug]/page.client";
-import LottieLogo from "@/components/LottieLogo/LottieLogo";
 import { findAgentByKey } from "@/lib/agents/agents.db";
 import { enforceClientAuth } from "@/lib/auth/client-access";
+import LottieLogo from "@/components/LottieLogo/LottieLogo";
 
 type AvatarPageProps = {
   params: Promise<{ avatarSlug: string }>;
@@ -28,7 +28,7 @@ export default async function AvatarPage({ params }: AvatarPageProps) {
         <div className="na-container">
             <div className="na-header-content">
             <Link href="/" className="na-logo-text" aria-label="Neil Avatar">
-              <LottieLogo className="na-logo-anim" />
+              Neil Avatar
             </Link>
             <Link href="/" className="na-back-link">
               ← Back to Roles
@@ -55,7 +55,11 @@ export default async function AvatarPage({ params }: AvatarPageProps) {
         />
 
         <div className="na-brand-logo" aria-hidden="true">
-          <LottieLogo className="na-logo-anim na-logo-anim--footer" />
+          <LottieLogo
+            className="na-logo-anim na-logo-anim--footer"
+            // loop
+            playOnView
+          />
         </div>
       </main>
     </>

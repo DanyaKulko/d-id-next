@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef } from "react";
 const IDLE_TIMEOUT_MS = 30000;
 
 interface UseIdleTimerProps {
-  isActive: boolean; // Таймер должен тикать только когда true (listening)
+  isActive: boolean;
   onTimeout: () => void;
 }
 
@@ -27,7 +27,6 @@ export const useIdleTimer = ({ isActive, onTimeout }: UseIdleTimerProps) => {
     }
   }, []);
 
-  // Реакция на изменение активности (например, статус listening)
   useEffect(() => {
     if (isActive) {
       console.log("🟢 Timer Active");
@@ -39,7 +38,6 @@ export const useIdleTimer = ({ isActive, onTimeout }: UseIdleTimerProps) => {
     return () => stopTimer();
   }, [isActive, startTimer, stopTimer]);
 
-  // Метод для ручного сброса (когда юзер говорит)
   const resetTimer = useCallback(() => {
     if (isActive) {
       startTimer();

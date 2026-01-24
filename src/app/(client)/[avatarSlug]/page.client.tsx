@@ -114,10 +114,6 @@ export const AvatarPageClient = ({
     >("idle");
     const [language, setLanguage] = useState(languages[0].code);
     const [selectedBackgroundId, setSelectedBackgroundId] = useState("default");
-    const [showSttDebug, setShowSttDebug] = useState(false);
-    const [sttFlowLog, setSttFlowLog] = useState<
-        { ts: string; event: string; detail?: string }[]
-    >([]);
     const isAppleMobileUa = useMemo(() => {
         if (typeof navigator === "undefined") return false;
         const ua = navigator.userAgent || "";
@@ -319,15 +315,6 @@ export const AvatarPageClient = ({
 
             if (connectionStatusRef.current !== "connected") {
                 pendingTranscriptRef.current = normalized;
-                const ts = new Date().toISOString().split("T")[1]?.replace("Z", "") ?? "";
-                setSttFlowLog((prev) => [
-                    {
-                        ts,
-                        event: "send_hold",
-                        detail: `conn=${connectionStatusRef.current}`,
-                    },
-                    ...prev,
-                ].slice(0, 50));
                 return;
             }
 
@@ -353,12 +340,6 @@ export const AvatarPageClient = ({
             setAgentStatus("thinking");
             resetTimer();
 
-            const ts = new Date().toISOString().split("T")[1]?.replace("Z", "") ?? "";
-            setSttFlowLog((prev) => [
-                { ts, event: "send_start", detail: normalized },
-                ...prev,
-            ].slice(0, 50));
-
             const res = await speak(normalized, language);
             if (!res?.success) {
                 const errorMessage =
@@ -377,16 +358,6 @@ export const AvatarPageClient = ({
                 responseStartedRef.current = false;
             }
 
-            setSttFlowLog((prev) => [
-                {
-                    ts,
-                    event: "send_done",
-                    // @ts-ignore
-                    detail: res?.success ? "ok" : `fail:${res?.error ?? "unknown"}`,
-                },
-                ...prev,
-            ].slice(0, 50));
-
             sendInFlightRef.current = false;
             const pending = pendingTranscriptRef.current;
             if (
@@ -403,45 +374,24 @@ export const AvatarPageClient = ({
 
     const handleUserSpeech = useCallback(
         (text: string) => {
-            const ts = new Date().toISOString().split("T")[1]?.replace("Z", "") ?? "";
             const normalized = normalizeTranscript(text);
             if (!normalized) {
-                setSttFlowLog((prev) => [
-                    { ts, event: "transcript_drop", detail: "empty" },
-                    ...prev,
-                ].slice(0, 50));
                 return;
             }
 
             if (isAgentSpeakingRef.current) {
-                setSttFlowLog((prev) => [
-                    { ts, event: "transcript_hold", detail: "agent_speaking" },
-                    ...prev,
-                ].slice(0, 50));
                 pendingTranscriptRef.current = normalized;
                 return;
             }
 
             if (connectionStatusRef.current !== "connected") {
-                setSttFlowLog((prev) => [
-                    { ts, event: "transcript_hold", detail: `conn=${connectionStatusRef.current}` },
-                    ...prev,
-                ].slice(0, 50));
                 pendingTranscriptRef.current = normalized;
                 return;
             }
 
-            setSttFlowLog((prev) => [
-                {
-                    ts,
-                    event: "transcript_ok",
-                    detail: `${normalized} (status=${agentStatus})`,
-                },
-                ...prev,
-            ].slice(0, 50));
             void sendTranscript(normalized);
         },
-        [normalizeTranscript, sendTranscript, agentStatus],
+        [normalizeTranscript, sendTranscript],
     );
 
     const {
@@ -450,20 +400,27 @@ export const AvatarPageClient = ({
         stopListening,
         interimTranscript,
         warmupAudio,
-        debugLog,
-        clearDebug,
         isAppleMobile,
-        mediaStreamActive,
     } = useAzureSTT(handleUserSpeech);
 
-    const shouldListenDebug =
-        ((connectionStatus === "connected" && agentStatus === "listening") ||
-            (isAppleMobile && preconnectListeningRef.current)) &&
-        !showError &&
-        micPermission === "granted" &&
-        !isAgentSpeaking &&
-        !sendInFlightRef.current &&
-        !responsePendingRef.current;
+    const shouldListenNow = useCallback(() => {
+        return (
+            ((connectionStatus === "connected" && agentStatus === "listening") ||
+                (isAppleMobile && preconnectListeningRef.current)) &&
+            !showError &&
+            micPermission === "granted" &&
+            !isAgentSpeaking &&
+            !sendInFlightRef.current &&
+            !responsePendingRef.current
+        );
+    }, [
+        agentStatus,
+        connectionStatus,
+        isAppleMobile,
+        isAgentSpeaking,
+        micPermission,
+        showError,
+    ]);
 
     useEffect(() => {
         stopListeningRef.current = stopListening;
@@ -727,14 +684,7 @@ export const AvatarPageClient = ({
     }, [agentStatus, connectionStatus, micPermission]);
 
     useEffect(() => {
-        const shouldListen =
-            ((connectionStatus === "connected" && agentStatus === "listening") ||
-                (isAppleMobile && preconnectListeningRef.current)) &&
-            !showError &&
-            micPermission === "granted" &&
-            !isAgentSpeaking &&
-            !sendInFlightRef.current &&
-            !responsePendingRef.current;
+        const shouldListen = shouldListenNow();
 
         if (shouldListen) {
             if (!listening) {
@@ -762,7 +712,7 @@ export const AvatarPageClient = ({
     useEffect(() => {
         if (isAppleMobile && connectionStatus === "connected") {
             const timer = setInterval(() => {
-                if (shouldListenDebug && !listening) {
+                if (shouldListenNow() && !listening) {
                     startListening(language);
                 }
             }, 1500);
@@ -771,7 +721,7 @@ export const AvatarPageClient = ({
     }, [
         isAppleMobile,
         connectionStatus,
-        shouldListenDebug,
+        shouldListenNow,
         listening,
         startListening,
         language,
@@ -1061,105 +1011,8 @@ export const AvatarPageClient = ({
             </span>
                     </div>
 
-                    <div className="na-control-group">
-                        <button
-                            type="button"
-                            className="na-btn na-btn--secondary"
-                            onClick={() => setShowSttDebug((prev) => !prev)}
-                        >
-                            {showSttDebug ? "Hide STT Debug" : "Show STT Debug"}
-                        </button>
-                        <span className="na-control-hint">
-              Show microphone / STT debug log (iOS troubleshooting)
-            </span>
-                    </div>
                 </div>
             </div>
-
-            {showSttDebug && (
-                <div
-                    className="na-stt-debug"
-                    style={{
-                        position: "fixed",
-                        right: 20,
-                        bottom: 20,
-                        width: 360,
-                        maxWidth: "90vw",
-                        maxHeight: "50vh",
-                        overflow: "auto",
-                        background: "rgba(0,0,0,0.85)",
-                        color: "#fff",
-                        padding: 12,
-                        borderRadius: 12,
-                        zIndex: 9999,
-                        fontSize: 12,
-                    }}
-                >
-                    <div style={{display: "flex", justifyContent: "space-between", marginBottom: 8}}>
-                        <strong>STT Debug</strong>
-                        <button
-                            type="button"
-                            className="na-btn na-btn--secondary"
-                            onClick={clearDebug}
-                            style={{padding: "4px 8px", fontSize: 11}}
-                        >
-                            Clear
-                        </button>
-                    </div>
-                    <div style={{marginBottom: 8}}>
-                        <div>Device: {isAppleMobile ? "Apple mobile" : "Other"}</div>
-                        <div>Listening: {listening ? "yes" : "no"}</div>
-                        <div>Status: {agentStatus}</div>
-                        <div>Connection: {connectionStatus}</div>
-                        <div>Agent speaking: {isAgentSpeaking ? "yes" : "no"}</div>
-                        <div>Send in flight: {sendInFlightRef.current ? "yes" : "no"}</div>
-                        <div>
-                            Pending transcript:{" "}
-                            {pendingTranscriptRef.current ? "yes" : "no"}
-                        </div>
-                        <div>
-                            Last sent:{" "}
-                            {lastSentRef.current?.text
-                                ? `"${lastSentRef.current.text}"`
-                                : "—"}
-                        </div>
-                        <div>Mic permission: {micPermission}</div>
-                        <div>Mic requesting: {micRequesting ? "yes" : "no"}</div>
-                        <div>Mic prompt: {showMicPrompt ? "shown" : "hidden"}</div>
-                        <div>Mic error: {micError || "—"}</div>
-                        <div>Should listen: {shouldListenDebug ? "yes" : "no"}</div>
-                        <div>
-                            Preconnect listening:{" "}
-                            {preconnectListeningRef.current ? "yes" : "no"}
-                        </div>
-                        <div>
-                            MediaStream: {mediaStreamActive ? "active" : "none"}
-                        </div>
-                        <div>
-                            MediaDevices:{" "}
-                            {typeof navigator !== "undefined" &&
-                            Boolean(navigator.mediaDevices?.getUserMedia)
-                                ? "available"
-                                : "missing"}
-                        </div>
-                    </div>
-                    {debugLog.length === 0 && <div>No events yet.</div>}
-                    {debugLog.map((entry, index) => (
-                        <div key={`${entry.ts}-${index}`}>
-                            [{entry.ts}] {entry.event}
-                            {entry.detail ? ` — ${entry.detail}` : ""}
-                        </div>
-                    ))}
-                    <div style={{marginTop: 10, opacity: 0.8}}>Flow</div>
-                    {sttFlowLog.length === 0 && <div>No flow events yet.</div>}
-                    {sttFlowLog.map((entry, index) => (
-                        <div key={`flow-${entry.ts}-${index}`}>
-                            [{entry.ts}] {entry.event}
-                            {entry.detail ? ` — ${entry.detail}` : ""}
-                        </div>
-                    ))}
-                </div>
-            )}
         </div>
     );
 };

@@ -11,16 +11,9 @@ interface CachedToken {
   expiresAt: number;
 }
 
-type DebugEntry = {
-  ts: string;
-  event: string;
-  detail?: string;
-};
-
 export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
   const [listening, setListening] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState("");
-  const [debugLog, setDebugLog] = useState<DebugEntry[]>([]);
 
   const recognizerRef = useRef<SpeechSDK.SpeechRecognizer | null>(null);
   const tokenCacheRef = useRef<CachedToken | null>(null);
@@ -86,22 +79,6 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
     } catch (_error) {}
   }, []);
 
-  const logDebug = useCallback((event: string, detail?: string) => {
-    const entry = {
-      ts: new Date().toISOString().split("T")[1]?.replace("Z", "") ?? "",
-      event,
-      detail,
-    };
-    setDebugLog((prev) => {
-      const next = [entry, ...prev];
-      return next.slice(0, 50);
-    });
-  }, []);
-
-  useEffect(() => {
-    logDebug("hook_init", `ua=${typeof navigator !== "undefined" ? navigator.userAgent : "n/a"}`);
-  }, [logDebug]);
-
   useEffect(() => {
     listeningRef.current = listening;
   }, [listening]);
@@ -119,17 +96,15 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
       return new Promise<void>((resolve, reject) => {
         recognizer.startContinuousRecognitionAsync(
           () => {
-            logDebug("start_async_ok");
             resolve();
           },
           (error) => {
-            logDebug("start_async_err", String(error));
             reject(error);
           },
         );
       });
     },
-    [logDebug],
+    [],
   );
 
   const stopRecognition = useCallback((recognizer: SpeechSDK.SpeechRecognizer) => {
@@ -148,19 +123,15 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
   const startListening = useCallback(
     async (lang: string) => {
       if (startGuardRef.current) {
-        logDebug("start_skip_guard");
         return;
       }
       if (listeningRef.current) {
-        logDebug("start_skip_listening");
         return;
       }
       startGuardRef.current = true;
       isStoppedRef.current = false;
       try {
-        logDebug("start", `lang=${lang}`);
         const { token, region } = await getOrFetchToken();
-        logDebug("token_ok", `region=${region}`);
 
         if (isStoppedRef.current) return;
 
@@ -170,7 +141,6 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
             (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
               (navigator.userAgent.includes("Mac") &&
                 navigator.maxTouchPoints > 1)));
-        logDebug("device_check", `apple=${isAppleMobile ? "yes" : "no"}`);
 
         const resumeTimeoutMs = 4000;
         let resumeTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -184,12 +154,7 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
               );
             }),
           ]);
-          logDebug("audio_context_ready");
-        } catch (error) {
-          logDebug(
-            "audio_context_error",
-            error instanceof Error ? error.message : String(error),
-          );
+        } catch (_error) {
         } finally {
           if (resumeTimeout) clearTimeout(resumeTimeout);
         }
@@ -201,7 +166,6 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
             recognizerRunningRef.current = true;
           }
           setListening(true);
-          logDebug("resume", `lang=${lang}`);
           return;
         }
 
@@ -233,7 +197,6 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
 
         let audioConfig: SpeechSDK.AudioConfig;
         if (isAppleMobile) {
-          logDebug("getusermedia_request");
           try {
             if (!mediaStreamRef.current) {
               const gumTimeoutMs = 6000;
@@ -253,12 +216,7 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
             audioConfig = SpeechSDK.AudioConfig.fromStreamInput(
               mediaStreamRef.current,
             );
-            logDebug("getusermedia_ok");
           } catch (error) {
-            logDebug(
-              "getusermedia_err",
-              error instanceof Error ? error.message : String(error),
-            );
             throw error;
           }
         } else {
@@ -268,18 +226,6 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
           speechConfig,
           audioConfig,
         );
-
-        recognizer.sessionStarted = () => {
-          logDebug("session_started");
-        };
-
-        recognizer.speechStartDetected = () => {
-          logDebug("speech_start");
-        };
-
-        recognizer.speechEndDetected = () => {
-          logDebug("speech_end");
-        };
 
         recognizer.recognizing = (_s, e) => {
           if (!listeningRef.current || isStoppedRef.current) return;
@@ -297,7 +243,6 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
               setInterimTranscript("");
             }, 1400);
           }
-          logDebug("recognizing", e.result.text ?? "");
         };
 
         recognizer.recognized = (_s, e) => {
@@ -306,17 +251,12 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
           if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
             const text = e.result.text;
             if (text && text.trim().length > 0) {
-              console.log("✅ Final phrase:", text);
               onFinalTranscript(text);
-              // Не останавливаем здесь! Пусть родитель решит остановить,
-              // когда перейдет в статус 'thinking'.
             }
             clearPartialTimer();
             partialBufferRef.current = "";
             setInterimTranscript("");
-            logDebug("recognized", text ?? "");
           } else if (e.result.reason === SpeechSDK.ResultReason.NoMatch) {
-            logDebug("no_match");
             const fallbackText = partialBufferRef.current.trim();
             if (fallbackText) {
               onFinalTranscript(fallbackText);
@@ -329,10 +269,6 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
 
         recognizer.canceled = (_s, e) => {
           console.warn(`STT Canceled: ${e.reason}`);
-          logDebug(
-            "canceled",
-            `${e.reason}${e.errorDetails ? `: ${e.errorDetails}` : ""}`,
-          );
           if (e.reason === SpeechSDK.CancellationReason.Error) {
             void logSttError(
               "STT Canceled",
@@ -352,7 +288,6 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
         };
 
         recognizer.sessionStopped = () => {
-          logDebug("session_stopped");
           if (!isStoppedRef.current) {
             setListening(false);
           }
@@ -380,17 +315,8 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
         recognizerRef.current = recognizer;
         activeLangRef.current = lang;
         recognizerRunningRef.current = true;
-        logDebug("started", `lang=${lang}`);
       } catch (error) {
         console.error("STT Start Error:", error);
-        logDebug(
-          "start_error_full",
-          error instanceof Error ? error.message : "start failed",
-        );
-        logDebug(
-          "start_error",
-          error instanceof Error ? error.message : "start failed",
-        );
         void logSttError(
           "STT Start Error",
           error instanceof Error ? error.message : "Failed to start STT",
@@ -419,7 +345,6 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
       setInterimTranscript("");
       clearPartialTimer();
       partialBufferRef.current = "";
-      logDebug("stop", "pause_ios_keepalive");
       return;
     }
 
@@ -429,11 +354,9 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
     setInterimTranscript("");
     clearPartialTimer();
     partialBufferRef.current = "";
-    logDebug("stop", dispose ? "dispose" : "pause");
 
     if (recognizerRef.current) {
       const r = recognizerRef.current;
-      console.log("🛑 Stopping Azure STT...");
       r.stopContinuousRecognitionAsync(
         () => {
           if (dispose || !isAppleMobileRef.current) {
@@ -467,7 +390,6 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
         track.stop();
       }
       mediaStreamRef.current = null;
-      logDebug("media_stream_closed");
     }
   }, [clearPartialTimer]);
 
@@ -475,21 +397,12 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
     return () => stopListening(true);
   }, [stopListening]);
 
-  useEffect(() => {
-    logDebug(
-      "state",
-      `listening=${listeningRef.current} running=${recognizerRunningRef.current} stopped=${isStoppedRef.current}`,
-    );
-  }, [listening, logDebug]);
-
   return {
     listening,
     startListening,
     stopListening,
     interimTranscript,
     warmupAudio: resumeAudioContext,
-    debugLog,
-    clearDebug: () => setDebugLog([]),
     isAppleMobile: isAppleMobileRef.current,
     mediaStreamActive: Boolean(mediaStreamRef.current),
   };

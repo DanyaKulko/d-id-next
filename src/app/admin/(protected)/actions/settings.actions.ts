@@ -275,3 +275,26 @@ export async function saveAdminCredentialsAction(formData: FormData) {
   revalidatePath("/admin/settings/admin-credentials");
   return { ok: true };
 }
+
+export async function verifyAdminPasswordAction(formData: FormData) {
+  await requireAdmin();
+  const password = getString(formData.get("password"));
+  if (!password) {
+    return { ok: false, error: "Password is required" };
+  }
+
+  const admin = await prisma.user.findFirst({
+    where: { roles: { some: { role: "ADMIN" } } },
+  });
+
+  if (!admin) {
+    return { ok: false, error: "Admin user not found" };
+  }
+
+  const valid = await verifyPassword(admin.passwordHash, password);
+  if (!valid) {
+    return { ok: false, error: "Incorrect password" };
+  }
+
+  return { ok: true };
+}

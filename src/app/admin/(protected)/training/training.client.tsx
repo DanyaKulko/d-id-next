@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState, useTransition } from "react";
 import toast from "react-hot-toast";
 import { useAzureSTT } from "@/app/(client)/[avatarSlug]/_hooks/useAzureSTT";
+import { useDevMode } from "@/app/admin/(protected)/_components/dev-mode";
 import {
   deleteKnowledgeDocumentAction,
   saveManualTrainingAction,
@@ -41,6 +42,8 @@ export default function LearningClient({
   const [deleteCandidate, setDeleteCandidate] = useState<KnowledgeItem | null>(
     null,
   );
+  const { enabled: devModeEnabled } = useDevMode();
+  const canEditKnowledgeArchive = devModeEnabled;
 
   const handleDictationFinal = useCallback((text: string) => {
     setManualText((prev) => (prev ? `${prev.trim()} ${text}` : text));
@@ -177,7 +180,7 @@ export default function LearningClient({
               <input
                 type="checkbox"
                 checked={textBlogEnabled}
-                disabled={isToggling}
+                disabled={isToggling || !canEditKnowledgeArchive}
                 onChange={(e) => handleTextBlogToggle(e.target.checked)}
               />
               <span className="slider" />
@@ -251,7 +254,7 @@ export default function LearningClient({
                   type="button"
                   className="btn btn-primary"
                   onClick={() => handleToggleKnowledge(k, !k.isEnabled)}
-                  disabled={isSaving}
+                  disabled={isSaving || !canEditKnowledgeArchive}
                 >
                   {k.isEnabled ? "🚫 Disable" : "✅ Enable"}
                 </button>
@@ -259,6 +262,7 @@ export default function LearningClient({
                   type="button"
                   className="btn btn-danger"
                   onClick={() => handleDelete(k)}
+                  disabled={!canEditKnowledgeArchive}
                 >
                   🗑️ Delete
                 </button>

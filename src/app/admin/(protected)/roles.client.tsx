@@ -10,6 +10,7 @@ import {
     useTransition,
 } from "react";
 import toast from "react-hot-toast";
+import { useDevMode } from "@/app/admin/(protected)/_components/dev-mode";
 
 import {
     addAgentFromDidAction,
@@ -117,6 +118,7 @@ export default function RolesClient({
     const [isReordering, startReordering] = useTransition();
     const [draggedKey, setDraggedKey] = useState<AgentKey | null>(null);
     const [dragOverKey, setDragOverKey] = useState<AgentKey | null>(null);
+    const { enabled: devModeEnabled } = useDevMode();
 
     useEffect(() => {
         setAgents(initialAgents);
@@ -387,6 +389,11 @@ export default function RolesClient({
     };
 
     const handleRoleDrop = (targetKey: AgentKey, sourceKey?: string | null) => {
+        if (!devModeEnabled) {
+            setDraggedKey(null);
+            setDragOverKey(null);
+            return;
+        }
         const source = sourceKey?.trim() || draggedKey;
         if (!source || source === targetKey) {
             setDraggedKey(null);
@@ -419,25 +426,29 @@ export default function RolesClient({
                         key={agent.key}
                         type="button"
                         className={`role-tab ${activeAgentKey === agent.key ? "active" : ""} ${draggedKey === agent.key ? "is-dragging" : ""} ${dragOverKey === agent.key ? "is-drop-target" : ""}`}
-                        draggable={!isReordering}
+                        draggable={devModeEnabled && !isReordering}
                         onDragStart={(event) => {
+                            if (!devModeEnabled) return;
                             setDraggedKey(agent.key);
                             setDragOverKey(null);
                             event.dataTransfer.effectAllowed = "move";
                             event.dataTransfer.setData("text/plain", agent.key);
                         }}
                         onDragOver={(event) => {
+                            if (!devModeEnabled) return;
                             if (draggedKey === agent.key) return;
                             event.preventDefault();
                             setDragOverKey(agent.key);
                             event.dataTransfer.dropEffect = "move";
                         }}
                         onDragLeave={() => {
+                            if (!devModeEnabled) return;
                             if (dragOverKey === agent.key) {
                                 setDragOverKey(null);
                             }
                         }}
                         onDrop={(event) => {
+                            if (!devModeEnabled) return;
                             event.preventDefault();
                             handleRoleDrop(
                                 agent.key,
@@ -445,6 +456,7 @@ export default function RolesClient({
                             );
                         }}
                         onDragEnd={() => {
+                            if (!devModeEnabled) return;
                             setDraggedKey(null);
                             setDragOverKey(null);
                         }}
@@ -461,6 +473,7 @@ export default function RolesClient({
                   type="button"
                   className="add-role-tab"
                   onClick={openAddAgentModal}
+                  disabled={!devModeEnabled}
                 >
                   <span>➕</span> Add New Agent
                 </button>
@@ -487,6 +500,7 @@ export default function RolesClient({
                         onSync={syncFromDid}
                         isSaving={isSaving}
                         isSyncing={isSyncing}
+                        devModeEnabled={devModeEnabled}
                     />
                 </div>
             )}
@@ -753,6 +767,7 @@ type RoleContentProps = {
     onSync: () => void;
     isSaving: boolean;
     isSyncing: boolean;
+    devModeEnabled: boolean;
 };
 
 function RoleContent({
@@ -765,11 +780,13 @@ function RoleContent({
                          onSync,
                          isSaving,
                          isSyncing,
+                         devModeEnabled,
                      }: RoleContentProps) {
     const currentVoiceLanguage = (defaults?.voiceLanguage ?? "").trim() || "Multilingual";
     const voiceLanguageOptions = voiceLanguageSuggestions.includes(currentVoiceLanguage)
         ? voiceLanguageSuggestions
         : [currentVoiceLanguage, ...voiceLanguageSuggestions];
+    const isReadOnly = !devModeEnabled;
 
     return (
         <form className="section" onSubmit={onSubmit}>
@@ -812,7 +829,15 @@ function RoleContent({
                         step="1"
                         defaultValue={defaults?.mobileVideoOffsetPx ?? 0}
                         placeholder="0"
+                        disabled={isReadOnly}
                     />
+                    {isReadOnly && (
+                        <input
+                            type="hidden"
+                            name="mobileVideoOffsetPx"
+                            value={defaults?.mobileVideoOffsetPx ?? 0}
+                        />
+                    )}
                 </div>
             </div>
 
@@ -875,7 +900,15 @@ function RoleContent({
                     type="text"
                     defaultValue={defaults?.voiceId ?? ""}
                     placeholder="voice_neil_basic"
+                    disabled={isReadOnly}
                 />
+                {isReadOnly && (
+                    <input
+                        type="hidden"
+                        name="voiceId"
+                        value={defaults?.voiceId ?? ""}
+                    />
+                )}
             </div>
             <div className="input-group">
                 <label htmlFor="voiceLanguage">Voice Language</label>
@@ -883,6 +916,7 @@ function RoleContent({
                     id="voiceLanguage"
                     name="voiceLanguage"
                     defaultValue={currentVoiceLanguage}
+                    disabled={isReadOnly}
                 >
                     {voiceLanguageOptions.map((option) => (
                         <option key={option} value={option}>
@@ -890,6 +924,13 @@ function RoleContent({
                         </option>
                     ))}
                 </select>
+                {isReadOnly && (
+                    <input
+                        type="hidden"
+                        name="voiceLanguage"
+                        value={currentVoiceLanguage}
+                    />
+                )}
             </div>
             <div className="input-group">
                 <label htmlFor="llmModel">LLM Model</label>
@@ -897,6 +938,7 @@ function RoleContent({
                     id="llmModel"
                     name="llmModel"
                     defaultValue={defaults?.llmModel ?? "gpt-4o-mini"}
+                    disabled={isReadOnly}
                 >
                     {llmModelOptions.map((option) => (
                         <option key={option} value={option}>
@@ -904,6 +946,13 @@ function RoleContent({
                         </option>
                     ))}
                 </select>
+                {isReadOnly && (
+                    <input
+                        type="hidden"
+                        name="llmModel"
+                        value={defaults?.llmModel ?? "gpt-4o-mini"}
+                    />
+                )}
             </div>
             <div className="input-group">
                 <label htmlFor="llmTemplate">LLM Template</label>
@@ -911,6 +960,7 @@ function RoleContent({
                     id="llmTemplate"
                     name="llmTemplate"
                     defaultValue={defaults?.llmTemplate ?? "rag-ungrounded"}
+                    disabled={isReadOnly}
                 >
                     {llmTemplateOptions.map((option) => (
                         <option key={option} value={option}>
@@ -918,6 +968,13 @@ function RoleContent({
                         </option>
                     ))}
                 </select>
+                {isReadOnly && (
+                    <input
+                        type="hidden"
+                        name="llmTemplate"
+                        value={defaults?.llmTemplate ?? "rag-ungrounded"}
+                    />
+                )}
             </div>
             <div className="input-group">
                 <TooltipLabel
@@ -927,6 +984,7 @@ function RoleContent({
                 <select
                     name="personalityStyle"
                     defaultValue={normalizePersonalityStyle(defaults?.personalityStyle)}
+                    disabled={isReadOnly}
                 >
                     {personalityOptions.map((option) => (
                         <option key={option.value} value={option.value}>
@@ -934,6 +992,13 @@ function RoleContent({
                         </option>
                     ))}
                 </select>
+                {isReadOnly && (
+                    <input
+                        type="hidden"
+                        name="personalityStyle"
+                        value={normalizePersonalityStyle(defaults?.personalityStyle)}
+                    />
+                )}
             </div>
 
             <SectionTooltipTitle
@@ -948,12 +1013,12 @@ function RoleContent({
             <div className="input-group">
                 <label htmlFor="backgroundsEnabled">Enable Backgrounds</label>
                 <div className="toggle-row">
-                    <input
-                        id="backgroundsEnabled"
-                        name="backgroundsEnabled"
-                        type="checkbox"
-                        defaultChecked={defaults?.backgroundsEnabled ?? false}
-                    />
+                <input
+                    id="backgroundsEnabled"
+                    name="backgroundsEnabled"
+                    type="checkbox"
+                    defaultChecked={defaults?.backgroundsEnabled ?? false}
+                />
                     <span>Allow background selection on the main page</span>
                 </div>
             </div>
@@ -1035,7 +1100,7 @@ function RoleContent({
                     type="button"
                     className="btn btn-secondary"
                     onClick={onSync}
-                    disabled={isSyncing || isSaving}
+                    disabled={isSyncing || isSaving || !devModeEnabled}
                 >
                     {isSyncing ? "Syncing..." : "🔄 Sync from D-ID"}
                 </button>
@@ -1047,7 +1112,12 @@ function RoleContent({
                     Deleting this agent will permanently remove all its settings,
                     configurations, and data. This action cannot be undone.
                 </p>
-                <button type="button" className="btn btn-danger" onClick={onDelete}>
+                <button
+                    type="button"
+                    className="btn btn-danger"
+                    onClick={onDelete}
+                    disabled={!devModeEnabled}
+                >
                     🗑️ Delete This Agent
                 </button>
             </div>

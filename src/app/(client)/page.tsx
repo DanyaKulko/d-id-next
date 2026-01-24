@@ -23,7 +23,7 @@ export default async function Home() {
         <div className="na-container">
           <div className="na-header-content">
             <Link href="/" className="na-logo-text" aria-label="Neil Avatar">
-              <LottieLogo className="na-logo-anim" />
+              Neil Avatar
             </Link>
             <div className="na-header-title">
               <h1 className="na-title-display na-glow">
@@ -81,7 +81,11 @@ export default async function Home() {
         </div>
 
         <div className="na-brand-logo" aria-hidden="true">
-          <LottieLogo className="na-logo-anim na-logo-anim--footer" />
+          <LottieLogo
+            className="na-logo-anim na-logo-anim--footer"
+            // loop
+            playOnView
+          />
         </div>
       </main>
     </>

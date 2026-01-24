@@ -194,6 +194,16 @@ h3 {
   font-size: 14px;
 }
 
+.input-group input:disabled,
+.input-group select:disabled,
+textarea:disabled {
+  background: #f1f5f9;
+  color: #64748b;
+  border-color: #e2e8f0;
+  opacity: 1;
+  cursor: not-allowed;
+}
+
 .input-group input:focus,
 .input-group select:focus,
 .input-group textarea:focus {
@@ -338,6 +348,42 @@ textarea {
 .status-badge.disabled {
   background: #e2e8f0;
   color: #4a5568;
+}
+
+.devmode-fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 1100;
+  background: #0f172a;
+  color: #ffffff;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.35);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.devmode-fab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 48px rgba(15, 23, 42, 0.4);
+}
+
+.devmode-fab.active {
+  background: #16a34a;
+}
+
+.devmode-fab-icon {
+  font-size: 18px;
+}
+
+.devmode-fab-text {
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .tooltip-text {
