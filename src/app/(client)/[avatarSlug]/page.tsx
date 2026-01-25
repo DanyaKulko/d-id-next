@@ -5,6 +5,7 @@ import { AvatarPageClient } from "@/app/(client)/[avatarSlug]/page.client";
 import { findAgentByKey } from "@/lib/agents/agents.db";
 import { enforceClientAuth } from "@/lib/auth/client-access";
 import LottieLogo from "@/components/LottieLogo/LottieLogo";
+import ClientPreloader from "@/components/ClientPreloader/ClientPreloader";
 
 type AvatarPageProps = {
   params: Promise<{ avatarSlug: string }>;
@@ -24,6 +25,7 @@ export default async function AvatarPage({ params }: AvatarPageProps) {
 
   return (
     <>
+      <ClientPreloader minDurationMs={2000} />
       <header className="na-header">
         <div className="na-container">
             <div className="na-header-content">
@@ -57,8 +59,8 @@ export default async function AvatarPage({ params }: AvatarPageProps) {
         <div className="na-brand-logo" aria-hidden="true">
           <LottieLogo
             className="na-logo-anim na-logo-anim--footer"
-            // loop
-            playOnView
+            loop
+            // playOnView
           />
         </div>
       </main>

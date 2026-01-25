@@ -4,6 +4,7 @@ import Link from "next/link";
 import HomeMediaPrefetch from "@/components/HomeMediaPrefetch";
 import LottieLogo from "@/components/LottieLogo/LottieLogo";
 import UserGuideModal from "@/components/UserGuideModal/UserGuideModal";
+import ClientPreloader from "@/components/ClientPreloader/ClientPreloader";
 import { fetchHomeAgents } from "@/lib/agents/agents.db";
 import { enforceClientAuth } from "@/lib/auth/client-access";
 
@@ -17,6 +18,7 @@ export default async function Home() {
   );
   return (
     <>
+      <ClientPreloader />
       <UserGuideModal />
       <HomeMediaPrefetch urls={mediaUrls} />
       <header className="na-header">
@@ -83,8 +85,8 @@ export default async function Home() {
         <div className="na-brand-logo" aria-hidden="true">
           <LottieLogo
             className="na-logo-anim na-logo-anim--footer"
-            // loop
-            playOnView
+            loop
+            // playOnView
           />
         </div>
       </main>

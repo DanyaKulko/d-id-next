@@ -248,7 +248,7 @@ export default function LearningClient({
                     }
                   }}
                 >
-                  👁️ View / Edit
+                  👁️ View
                 </button>
                 <button
                   type="button"
