@@ -25,7 +25,7 @@ export default async function AvatarPage({ params }: AvatarPageProps) {
 
   return (
     <>
-      <ClientPreloader minDurationMs={2000} />
+      <ClientPreloader />
       <header className="na-header">
         <div className="na-container">
             <div className="na-header-content">

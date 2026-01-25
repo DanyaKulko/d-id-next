@@ -8,7 +8,7 @@ type ClientPreloaderProps = {
 };
 
 export default function ClientPreloader({
-  minDurationMs = 600,
+  minDurationMs = 2100,
 }: ClientPreloaderProps) {
   const [phase, setPhase] = useState<"visible" | "hiding" | "hidden">(
     "visible",
