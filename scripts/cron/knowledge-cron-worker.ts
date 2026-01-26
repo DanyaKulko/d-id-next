@@ -10,6 +10,7 @@ import {
     serializeDocumentIds,
 } from '@/lib/external-sources/documents';
 import { didService } from '@/lib/services/did.service';
+import {resolveBaseUrl} from "@/lib/http/base-url";
 
 // --- CONFIG ---
 const REDIS_URL = process.env.REDIS_URL || 'redis://redis:6379';
@@ -369,10 +370,15 @@ async function syncDocumentToDid(
                 .catch(e => console.warn("Old doc delete skipped:", e.message));
         }
 
+        const baseUrl = await resolveBaseUrl();
+
+        const webhookUrl = `${baseUrl}/api/webhooks/did/knowledge`;
+
         const result = await didService.createKnowledgeDocument(DID_KNOWLEDGE_BASE_ID!, {
             documentType: "text",
             source_url: publicUrl,
             title: `Text Blog (Part #${partNumber})`,
+            webhook: webhookUrl
         });
 
         const newDidId = (result as any)?.id || (result as any)?.documentId;

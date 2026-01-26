@@ -228,9 +228,10 @@ export default function LearningClient({
                 >
                   {!k.isEnabled
                     ? "Disabled"
-                    : k.status === "processing"
+                    : k.status.toLowerCase() === "processing"
                       ? "Training"
-                      : k.status === "error"
+                          // @ts-ignore
+                      : k.status.toLowerCase() === "failed"
                         ? "Error"
                         : "Active"}
                 </span>
