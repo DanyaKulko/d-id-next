@@ -105,21 +105,44 @@ interface ApiPost {
     updated_at?: string | null;
 }
 
-// --- ХЕЛПЕРЫ ---
+const decodeHtmlEntities = (value: string) => {
+    let text = value
+        .replace(/Ђ™/g, "'")
+        .replace(/â€™/g, "'")
+        .replace(/Ã¢â‚¬â„¢/g, "'");
 
-const decodeHtmlEntities = (value: string) =>
-    value
+    text = text
         .replace(/&nbsp;/gi, ' ')
         .replace(/&amp;/gi, '&')
         .replace(/&lt;/gi, '<')
         .replace(/&gt;/gi, '>')
         .replace(/&quot;/gi, '"')
-        .replace(/&#39;/gi, "'");
+        .replace(/&#39;/gi, "'")
+        .replace(/&rsquo;/gi, "'")
+        .replace(/&lsquo;/gi, "'")
+        .replace(/&rdquo;/gi, '"')
+        .replace(/&ldquo;/gi, '"')
+        .replace(/&mdash;/gi, '--')
+        .replace(/&ndash;/gi, '-');
+
+    return text;
+}
+
+const normalizeTypography = (value: string) => {
+    return value
+        .replace(/[\u2018\u2019]/g, "'")
+        .replace(/[\u201C\u201D]/g, '"')
+        .replace(/\u2013/g, "-")
+        .replace(/\u2014/g, "--")
+        .replace(/\u2026/g, "...");
+};
 
 const stripHtml = (value: string) => {
     if (!value) return '';
     const withoutTags = value.replace(/<[^>]+>/g, ' ');
-    return decodeHtmlEntities(withoutTags).replace(/\s+/g, ' ').trim();
+    const decoded = decodeHtmlEntities(withoutTags);
+    const normalized = normalizeTypography(decoded);
+    return normalized.replace(/\s+/g, ' ').trim();
 };
 
 const resolvePostDate = (post: ApiPost) =>
