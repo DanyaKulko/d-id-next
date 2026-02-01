@@ -4,6 +4,7 @@ import {
   chatAction,
   closeSessionAction,
   createSessionAction,
+  sendStreamScriptAction,
   submitAnswerAction,
   submitIceAction,
 } from "@/app/actions/agent.actions";
@@ -250,6 +251,21 @@ export const useAgent = (
     [agentId],
   );
 
+  const sendStreamScript = useCallback(
+    async (text: string) => {
+      if (!idsRef.current) {
+        return { success: false, error: "Not connected" };
+      }
+
+      return sendStreamScriptAction(agentId, {
+        streamId: idsRef.current.streamId,
+        sessionId: idsRef.current.sessionId,
+        text,
+      });
+    },
+    [agentId],
+  );
+
   const interrupt = useCallback(() => {
     if (
       dcRef.current &&
@@ -282,6 +298,7 @@ export const useAgent = (
     connect,
     disconnect,
     speak,
+    sendStreamScript,
     interrupt,
     status,
     isAgentSpeaking,

@@ -160,6 +160,30 @@ export const didService = {
     return data;
   },
 
+  async sendStreamScript(
+    agentId: string,
+    streamId: string,
+    sessionId: string | undefined,
+    text: string,
+  ) {
+    const payload: Record<string, unknown> = {
+      script: {
+        type: "text",
+        // provider: { type: "elevenlabs" },
+        input: text,
+      },
+    };
+    if (sessionId) {
+      payload.session_id = sessionId;
+    }
+
+    const { data } = await client.post(
+      `/agents/${agentId}/streams/${streamId}`,
+      payload,
+    );
+    return data;
+  },
+
   async closeSession(_agentId: string, _streamId: string) {
     // await client.delete(`/agents/${agentId}/streams/${streamId}`);
     return { status: "closed" };

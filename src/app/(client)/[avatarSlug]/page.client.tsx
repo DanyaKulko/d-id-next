@@ -55,13 +55,13 @@ const languages = [
 ];
 
 const greetingByLanguage: Record<string, string> = {
-    "en-US": "Hello!",
-    "hi-IN": "नमस्ते!",
-    "mr-IN": "नमस्कार!",
-    "es-ES": "¡Hola!",
-    "fr-FR": "Bonjour!",
-    "ru-RU": "Здравствуйте!",
-    "id-ID": "Halo!",
+    "en-US": "Hi. Let’s talk — ask me anything.",
+    "hi-IN": "नमस्ते। चलिए बात करते हैं — मुझसे कुछ भी पूछिए।",
+    "mr-IN": "नमस्कार. चला बोलूया — मला काहीही विचारा.",
+    "es-ES": "Hola. Hablemos — pregúntame lo que quieras.",
+    "fr-FR": "Bonjour. Parlons — demandez-moi ce que vous voulez.",
+    "ru-RU": "Привет. Давай поговорим — спрашивай что угодно.",
+    "id-ID": "Halo. Mari berbincang — tanyakan apa saja.",
 };
 
 export const AvatarPageClient = ({
@@ -259,6 +259,7 @@ export const AvatarPageClient = ({
         connect,
         disconnect,
         speak,
+        sendStreamScript,
         interrupt,
         status: connectionStatus,
         isAgentSpeaking,
@@ -749,7 +750,10 @@ export const AvatarPageClient = ({
             greetingStartedRef.current = false;
             // setTimeout(() => {
             setAgentStatus("thinking");
-            void speak(greetingByLanguage[language] ?? "Hello!", language).then(
+            void sendStreamScript(
+                greetingByLanguage[language] ??
+                "Hi. Let’s talk — ask me anything.",
+            ).then(
                 (res) => {
                     if (!res?.success) {
                         greetingPendingRef.current = false;
@@ -760,7 +764,7 @@ export const AvatarPageClient = ({
             );
             // }, 500);
         }
-    }, [connectionStatus, speak, language]);
+    }, [connectionStatus, sendStreamScript, language]);
 
     const handleMicEnable = useCallback(async () => {
         const ok = await requestMicrophoneAccess();
@@ -833,12 +837,12 @@ export const AvatarPageClient = ({
                         >
                             {isFullscreen ? (
                                 // biome-ignore lint/a11y/noSvgWithoutTitle: 1
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/>
                                 </svg>
                             ) : (
                                 // biome-ignore lint/a11y/noSvgWithoutTitle: 1
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
                                 </svg>
                             )}

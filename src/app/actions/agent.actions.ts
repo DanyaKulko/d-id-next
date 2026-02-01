@@ -17,6 +17,7 @@ import {
   closeSessionSchema,
   submitAnswerSchema,
   submitIceSchema,
+  streamScriptSchema,
 } from "@/lib/validators/agent.schema";
 
 const resolveDeviceLabel = (userAgent?: string | null) => {
@@ -399,6 +400,28 @@ export async function appendAssistantMessageAction(
     return { success: true };
   } catch (error) {
     return handleError(error, "Append Assistant Message");
+  }
+}
+
+export async function sendStreamScriptAction(
+  agentId: string,
+  payload: z.infer<typeof streamScriptSchema>,
+) {
+  const result = streamScriptSchema.safeParse(payload);
+  if (!result.success) return { success: false, error: "Validation failed" };
+
+  try {
+    await ensureClientAuth();
+    const { streamId, sessionId, text } = result.data;
+    const data = await didService.sendStreamScript(
+      agentId,
+      streamId,
+      sessionId,
+      text,
+    );
+    return { success: true, data };
+  } catch (error) {
+    return handleError(error, "Stream Script");
   }
 }
 

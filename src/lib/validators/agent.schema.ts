@@ -31,6 +31,12 @@ export const assistantMessageSchema = z.object({
   message: z.string().min(1),
 });
 
+export const streamScriptSchema = z.object({
+  streamId: z.string().min(1),
+  sessionId: z.string().optional(),
+  text: z.string().min(1),
+});
+
 export const closeSessionSchema = z.object({
   streamId: z.string().min(1),
   chatId: z.string().optional(),
