@@ -44,6 +44,9 @@ export default function LearningClient({
   );
   const { enabled: devModeEnabled } = useDevMode();
   const canEditKnowledgeArchive = devModeEnabled;
+  const notifyDevModeRequired = useCallback(() => {
+    toast.error("Enable Dev Mode to manage knowledge files");
+  }, []);
 
   const handleDictationFinal = useCallback((text: string) => {
     setManualText((prev) => (prev ? `${prev.trim()} ${text}` : text));
@@ -64,16 +67,22 @@ export default function LearningClient({
     });
   }, [knowledge, search]);
 
-  const visibleKnowledge = useMemo(() => {
-    if (textBlogEnabled) return filteredKnowledge;
-    return filteredKnowledge.filter((item) => item.sourceLabel !== "Text blog");
-  }, [filteredKnowledge, textBlogEnabled]);
+  const visibleKnowledge = filteredKnowledge;
 
   const handleDelete = (item: KnowledgeItem) => {
+    if (!canEditKnowledgeArchive) {
+      notifyDevModeRequired();
+      return;
+    }
     setDeleteCandidate(item);
   };
 
   const handleToggleKnowledge = (item: KnowledgeItem, enabled: boolean) => {
+    if (!canEditKnowledgeArchive) {
+      notifyDevModeRequired();
+      return;
+    }
+
     const formData = new FormData();
     formData.set("documentId", item.id);
     formData.set("enabled", String(enabled));
@@ -104,6 +113,11 @@ export default function LearningClient({
   };
 
   const confirmDelete = () => {
+    if (!canEditKnowledgeArchive) {
+      notifyDevModeRequired();
+      return;
+    }
+
     const item = deleteCandidate;
     if (!item) return;
     const formData = new FormData();
@@ -113,9 +127,7 @@ export default function LearningClient({
     startSaving(async () => {
       await deleteKnowledgeDocumentAction(formData)
         .then(() => {
-          setKnowledge((prev) =>
-            prev.filter((doc) => doc.id !== item.id),
-          );
+          setKnowledge((prev) => prev.filter((doc) => doc.id !== item.id));
           toast.success("Document deleted");
           setDeleteCandidate(null);
         })
@@ -124,30 +136,39 @@ export default function LearningClient({
   };
 
   const handleTextBlogToggle = (enabled: boolean) => {
+    if (!canEditKnowledgeArchive) {
+      notifyDevModeRequired();
+      return;
+    }
+
     const formData = new FormData();
     formData.set("enabled", String(enabled));
 
     startToggling(async () => {
-        try {
-          await toast.promise(
-            toggleTextBlogKnowledgeAction(formData),
-            {
-              loading: enabled
-                ? "Enabling blog knowledge..."
-                : "Disabling blog knowledge...",
-              success: enabled
-                ? "Blog knowledge enabled(uploading started)"
-                : "Blog knowledge disabled(removal started)",
-              error: "Failed to update blog knowledge setting",
-            },
-          );
+      try {
+        await toast.promise(toggleTextBlogKnowledgeAction(formData), {
+          loading: enabled
+            ? "Enabling blog knowledge..."
+            : "Disabling blog knowledge...",
+          success: enabled
+            ? "Blog knowledge enabled(uploading started)"
+            : "Blog knowledge disabled(removal started)",
+          error: "Failed to update blog knowledge setting",
+        });
 
         setTextBlogEnabled(enabled);
-        if (!enabled) {
-          setKnowledge((prev) =>
-            prev.filter((item) => item.sourceLabel !== "Text blog"),
-          );
-        }
+        setKnowledge((prev) =>
+          prev.map((item) => {
+            if (item.sourceLabel.trim().toLowerCase() !== "text blog") {
+              return item;
+            }
+            return {
+              ...item,
+              isEnabled: enabled,
+              status: enabled ? "processing" : item.status,
+            };
+          }),
+        );
       } catch (_error) {}
     });
   };
@@ -175,12 +196,19 @@ export default function LearningClient({
             avatar&apos;s responses
           </div>
 
-          <div className="toggle-container">
+          <div
+            className={`toggle-container ${!canEditKnowledgeArchive ? "is-readonly" : ""}`}
+          >
             <label className="toggle-switch">
               <input
                 type="checkbox"
                 checked={textBlogEnabled}
-                disabled={isToggling || !canEditKnowledgeArchive}
+                disabled={isToggling}
+                onClick={(event) => {
+                  if (canEditKnowledgeArchive) return;
+                  event.preventDefault();
+                  notifyDevModeRequired();
+                }}
                 onChange={(e) => handleTextBlogToggle(e.target.checked)}
               />
               <span className="slider" />
@@ -230,8 +258,7 @@ export default function LearningClient({
                     ? "Disabled"
                     : k.status.toLowerCase() === "processing"
                       ? "Training"
-                          // @ts-ignore
-                      : k.status.toLowerCase() === "failed"
+                      : k.status.toLowerCase() === "error"
                         ? "Error"
                         : "Active"}
                 </span>
@@ -253,17 +280,19 @@ export default function LearningClient({
                 </button>
                 <button
                   type="button"
-                  className="btn btn-primary"
+                  className={`btn btn-primary ${!canEditKnowledgeArchive ? "is-readonly" : ""}`}
                   onClick={() => handleToggleKnowledge(k, !k.isEnabled)}
-                  disabled={isSaving || !canEditKnowledgeArchive}
+                  disabled={isSaving}
+                  aria-disabled={!canEditKnowledgeArchive}
                 >
                   {k.isEnabled ? "🚫 Disable" : "✅ Enable"}
                 </button>
                 <button
                   type="button"
-                  className="btn btn-danger"
+                  className={`btn btn-danger ${!canEditKnowledgeArchive ? "is-readonly" : ""}`}
                   onClick={() => handleDelete(k)}
-                  disabled={!canEditKnowledgeArchive}
+                  disabled={isSaving}
+                  aria-disabled={!canEditKnowledgeArchive}
                 >
                   🗑️ Delete
                 </button>
