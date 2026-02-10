@@ -13,7 +13,6 @@ import { resolveBaseUrl } from "@/lib/http/base-url";
 import { didService } from "@/lib/services/did.service";
 import {
   defaultPersonalityStyle,
-  disabledKnowledgeDocsKey,
   getString,
   manualTrainingDocKey,
   manualTrainingFileKey,
@@ -46,64 +45,35 @@ const matchesDidDocumentId = (value: string, candidate: string) =>
   value === candidate ||
   normalizeDidDocumentId(value) === normalizeDidDocumentId(candidate);
 
-const parseDisabledDocIds = (value?: string | null) => {
-  if (!value) return [];
-  try {
-    const parsed = JSON.parse(value);
-    if (Array.isArray(parsed)) {
-      return parsed.map((entry) => String(entry ?? "").trim()).filter(Boolean);
-    }
-  } catch {
-    // ignore parse errors
-  }
-  const trimmed = value.trim();
-  return trimmed ? [trimmed] : [];
-};
-
-const persistDisabledDocIds = async (ids: string[]) => {
-  if (ids.length === 0) {
-    await prisma.appSetting.deleteMany({
-      where: { key: disabledKnowledgeDocsKey },
-    });
-    return;
-  }
-  await prisma.appSetting.upsert({
-    where: { key: disabledKnowledgeDocsKey },
-    update: { value: JSON.stringify(ids) },
-    create: { key: disabledKnowledgeDocsKey, value: JSON.stringify(ids) },
-  });
-};
-
-const collectEnabledDocIds = (
-  docs: { documentId: string | null; id: string }[],
-  disabled: Set<string>,
-) => {
-  return docs
-    .map((doc) => doc.documentId)
-    .filter((docId): docId is string => Boolean(docId))
-    .filter((docId) => {
-      const normalized = normalizeDidDocumentId(docId);
-      return !disabled.has(docId) && !disabled.has(normalized);
-    });
-};
-
-const updateExternalSourceDocIds = async (
-  kind: "TEXT" | "VIDEO",
-  disabled: Set<string>,
-) => {
+const updateExternalSourceDocIds = async (kind: "TEXT" | "VIDEO") => {
   const sourceLabel = kind === "TEXT" ? textBlogSource : videoTranscriptsSource;
   const docs = await prisma.knowledgeDocuments.findMany({
-    where: { source: { equals: sourceLabel, mode: "insensitive" } },
-    select: { id: true, documentId: true },
+    where: {
+      source: { equals: sourceLabel, mode: "insensitive" },
+      isEnabled: true,
+      documentId: { not: null },
+    },
+    select: { documentId: true },
     orderBy: { createdAt: "asc" },
   });
-  const enabledDocIds = collectEnabledDocIds(docs, disabled);
+  const enabledDocIds: string[] = [];
+  const seenNormalized = new Set<string>();
+  for (const doc of docs) {
+    if (!doc.documentId) continue;
+    const normalized = normalizeDidDocumentId(doc.documentId);
+    if (seenNormalized.has(normalized)) continue;
+    seenNormalized.add(normalized);
+    enabledDocIds.push(doc.documentId);
+  }
+  const data: { documentId: string | null; filePath?: string | null } = {
+    documentId: serializeDocumentIds(enabledDocIds),
+  };
+  if (enabledDocIds.length === 0) {
+    data.filePath = null;
+  }
   await prisma.externalSource.updateMany({
     where: { kind },
-    data: {
-      documentId:
-        enabledDocIds.length > 0 ? JSON.stringify(enabledDocIds) : null,
-    },
+    data,
   });
 };
 
@@ -247,6 +217,7 @@ export async function saveManualTrainingAction(formData: FormData) {
         documentId: String(docId),
         documentUrl: `${baseUrl}${publicPath}`,
         status: "PROCESSING",
+        isEnabled: true,
       },
     });
   }
@@ -269,7 +240,7 @@ export async function toggleTextBlogKnowledgeAction(formData: FormData) {
   });
 
   const knowledgeBaseId = process.env.DID_KNOWLEDGE_BASE_ID ?? "";
-  const [textSource, localDocs, disabledSetting] = await Promise.all([
+  const [textSource, localDocs] = await Promise.all([
     prisma.externalSource.findUnique({ where: { kind: "TEXT" } }),
     prisma.knowledgeDocuments.findMany({
       where: {
@@ -281,42 +252,40 @@ export async function toggleTextBlogKnowledgeAction(formData: FormData) {
         documentId: true,
         documentUrl: true,
         source: true,
+        isEnabled: true,
       },
     }),
-    prisma.appSetting.findUnique({ where: { key: disabledKnowledgeDocsKey } }),
   ]);
-  const disabled = new Set(parseDisabledDocIds(disabledSetting?.value));
 
   if (!enabled) {
-    const docIds = new Set<string>();
+    const docIdsToDelete = new Set<string>();
     for (const docId of parseStoredDocumentIds(
       textSource?.documentId ?? null,
     )) {
       if (!docId) continue;
-      docIds.add(docId);
-      docIds.add(normalizeDidDocumentId(docId));
+      docIdsToDelete.add(docId);
+      docIdsToDelete.add(normalizeDidDocumentId(docId));
     }
     for (const doc of localDocs) {
       if (!doc.documentId) continue;
-      docIds.add(doc.documentId);
-      docIds.add(normalizeDidDocumentId(doc.documentId));
+      docIdsToDelete.add(doc.documentId);
+      docIdsToDelete.add(normalizeDidDocumentId(doc.documentId));
     }
 
-    if (knowledgeBaseId && docIds.size > 0) {
-      for (const docId of docIds) {
+    if (knowledgeBaseId && docIdsToDelete.size > 0) {
+      for (const docId of docIdsToDelete) {
         await withDidLogging("Delete Knowledge Document", () =>
           didService.deleteKnowledgeDocument(knowledgeBaseId, docId),
         ).catch(() => undefined);
       }
     }
 
-    for (const doc of localDocs) {
-      disabled.add(doc.id);
-      if (doc.documentId) {
-        disabled.add(doc.documentId);
-        disabled.add(normalizeDidDocumentId(doc.documentId));
-      }
-    }
+    await prisma.knowledgeDocuments.updateMany({
+      where: {
+        source: { equals: textBlogSource, mode: "insensitive" },
+      },
+      data: { isEnabled: false },
+    });
   } else {
     if (!knowledgeBaseId) {
       throw new Error("DID_KNOWLEDGE_BASE_ID is missing");
@@ -326,18 +295,16 @@ export async function toggleTextBlogKnowledgeAction(formData: FormData) {
     const webhookUrl = `${baseUrl}/api/webhooks/did/knowledge`;
 
     for (const doc of localDocs) {
-      const docId = doc.documentId;
-      const isDisabled =
-        disabled.has(doc.id) ||
-        Boolean(
-          docId &&
-            (disabled.has(docId) ||
-              disabled.has(normalizeDidDocumentId(docId))),
-        );
-      if (!isDisabled) continue;
+      if (doc.isEnabled) continue;
 
       const sourceUrl = doc.documentUrl;
-      if (!sourceUrl) continue;
+      if (!sourceUrl) {
+        await prisma.knowledgeDocuments.update({
+          where: { id: doc.id },
+          data: { status: "FAILED" },
+        });
+        continue;
+      }
 
       const created = await withDidLogging("Create Knowledge Document", () =>
         didService.createKnowledgeDocument(knowledgeBaseId, {
@@ -351,30 +318,22 @@ export async function toggleTextBlogKnowledgeAction(formData: FormData) {
         (created as Record<string, unknown>)?.id ??
         (created as Record<string, unknown>)?.document_id ??
         (created as Record<string, unknown>)?.documentId;
+      if (!newDocId) {
+        throw new Error("D-ID did not return document id");
+      }
 
       await prisma.knowledgeDocuments.update({
         where: { id: doc.id },
         data: {
-          documentId: newDocId ? String(newDocId) : doc.documentId,
+          documentId: String(newDocId),
           status: "PROCESSING",
+          isEnabled: true,
         },
       });
-
-      disabled.delete(doc.id);
-      if (docId) {
-        disabled.delete(docId);
-        disabled.delete(normalizeDidDocumentId(docId));
-      }
-      if (newDocId) {
-        const resolved = String(newDocId);
-        disabled.delete(resolved);
-        disabled.delete(normalizeDidDocumentId(resolved));
-      }
     }
   }
 
-  await persistDisabledDocIds(Array.from(disabled));
-  await updateExternalSourceDocIds("TEXT", disabled);
+  await updateExternalSourceDocIds("TEXT");
 
   revalidatePath("/admin/training");
   revalidatePath("/admin/training/archive");
@@ -395,15 +354,11 @@ export async function deleteKnowledgeDocumentAction(formData: FormData) {
     ? normalizeKnowledgeSource(sourceLabel)
     : "";
 
-  const [manualDoc, manualFile, externalSources, disabledSetting] =
-    await Promise.all([
-      prisma.appSetting.findUnique({ where: { key: manualTrainingDocKey } }),
-      prisma.appSetting.findUnique({ where: { key: manualTrainingFileKey } }),
-      prisma.externalSource.findMany(),
-      prisma.appSetting.findUnique({
-        where: { key: disabledKnowledgeDocsKey },
-      }),
-    ]);
+  const [manualDoc, manualFile, externalSources] = await Promise.all([
+    prisma.appSetting.findUnique({ where: { key: manualTrainingDocKey } }),
+    prisma.appSetting.findUnique({ where: { key: manualTrainingFileKey } }),
+    prisma.externalSource.findMany(),
+  ]);
 
   const textSource = externalSources.find((item) => item.kind === "TEXT");
   const videoSource = externalSources.find((item) => item.kind === "VIDEO");
@@ -442,13 +397,23 @@ export async function deleteKnowledgeDocumentAction(formData: FormData) {
       })
     : [];
 
-  const localDoc = localDocs[0] ?? null;
-  const didDocumentId = localDoc?.documentId ?? documentId;
+  const didDocumentIdsToDelete = new Set<string>();
+  if (documentId) {
+    didDocumentIdsToDelete.add(documentId);
+    didDocumentIdsToDelete.add(normalizeDidDocumentId(documentId));
+  }
+  for (const localDoc of localDocs) {
+    if (!localDoc.documentId) continue;
+    didDocumentIdsToDelete.add(localDoc.documentId);
+    didDocumentIdsToDelete.add(normalizeDidDocumentId(localDoc.documentId));
+  }
 
-  if (knowledgeBaseId && didDocumentId) {
-    await withDidLogging("Delete Knowledge Document", () =>
-      didService.deleteKnowledgeDocument(knowledgeBaseId, didDocumentId),
-    ).catch(() => undefined);
+  if (knowledgeBaseId && didDocumentIdsToDelete.size > 0) {
+    for (const didDocumentId of didDocumentIdsToDelete) {
+      await withDidLogging("Delete Knowledge Document", () =>
+        didService.deleteKnowledgeDocument(knowledgeBaseId, didDocumentId),
+      ).catch(() => undefined);
+    }
   }
 
   if (isManual) {
@@ -467,33 +432,6 @@ export async function deleteKnowledgeDocumentAction(formData: FormData) {
       },
     });
   } else if (isText || isVideo) {
-    const sourceRow = isText ? textSource : videoSource;
-    if (sourceRow?.id) {
-      const sourceDocIds = isText ? textSourceDocIds : videoSourceDocIds;
-      const removableDocIds = new Set<string>();
-      if (documentId) {
-        removableDocIds.add(documentId);
-        removableDocIds.add(normalizeDidDocumentId(documentId));
-      }
-      for (const doc of localDocs) {
-        if (!doc.documentId) continue;
-        removableDocIds.add(doc.documentId);
-        removableDocIds.add(normalizeDidDocumentId(doc.documentId));
-      }
-      const nextDocIds = sourceDocIds.filter(
-        (sourceDocId) =>
-          !Array.from(removableDocIds).some((removableDocId) =>
-            matchesDidDocumentId(sourceDocId, removableDocId),
-          ),
-      );
-      await prisma.externalSource.update({
-        where: { id: sourceRow.id },
-        data: {
-          documentId: serializeDocumentIds(nextDocIds),
-          filePath: nextDocIds.length > 0 ? sourceRow.filePath : null,
-        },
-      });
-    }
     if (localDocs.length > 0) {
       await prisma.processedPost.updateMany({
         where: {
@@ -509,6 +447,12 @@ export async function deleteKnowledgeDocumentAction(formData: FormData) {
         where: { OR: [{ documentId }, { id: documentId }] },
       });
     }
+    if (isText) {
+      await updateExternalSourceDocIds("TEXT");
+    }
+    if (isVideo) {
+      await updateExternalSourceDocIds("VIDEO");
+    }
   } else if (documentId) {
     if (localDocs.length > 0) {
       await prisma.processedPost.updateMany({
@@ -521,20 +465,6 @@ export async function deleteKnowledgeDocumentAction(formData: FormData) {
     await prisma.knowledgeDocuments.deleteMany({
       where: { OR: [{ documentId }, { id: documentId }] },
     });
-  }
-
-  if (documentId) {
-    const disabled = new Set(parseDisabledDocIds(disabledSetting?.value));
-    disabled.delete(documentId);
-    disabled.delete(normalizeDidDocumentId(documentId));
-    for (const doc of localDocs) {
-      disabled.delete(doc.id);
-      if (doc.documentId) {
-        disabled.delete(doc.documentId);
-        disabled.delete(normalizeDidDocumentId(doc.documentId));
-      }
-    }
-    await persistDisabledDocIds(Array.from(disabled));
   }
 
   revalidatePath("/admin/training");
@@ -552,11 +482,6 @@ export async function toggleKnowledgeDocumentEnabledAction(formData: FormData) {
     throw new Error("Document id is required");
   }
 
-  const [disabledSetting] = await Promise.all([
-    prisma.appSetting.findUnique({ where: { key: disabledKnowledgeDocsKey } }),
-  ]);
-  const disabled = new Set(parseDisabledDocIds(disabledSetting?.value));
-
   const localDoc = await prisma.knowledgeDocuments.findFirst({
     where: { OR: [{ id: documentId }, { documentId }] },
   });
@@ -566,17 +491,8 @@ export async function toggleKnowledgeDocumentEnabledAction(formData: FormData) {
   }
 
   const knowledgeBaseId = process.env.DID_KNOWLEDGE_BASE_ID ?? "";
-  const baseUrl = await resolveBaseUrl();
 
   if (enabled) {
-    disabled.delete(documentId);
-    disabled.delete(normalizeDidDocumentId(documentId));
-    if (localDoc.id) disabled.delete(localDoc.id);
-    if (localDoc.documentId) {
-      disabled.delete(localDoc.documentId);
-      disabled.delete(normalizeDidDocumentId(localDoc.documentId));
-    }
-
     if (!knowledgeBaseId) {
       throw new Error("DID_KNOWLEDGE_BASE_ID is missing");
     }
@@ -586,6 +502,7 @@ export async function toggleKnowledgeDocumentEnabledAction(formData: FormData) {
       throw new Error("Document URL is missing");
     }
 
+    const baseUrl = await resolveBaseUrl();
     const webhookUrl = `${baseUrl}/api/webhooks/did/knowledge`;
     const created = await withDidLogging("Create Knowledge Document", () =>
       didService.createKnowledgeDocument(knowledgeBaseId, {
@@ -600,40 +517,38 @@ export async function toggleKnowledgeDocumentEnabledAction(formData: FormData) {
       (created as Record<string, unknown>)?.id ??
       (created as Record<string, unknown>)?.document_id ??
       (created as Record<string, unknown>)?.documentId;
+    if (!newDocId) {
+      throw new Error("D-ID did not return document id");
+    }
 
     await prisma.knowledgeDocuments.update({
       where: { id: localDoc.id },
       data: {
-        documentId: newDocId ? String(newDocId) : localDoc.documentId,
+        documentId: String(newDocId),
         status: "PROCESSING",
+        isEnabled: true,
       },
     });
 
     if (localDoc.source === manualTrainingSource) {
-      if (newDocId) {
-        await prisma.appSetting.upsert({
-          where: { key: manualTrainingDocKey },
-          update: { value: String(newDocId) },
-          create: { key: manualTrainingDocKey, value: String(newDocId) },
-        });
-      }
+      await prisma.appSetting.upsert({
+        where: { key: manualTrainingDocKey },
+        update: { value: String(newDocId) },
+        create: { key: manualTrainingDocKey, value: String(newDocId) },
+      });
     }
   } else {
-    disabled.add(documentId);
-    if (localDoc.documentId) {
-      disabled.add(localDoc.documentId);
-      disabled.add(normalizeDidDocumentId(localDoc.documentId));
-    }
-    if (localDoc.id) {
-      disabled.add(localDoc.id);
-    }
-
     const localDidDocumentId = localDoc.documentId;
     if (knowledgeBaseId && localDidDocumentId) {
       await withDidLogging("Delete Knowledge Document", () =>
         didService.deleteKnowledgeDocument(knowledgeBaseId, localDidDocumentId),
       ).catch(() => undefined);
     }
+
+    await prisma.knowledgeDocuments.update({
+      where: { id: localDoc.id },
+      data: { isEnabled: false },
+    });
 
     if (localDoc.source === manualTrainingSource) {
       await prisma.appSetting.deleteMany({
@@ -642,13 +557,11 @@ export async function toggleKnowledgeDocumentEnabledAction(formData: FormData) {
     }
   }
 
-  await persistDisabledDocIds(Array.from(disabled));
-
   if (localDoc.source === textBlogSource) {
-    await updateExternalSourceDocIds("TEXT", disabled);
+    await updateExternalSourceDocIds("TEXT");
   }
   if (localDoc.source === videoTranscriptsSource) {
-    await updateExternalSourceDocIds("VIDEO", disabled);
+    await updateExternalSourceDocIds("VIDEO");
   }
 
   if (!enabled && localDoc.source === manualTrainingSource) {

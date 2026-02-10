@@ -111,10 +111,9 @@ export async function POST(request: Request) {
 
   const expectedDocIdBySourceKey = new Map<string, string[]>();
   if (manualDoc?.value) {
-    expectedDocIdBySourceKey.set(
-      manualTrainingSource.toLowerCase(),
-      [manualDoc.value],
-    );
+    expectedDocIdBySourceKey.set(manualTrainingSource.toLowerCase(), [
+      manualDoc.value,
+    ]);
   }
   if (textDoc?.documentId) {
     expectedDocIdBySourceKey.set(
@@ -160,7 +159,7 @@ export async function POST(request: Request) {
   });
 
   const existingBySource =
-    !existing && knownSources.has(sourceKey)
+    !existing && sourceKey === manualTrainingSource.toLowerCase()
       ? await prisma.knowledgeDocuments.findFirst({
           where: { source: canonicalSource },
         })
@@ -173,6 +172,7 @@ export async function POST(request: Request) {
         status,
         documentUrl:
           typeof documentUrl === "string" ? documentUrl : existing.documentUrl,
+        isEnabled: true,
       },
     });
   } else if (existingBySource) {
@@ -186,6 +186,7 @@ export async function POST(request: Request) {
             ? documentUrl
             : existingBySource.documentUrl,
         source: canonicalSource,
+        isEnabled: true,
       },
     });
   } else {
@@ -195,11 +196,12 @@ export async function POST(request: Request) {
         documentId: String(documentId),
         documentUrl: typeof documentUrl === "string" ? documentUrl : null,
         status,
+        isEnabled: true,
       },
     });
   }
 
-  if (knownSources.has(sourceKey)) {
+  if (sourceKey === manualTrainingSource.toLowerCase()) {
     await prisma.knowledgeDocuments.deleteMany({
       where: {
         source: { equals: canonicalSource, mode: "insensitive" },

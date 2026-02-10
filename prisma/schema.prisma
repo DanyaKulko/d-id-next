@@ -244,6 +244,7 @@ model KnowledgeDocuments {
   documentId  String?
   documentUrl String?
   status      KnowledgeDocumentStatus @default(PROCESSING)
+  isEnabled   Boolean                 @default(true)
 
   charCount Int     @default(0)
   isFull    Boolean @default(false)

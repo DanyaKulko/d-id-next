@@ -19,7 +19,6 @@ export const manualTrainingDocKey = "manualTrainingDocId";
 export const manualTrainingFileKey = "manualTrainingFilePath";
 export const authRequiredKey = "requireAuthentication";
 export const textBlogEnabledKey = "textBlogEnabled";
-export const disabledKnowledgeDocsKey = "disabledKnowledgeDocs";
 export const manualTrainingSource = "Manual training";
 export const textBlogSource = "Text blog";
 export const videoTranscriptsSource = "Video transcripts";
@@ -57,9 +56,7 @@ export const formatSafetyRules = (rules: string) => {
 export const splitSafetyRulesFromPrompt = (prompt: string) => {
   const trimmed = prompt.trim();
   if (!trimmed) return { prompt: "", safetyRules: "" };
-  const match = trimmed.match(
-    /(?:^|\n)\s*safety rules\s*:?\s*(?:\n|$)/i,
-  );
+  const match = trimmed.match(/(?:^|\n)\s*safety rules\s*:?\s*(?:\n|$)/i);
   if (!match || typeof match.index !== "number") {
     return { prompt: trimmed, safetyRules: "" };
   }

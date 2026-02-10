@@ -91,7 +91,6 @@ const manualTrainingKey = "manualTrainingText";
 const manualTrainingDocKey = "manualTrainingDocId";
 const authRequiredKey = "requireAuthentication";
 const textBlogEnabledKey = "textBlogEnabled";
-const disabledKnowledgeDocsKey = "disabledKnowledgeDocs";
 const manualTrainingSource = "Manual training";
 const textBlogSource = "Text blog";
 const videoTranscriptsSource = "Video transcripts";
@@ -107,10 +106,6 @@ Always:
 
 const normalizeDidDocumentId = (value: string) =>
   value.includes("#") ? (value.split("#").pop() ?? value) : value;
-
-const matchesDidDocumentId = (value: string, candidate: string) =>
-  value === candidate ||
-  normalizeDidDocumentId(value) === normalizeDidDocumentId(candidate);
 
 const isCookieLikeValue = (value: string) => {
   const lower = value.toLowerCase();
@@ -212,46 +207,15 @@ export async function fetchUsers(): Promise<UserRow[]> {
 
 export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
   const knowledgeBaseId = process.env.DID_KNOWLEDGE_BASE_ID ?? "";
-  const [manualDoc, externalSources, disabledDocsSetting] = await Promise.all([
+  const [manualDoc, externalSources] = await Promise.all([
     prisma.appSetting.findUnique({ where: { key: manualTrainingDocKey } }),
     prisma.externalSource.findMany(),
-    prisma.appSetting.findUnique({ where: { key: disabledKnowledgeDocsKey } }),
   ]);
 
   const textSource = externalSources.find((item) => item.kind === "TEXT");
   const videoSource = externalSources.find((item) => item.kind === "VIDEO");
   const textDocIds = parseStoredDocumentIds(textSource?.documentId ?? null);
   const videoDocIds = parseStoredDocumentIds(videoSource?.documentId ?? null);
-  const disabledDocIds = new Set<string>();
-  if (disabledDocsSetting?.value) {
-    try {
-      const parsed = JSON.parse(disabledDocsSetting.value);
-      if (Array.isArray(parsed)) {
-        for (const entry of parsed) {
-          if (entry) {
-            const value = String(entry);
-            disabledDocIds.add(value);
-            disabledDocIds.add(normalizeDidDocumentId(value));
-          }
-        }
-      }
-    } catch {
-      const trimmed = disabledDocsSetting.value.trim();
-      if (trimmed) {
-        disabledDocIds.add(trimmed);
-        disabledDocIds.add(normalizeDidDocumentId(trimmed));
-      }
-    }
-  }
-
-  const isDocDisabled = (doc: { id?: string | null; documentId?: string | null }) => {
-    if (doc.id && disabledDocIds.has(doc.id)) return true;
-    if (doc.documentId) {
-      if (disabledDocIds.has(doc.documentId)) return true;
-      if (disabledDocIds.has(normalizeDidDocumentId(doc.documentId))) return true;
-    }
-    return false;
-  };
 
   const knownDocIdMap = new Map<string, string>();
   const registerDocId = (docId: string, label: string) => {
@@ -314,6 +278,7 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
       await prisma.knowledgeDocuments.deleteMany({
         where: {
           source: { equals: manualTrainingSource, mode: "insensitive" },
+          isEnabled: true,
           documentId: { notIn: manualDocIds },
         },
       });
@@ -322,6 +287,7 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
       await prisma.knowledgeDocuments.deleteMany({
         where: {
           source: { equals: textBlogSource, mode: "insensitive" },
+          isEnabled: true,
           documentId: { notIn: textDocIds },
         },
       });
@@ -330,6 +296,7 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
       await prisma.knowledgeDocuments.deleteMany({
         where: {
           source: { equals: videoTranscriptsSource, mode: "insensitive" },
+          isEnabled: true,
           documentId: { notIn: videoDocIds },
         },
       });
@@ -352,7 +319,7 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
             ? "error"
             : "processing",
       url: doc.documentUrl ?? undefined,
-      isEnabled: !isDocDisabled(doc),
+      isEnabled: doc.isEnabled,
     }));
   }
 
@@ -411,7 +378,9 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
         const expectedDocIds = expectedDocIdBySourceKey.get(titleKey);
 
         if (expectedDocIds && !expectedDocIds.has(docId)) {
-          return null;
+          if (!local || local.isEnabled) {
+            return null;
+          }
         }
 
         const sourceLabel =
@@ -436,7 +405,7 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
             doc.url ??
             doc.document_url ??
             doc.documentUrl,
-          isEnabled: local ? !isDocDisabled(local) : !disabledDocIds.has(docId),
+          isEnabled: local?.isEnabled ?? true,
         };
       })
       .filter((item): item is KnowledgeItem => item !== null);
@@ -454,7 +423,8 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
           expectedDocIds &&
           doc.documentId &&
           !expectedDocIds.has(doc.documentId) &&
-          !expectedDocIds.has(normalizeDidDocumentId(doc.documentId))
+          !expectedDocIds.has(normalizeDidDocumentId(doc.documentId)) &&
+          doc.isEnabled
         ) {
           return null;
         }
@@ -471,7 +441,7 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
                 ? "error"
                 : "processing",
           url: doc.documentUrl ?? undefined,
-          isEnabled: !isDocDisabled(doc),
+          isEnabled: doc.isEnabled,
         };
       })
       .filter((item): item is KnowledgeItem => Boolean(item));
@@ -510,7 +480,7 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
             ? "error"
             : "processing",
       url: doc.documentUrl ?? undefined,
-      isEnabled: !isDocDisabled(doc),
+      isEnabled: doc.isEnabled,
     }));
   }
 }
