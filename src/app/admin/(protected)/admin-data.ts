@@ -401,10 +401,10 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
           status:
             statusMap[String(doc.status ?? "").toLowerCase()] ?? "processing",
           url:
+            doc.documentUrl ??
             local?.documentUrl ??
             doc.url ??
-            doc.document_url ??
-            doc.documentUrl,
+            doc.document_url,
           isEnabled: local?.isEnabled ?? true,
         };
       })
