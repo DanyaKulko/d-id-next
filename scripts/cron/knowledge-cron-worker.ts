@@ -51,6 +51,7 @@ Response format:
 — Clean, classic Markdown.
 — The text must be self-contained and read as a coherent line of reasoning, even if the source consisted of fragments.
 — Output only the final processed text. No comments, no notes like “removed/edited,” no explanations of the process. No additional headings such as “Here is the result” — only the text itself.
+— The final text must not exceed 2500 characters including spaces.
 </response_format>
 
 <warnings>  
@@ -68,13 +69,14 @@ Additionally, for video and audio transcriptions, remove:
 — Timecodes, timestamps, segment numbers.
 — Any references to the recording/filming process: “I’m filming,” “camera,” “microphone,” “I’ll record,” “on camera,” “you see,” “listen.”
 — Speech noise and fillers: “uh,” “um,” “like,” false starts, self-corrections, stutters, placeholder phrases.
-— Technical speech-recognition notes: [laughter], [noise], [pause], [inaudible] (unless they are critical to meaning or humor). </warnings>
+— Technical speech-recognition notes: [laughter], [noise], [pause], [inaudible] (unless they are critical to meaning or humor).  
+</warnings>
 
 <context>  
 We are creating a digital copy of the personality Anil (Neil) Marathe. Our task is to process his materials (written blogs and video subtitles) and turn them into high-quality training data for his digital copy in the form of an AI avatar.
 
-You are an editor and preprocessor of training data. Your task is to transform raw material into clean, coherent, self-contained first-person text suitable for training an LLM model that accurately reproduces Neil’s personality, thinking style, tone, humor, mannerisms, and personal observations. </context>
-`;
+You are an editor and preprocessor of training data. Your task is to transform raw material into clean, coherent, self-contained first-person text suitable for training an LLM model that accurately reproduces Neil’s personality, thinking style, tone, humor, mannerisms, and personal observations.  
+</context>`;
 
 const redis = new IORedis(REDIS_URL, { maxRetriesPerRequest: null });
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
