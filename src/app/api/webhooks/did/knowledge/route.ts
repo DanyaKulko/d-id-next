@@ -26,6 +26,19 @@ const mapStatus = (value?: string) => {
   }
 };
 
+const resolveDocumentUrl = (
+  incoming: unknown,
+  current: string | null,
+): string | null => {
+  if (typeof incoming !== "string") return current;
+  const trimmed = incoming.trim();
+  if (!trimmed) return current;
+  if (trimmed.startsWith("s3://")) {
+    return current;
+  }
+  return trimmed;
+};
+
 const normalizeDidDocumentId = (value: string) =>
   value.includes("#") ? (value.split("#").pop() ?? value) : value;
 
@@ -73,6 +86,9 @@ export async function POST(request: Request) {
   if (!documentId) {
     return NextResponse.json({ error: "Missing document id" }, { status: 400 });
   }
+  const incomingDocumentId = String(documentId);
+  const normalizedIncomingDocumentId =
+    normalizeDidDocumentId(incomingDocumentId);
 
   const title =
     record.title ??
@@ -136,7 +152,7 @@ export async function POST(request: Request) {
   const expectedDocIds = expectedDocIdBySourceKey.get(sourceKey);
   if (expectedDocIds && expectedDocIds.length > 0) {
     const matches = expectedDocIds.some((docId) =>
-      matchesDidDocumentId(String(documentId), docId),
+      matchesDidDocumentId(incomingDocumentId, docId),
     );
     if (!matches) {
       return NextResponse.json({ ok: true });
@@ -154,9 +170,25 @@ export async function POST(request: Request) {
     payload.url ??
     payload.source_url;
 
-  const existing = await prisma.knowledgeDocuments.findFirst({
-    where: { documentId: String(documentId) },
+  const existingCandidates = await prisma.knowledgeDocuments.findMany({
+    where: {
+      OR: [
+        { documentId: incomingDocumentId },
+        { documentId: normalizedIncomingDocumentId },
+        { documentId: { endsWith: `#${normalizedIncomingDocumentId}` } },
+      ],
+    },
+    orderBy: { updatedAt: "desc" },
   });
+  const existing =
+    existingCandidates.find(
+      (candidate) =>
+        Boolean(candidate.documentUrl) &&
+        !candidate.documentUrl?.startsWith("s3://"),
+    ) ??
+    existingCandidates[0] ??
+    null;
+  const storedDocumentId = normalizedIncomingDocumentId || incomingDocumentId;
 
   const existingBySource =
     !existing && sourceKey === manualTrainingSource.toLowerCase()
@@ -170,8 +202,7 @@ export async function POST(request: Request) {
       where: { id: existing.id },
       data: {
         status,
-        documentUrl:
-          typeof documentUrl === "string" ? documentUrl : existing.documentUrl,
+        documentUrl: resolveDocumentUrl(documentUrl, existing.documentUrl),
         isEnabled: true,
       },
     });
@@ -179,12 +210,12 @@ export async function POST(request: Request) {
     await prisma.knowledgeDocuments.update({
       where: { id: existingBySource.id },
       data: {
-        documentId: String(documentId),
+        documentId: storedDocumentId,
         status,
-        documentUrl:
-          typeof documentUrl === "string"
-            ? documentUrl
-            : existingBySource.documentUrl,
+        documentUrl: resolveDocumentUrl(
+          documentUrl,
+          existingBySource.documentUrl,
+        ),
         source: canonicalSource,
         isEnabled: true,
       },
@@ -193,8 +224,8 @@ export async function POST(request: Request) {
     await prisma.knowledgeDocuments.create({
       data: {
         source: canonicalSource || "Knowledge Document",
-        documentId: String(documentId),
-        documentUrl: typeof documentUrl === "string" ? documentUrl : null,
+        documentId: storedDocumentId,
+        documentUrl: resolveDocumentUrl(documentUrl, null),
         status,
         isEnabled: true,
       },
@@ -205,7 +236,7 @@ export async function POST(request: Request) {
     await prisma.knowledgeDocuments.deleteMany({
       where: {
         source: { equals: canonicalSource, mode: "insensitive" },
-        documentId: { not: String(documentId) },
+        documentId: { not: storedDocumentId },
       },
     });
   }

@@ -384,6 +384,7 @@ async function syncDocumentToDid(
         });
 
         const newDidId = (result as any)?.id || (result as any)?.documentId;
+        const storedDidId = normalizeDocumentId(String(newDidId));
 
         let dbRecord: any;
         if (docId) {
@@ -391,7 +392,7 @@ async function syncDocumentToDid(
                 where: { id: docId },
                 data: {
                     source: DOC_SOURCE_NAME,
-                    documentId: String(newDidId),
+                    documentId: storedDidId,
                     documentUrl: publicUrl,
                     status: 'PROCESSING',
                     charCount: fullContent.length,
@@ -402,7 +403,7 @@ async function syncDocumentToDid(
             dbRecord = await prisma.knowledgeDocuments.create({
                 data: {
                     source: DOC_SOURCE_NAME,
-                    documentId: String(newDidId),
+                    documentId: storedDidId,
                     documentUrl: publicUrl,
                     status: 'PROCESSING',
                     charCount: fullContent.length
