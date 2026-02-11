@@ -340,11 +340,42 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
           where: { documentId: { in: queryDocumentIds } },
         })
       : [];
+    const pickPreferredDoc = (
+      current: (typeof localDocs)[number] | undefined,
+      candidate: (typeof localDocs)[number],
+    ) => {
+      if (!current) return candidate;
+      const currentHasPublicUrl = Boolean(
+        current.documentUrl && !current.documentUrl.startsWith("s3://"),
+      );
+      const candidateHasPublicUrl = Boolean(
+        candidate.documentUrl && !candidate.documentUrl.startsWith("s3://"),
+      );
+      if (currentHasPublicUrl !== candidateHasPublicUrl) {
+        return candidateHasPublicUrl ? candidate : current;
+      }
+      const currentHasUrl = Boolean(current.documentUrl);
+      const candidateHasUrl = Boolean(candidate.documentUrl);
+      if (currentHasUrl !== candidateHasUrl) {
+        return candidateHasUrl ? candidate : current;
+      }
+      if (current.isEnabled !== candidate.isEnabled) {
+        return candidate.isEnabled ? candidate : current;
+      }
+      return candidate.updatedAt > current.updatedAt ? candidate : current;
+    };
     const localMap = new Map<string, (typeof localDocs)[number]>();
     for (const doc of localDocs) {
       if (!doc.documentId) continue;
-      localMap.set(doc.documentId, doc);
-      localMap.set(normalizeDidDocumentId(doc.documentId), doc);
+      const normalizedDocId = normalizeDidDocumentId(doc.documentId);
+      localMap.set(
+        doc.documentId,
+        pickPreferredDoc(localMap.get(doc.documentId), doc),
+      );
+      localMap.set(
+        normalizedDocId,
+        pickPreferredDoc(localMap.get(normalizedDocId), doc),
+      );
     }
 
     const statusMap: Record<string, KnowledgeItem["status"]> = {
@@ -361,7 +392,8 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
     const mapped = documentList
       .map((doc) => {
         const docId = String(doc.id ?? doc.document_id ?? doc.documentId);
-        const local = localMap.get(docId);
+        const local =
+          localMap.get(docId) ?? localMap.get(normalizeDidDocumentId(docId));
         const titleRaw = String(doc.title ?? doc.name ?? "").trim();
         const titleKey = titleRaw.toLowerCase();
         const labelFromId =
@@ -389,6 +421,10 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
           doc.source ??
           local?.source ??
           "Knowledge";
+        const remoteUrlRaw = doc.documentUrl ?? doc.url ?? doc.document_url;
+        const remoteUrl =
+          typeof remoteUrlRaw === "string" ? remoteUrlRaw : undefined;
+        const localUrl = local?.documentUrl ?? undefined;
 
         return {
           id: docId,
@@ -401,10 +437,8 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
           status:
             statusMap[String(doc.status ?? "").toLowerCase()] ?? "processing",
           url:
-            doc.documentUrl ??
-            local?.documentUrl ??
-            doc.url ??
-            doc.document_url,
+            localUrl ||
+            (remoteUrl?.startsWith("s3://") ? undefined : remoteUrl),
           isEnabled: local?.isEnabled ?? true,
         };
       })
