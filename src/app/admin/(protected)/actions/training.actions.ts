@@ -482,8 +482,10 @@ export async function toggleKnowledgeDocumentEnabledAction(formData: FormData) {
     throw new Error("Document id is required");
   }
 
+  const normalizedDocId = normalizeDidDocumentId(documentId);
+
   const localDoc = await prisma.knowledgeDocuments.findFirst({
-    where: { OR: [{ id: documentId }, { documentId }] },
+    where: { OR: [{ id: documentId }, { documentId: normalizedDocId }] },
   });
 
   if (!localDoc) {
