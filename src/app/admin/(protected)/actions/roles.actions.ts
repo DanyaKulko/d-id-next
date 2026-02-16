@@ -73,6 +73,16 @@ const allowedLlmTemplates = new Set([
   "assistant",
 ]);
 
+const normalizeVoiceLanguage = (value?: string) => {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  const key = trimmed.toLowerCase();
+  if (key === "multilingual" || key === "multilang" || key === "multi") {
+    return "Multilingual";
+  }
+  return trimmed;
+};
+
 export async function addAgentFromDidAction(formData: FormData) {
   await requireAdmin();
   const displayName = getString(formData.get("displayName")).trim();
@@ -193,7 +203,6 @@ export async function syncAgentFromDidAction(agentKey: AgentKey) {
   const didAgentRaw = await withDidLogging("Get Agent", () =>
     didService.getAgent(agent.agentId),
   );
-    console.log('didAgentRaw', didAgentRaw)
   if (!didAgentRaw || typeof didAgentRaw !== "object") {
     throw new Error("D-ID agent not found");
   }
@@ -340,13 +349,67 @@ export async function saveRoleSettingsAction(formData: FormData) {
       ? llmTemplateRaw.trim()
       : undefined
     : undefined;
-  const voiceLanguage = voiceLanguageRaw?.trim()
-    ? voiceLanguageRaw.trim()
-    : undefined;
+  const voiceLanguage = normalizeVoiceLanguage(voiceLanguageRaw ?? undefined);
   const safetySetting = await prisma.appSetting.findUnique({
     where: { key: safetyRulesKey },
   });
   const safetyRules = safetySetting?.value ?? "";
+
+  if (voiceId && voiceLanguage) {
+    const voices = await withDidLogging("List Voices", () =>
+      didService.listVoices(),
+    );
+    const matchedVoice = voices.find((voice) => {
+      if (!voice || typeof voice !== "object") return false;
+      return (
+        String((voice as Record<string, unknown>).id ?? "").trim() === voiceId
+      );
+    }) as Record<string, unknown> | undefined;
+
+    if (matchedVoice) {
+      const languages = Array.isArray(matchedVoice.languages)
+        ? (matchedVoice.languages as Record<string, unknown>[])
+        : [];
+
+      if (languages.length > 0) {
+        const supportedNames = languages
+          .map((entry) =>
+            typeof entry.language === "string" ? entry.language.trim() : "",
+          )
+          .filter((value) => value.length > 0);
+        const supportedLocales = languages
+          .map((entry) =>
+            typeof entry.locale === "string" ? entry.locale.trim() : "",
+          )
+          .filter((value) => value.length > 0);
+
+        const normalizedVoiceLanguage = voiceLanguage.toLowerCase();
+        if (normalizedVoiceLanguage === "multilingual") {
+          if (new Set(supportedLocales.map((value) => value.toLowerCase())).size <= 1) {
+            const supportedLabel = supportedNames.join(", ") || supportedLocales.join(", ");
+            throw new Error(
+              `Selected voice does not support multilingual mode. Supported languages: ${supportedLabel}`,
+            );
+          }
+        } else {
+          const supportsLanguage =
+            supportedNames.some(
+              (value) => value.toLowerCase() === normalizedVoiceLanguage,
+            ) ||
+            supportedLocales.some(
+              (value) => value.toLowerCase() === normalizedVoiceLanguage,
+            );
+
+          if (!supportsLanguage) {
+            const supportedLabel = supportedNames.join(", ") || supportedLocales.join(", ");
+            throw new Error(
+              `Selected voice does not support "${voiceLanguage}". Supported languages: ${supportedLabel}`,
+            );
+          }
+        }
+      }
+    }
+  }
 
   await prisma.agent.update({
     where: { id: agent.id },

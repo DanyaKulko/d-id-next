@@ -782,10 +782,12 @@ function RoleContent({
                          isSyncing,
                          devModeEnabled,
                      }: RoleContentProps) {
-    const currentVoiceLanguage = (defaults?.voiceLanguage ?? "").trim() || "Multilingual";
-    const voiceLanguageOptions = voiceLanguageSuggestions.includes(currentVoiceLanguage)
-        ? voiceLanguageSuggestions
-        : [currentVoiceLanguage, ...voiceLanguageSuggestions];
+    const currentVoiceLanguage = (defaults?.voiceLanguage ?? "").trim();
+    const voiceLanguageOptions = currentVoiceLanguage
+        ? voiceLanguageSuggestions.includes(currentVoiceLanguage)
+            ? voiceLanguageSuggestions
+            : [currentVoiceLanguage, ...voiceLanguageSuggestions]
+        : voiceLanguageSuggestions;
     const isReadOnly = !devModeEnabled;
 
     return (
@@ -915,9 +917,10 @@ function RoleContent({
                 <select
                     id="voiceLanguage"
                     name="voiceLanguage"
-                    defaultValue={currentVoiceLanguage}
+                    defaultValue={currentVoiceLanguage || ""}
                     disabled={isReadOnly}
                 >
+                    <option value="">Auto (Voice default)</option>
                     {voiceLanguageOptions.map((option) => (
                         <option key={option} value={option}>
                             {option}

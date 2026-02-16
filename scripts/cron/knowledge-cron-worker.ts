@@ -254,12 +254,23 @@ async function cleanWithGPT(post: ApiPost): Promise<string> {
 
 async function updateTextSourceDocumentIds() {
     const documents = await prisma.knowledgeDocuments.findMany({
-        where: { source: { equals: DOC_SOURCE_NAME, mode: 'insensitive' } },
+        where: {
+            source: { equals: DOC_SOURCE_NAME, mode: 'insensitive' },
+            isEnabled: true,
+            documentId: { not: null },
+        },
         orderBy: { createdAt: 'asc' },
     });
+    const seenDocIds = new Set<string>();
     const docIds = documents
         .map((doc) => doc.documentId)
-        .filter((docId): docId is string => Boolean(docId));
+        .filter((docId): docId is string => Boolean(docId))
+        .filter((docId) => {
+            const normalized = normalizeDocumentId(docId);
+            if (seenDocIds.has(normalized)) return false;
+            seenDocIds.add(normalized);
+            return true;
+        });
     await prisma.externalSource.updateMany({
         where: { kind: 'TEXT' },
         data: { documentId: serializeDocumentIds(docIds) },
@@ -270,7 +281,7 @@ async function updateTextSourceDocumentIds() {
 async function reconcileTextBlogDocuments() {
     const localDocs = await prisma.knowledgeDocuments.findMany({
         where: { source: { equals: DOC_SOURCE_NAME, mode: 'insensitive' } },
-        select: { id: true, documentId: true },
+        select: { id: true, documentId: true, isEnabled: true },
     });
     const localDocIds = localDocs.map((doc) => doc.id);
 
@@ -292,7 +303,7 @@ async function reconcileTextBlogDocuments() {
     }
 
     const docsWithoutDidId = localDocs
-        .filter((doc) => !doc.documentId)
+        .filter((doc) => doc.isEnabled && !doc.documentId)
         .map((doc) => doc.id);
     if (docsWithoutDidId.length > 0) {
         await prisma.processedPost.updateMany({
@@ -326,6 +337,7 @@ async function reconcileTextBlogDocuments() {
     ]);
 
     const missingLocal = localDocs.filter((doc) => {
+        if (!doc.isEnabled) return false;
         if (!doc.documentId) return false;
         const normalized = normalizeDocumentId(doc.documentId);
         return !didSet.has(doc.documentId) && !didSet.has(normalized);
@@ -375,11 +387,12 @@ async function syncDocumentToDid(
         const baseUrl = await resolveBaseUrl();
 
         const webhookUrl = `${baseUrl}/api/webhooks/did/knowledge`;
+        const documentTitle = `Text Blog (Part #${partNumber})`;
 
         const result = await didService.createKnowledgeDocument(DID_KNOWLEDGE_BASE_ID!, {
             documentType: "text",
             source_url: publicUrl,
-            title: `Text Blog (Part #${partNumber})`,
+            title: documentTitle,
             webhook: webhookUrl
         });
 
@@ -392,9 +405,11 @@ async function syncDocumentToDid(
                 where: { id: docId },
                 data: {
                     source: DOC_SOURCE_NAME,
+                    title: documentTitle,
                     documentId: storedDidId,
                     documentUrl: publicUrl,
                     status: 'PROCESSING',
+                    isEnabled: true,
                     charCount: fullContent.length,
                     updatedAt: new Date()
                 }
@@ -403,9 +418,11 @@ async function syncDocumentToDid(
             dbRecord = await prisma.knowledgeDocuments.create({
                 data: {
                     source: DOC_SOURCE_NAME,
+                    title: documentTitle,
                     documentId: storedDidId,
                     documentUrl: publicUrl,
                     status: 'PROCESSING',
+                    isEnabled: true,
                     charCount: fullContent.length
                 }
             });
@@ -566,6 +583,7 @@ const worker = new Worker('knowledge-sync-queue', async (job) => {
         let currentDoc = await prisma.knowledgeDocuments.findFirst({
             where: {
                 isFull: false,
+                isEnabled: true,
                 source: { equals: DOC_SOURCE_NAME, mode: 'insensitive' },
             },
             orderBy: { createdAt: 'desc' },
@@ -573,7 +591,10 @@ const worker = new Worker('knowledge-sync-queue', async (job) => {
         });
 
         const totalDocsCount = await prisma.knowledgeDocuments.count({
-            where: { source: { equals: DOC_SOURCE_NAME, mode: 'insensitive' } }
+            where: {
+                source: { equals: DOC_SOURCE_NAME, mode: 'insensitive' },
+                isEnabled: true,
+            }
         });
 
         let currentPartNumber = currentDoc ? totalDocsCount : totalDocsCount + 1;

@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { parseStoredDocumentIds } from "@/lib/external-sources/documents";
 import { didService } from "@/lib/services/did.service";
+import { normalizeDidChatText } from "@/lib/text/did-chat";
 
 export type UserRow = {
   id: string;
@@ -309,7 +310,7 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
     });
     return localDocs.map((doc) => ({
       id: doc.documentId ?? doc.id,
-      title: doc.source,
+      title: doc.title ?? doc.source,
       sourceLabel: doc.source,
       created: doc.createdAt.toISOString().split("T")[0],
       status:
@@ -429,7 +430,11 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
         return {
           id: docId,
           title:
-            titleRaw || local?.source || sourceLabel || "Knowledge Document",
+            titleRaw ||
+            local?.title ||
+            local?.source ||
+            sourceLabel ||
+            "Knowledge Document",
           sourceLabel,
           created: doc.created_at
             ? new Date(doc.created_at).toISOString().split("T")[0]
@@ -465,7 +470,7 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
 
         return {
           id: doc.documentId ?? doc.id,
-          title: doc.source,
+          title: doc.title ?? doc.source,
           sourceLabel: doc.source,
           created: doc.createdAt.toISOString().split("T")[0],
           status:
@@ -504,7 +509,7 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
     });
     return localDocs.map((doc) => ({
       id: doc.documentId ?? doc.id,
-      title: doc.source,
+      title: doc.title ?? doc.source,
       sourceLabel: doc.source,
       created: doc.createdAt.toISOString().split("T")[0],
       status:
@@ -629,7 +634,10 @@ export async function fetchSessionRecords(
       messages: session.messages.map((message) => ({
         id: message.id,
         role: message.role.toLowerCase() as SessionMessageItem["role"],
-        content: message.content,
+        content:
+          message.role === "ASSISTANT"
+            ? normalizeDidChatText(message.content)
+            : message.content,
         createdAt: toLocalDateTime(message.createdAt),
       })),
     };

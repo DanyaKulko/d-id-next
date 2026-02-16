@@ -241,6 +241,7 @@ model ExternalServiceLog {
 model KnowledgeDocuments {
   id          String                  @id @default(cuid())
   source      String
+  title       String?
   documentId  String?
   documentUrl String?
   status      KnowledgeDocumentStatus @default(PROCESSING)

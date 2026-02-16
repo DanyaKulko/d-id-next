@@ -8,6 +8,7 @@ import {
   submitAnswerAction,
   submitIceAction,
 } from "@/app/actions/agent.actions";
+import { normalizeDidChatText } from "@/lib/text/did-chat";
 
 type ConnectionStatus = "idle" | "connecting" | "connected" | "error";
 
@@ -32,17 +33,9 @@ export const useAgent = (
   const lastAssistantRef = useRef<string | null>(null);
 
   const decodeChatAnswer = useCallback((raw: string) => {
-    const marker = "chat/answer";
-    if (!raw.startsWith(marker)) return null;
-    const idx = raw.indexOf(":");
-    if (idx === -1) return null;
-    const encoded = raw.slice(idx + 1);
-    if (!encoded) return null;
-    try {
-      return decodeURIComponent(encoded.replace(/\+/g, " ")).trim();
-    } catch {
-      return encoded.trim();
-    }
+    if (!raw.startsWith("chat/answer")) return null;
+    const decoded = normalizeDidChatText(raw);
+    return decoded || null;
   }, []);
 
   const cleanup = useCallback(() => {

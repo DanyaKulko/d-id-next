@@ -214,6 +214,7 @@ export async function saveManualTrainingAction(formData: FormData) {
     await prisma.knowledgeDocuments.create({
       data: {
         source: manualTrainingSource,
+        title: manualTrainingSource,
         documentId: String(docId),
         documentUrl: `${baseUrl}${publicPath}`,
         status: "PROCESSING",
@@ -252,6 +253,7 @@ export async function toggleTextBlogKnowledgeAction(formData: FormData) {
         documentId: true,
         documentUrl: true,
         source: true,
+        title: true,
         isEnabled: true,
       },
     }),
@@ -294,7 +296,7 @@ export async function toggleTextBlogKnowledgeAction(formData: FormData) {
     const baseUrl = await resolveBaseUrl();
     const webhookUrl = `${baseUrl}/api/webhooks/did/knowledge`;
 
-    for (const doc of localDocs) {
+    for (const [index, doc] of localDocs.entries()) {
       if (doc.isEnabled) continue;
 
       const sourceUrl = doc.documentUrl;
@@ -305,12 +307,20 @@ export async function toggleTextBlogKnowledgeAction(formData: FormData) {
         });
         continue;
       }
+      const normalizedTitle = doc.title?.trim() ?? "";
+      const shouldUsePartTitle =
+        doc.source === textBlogSource &&
+        (!normalizedTitle ||
+          normalizedTitle.toLowerCase() === textBlogSource.toLowerCase());
+      const title = shouldUsePartTitle
+        ? `Text Blog (Part #${index + 1})`
+        : normalizedTitle || doc.source;
 
       const created = await withDidLogging("Create Knowledge Document", () =>
         didService.createKnowledgeDocument(knowledgeBaseId, {
           documentType: "text",
           source_url: sourceUrl,
-          title: doc.source,
+          title,
           webhook: webhookUrl,
         }),
       );
@@ -326,6 +336,7 @@ export async function toggleTextBlogKnowledgeAction(formData: FormData) {
         where: { id: doc.id },
         data: {
           documentId: String(newDocId),
+          title,
           status: "PROCESSING",
           isEnabled: true,
         },
@@ -485,7 +496,14 @@ export async function toggleKnowledgeDocumentEnabledAction(formData: FormData) {
   const normalizedDocId = normalizeDidDocumentId(documentId);
 
   const localDoc = await prisma.knowledgeDocuments.findFirst({
-    where: { OR: [{ id: documentId }, { documentId: normalizedDocId }] },
+    where: {
+      OR: [
+        { id: documentId },
+        { documentId },
+        { documentId: normalizedDocId },
+        { documentId: { endsWith: `#${normalizedDocId}` } },
+      ],
+    },
   });
 
   if (!localDoc) {
@@ -503,6 +521,21 @@ export async function toggleKnowledgeDocumentEnabledAction(formData: FormData) {
     if (!documentUrl) {
       throw new Error("Document URL is missing");
     }
+    const normalizedTitle = localDoc.title?.trim() ?? "";
+    let title = normalizedTitle || localDoc.source;
+    if (
+      localDoc.source === textBlogSource &&
+      (!normalizedTitle ||
+        normalizedTitle.toLowerCase() === textBlogSource.toLowerCase())
+    ) {
+      const partNumber = await prisma.knowledgeDocuments.count({
+        where: {
+          source: { equals: textBlogSource, mode: "insensitive" },
+          createdAt: { lte: localDoc.createdAt },
+        },
+      });
+      title = `Text Blog (Part #${Math.max(partNumber, 1)})`;
+    }
 
     const baseUrl = await resolveBaseUrl();
     const webhookUrl = `${baseUrl}/api/webhooks/did/knowledge`;
@@ -510,7 +543,7 @@ export async function toggleKnowledgeDocumentEnabledAction(formData: FormData) {
       didService.createKnowledgeDocument(knowledgeBaseId, {
         documentType: "text",
         source_url: documentUrl,
-        title: localDoc.source,
+        title,
         webhook: webhookUrl,
       }),
     );
@@ -527,6 +560,7 @@ export async function toggleKnowledgeDocumentEnabledAction(formData: FormData) {
       where: { id: localDoc.id },
       data: {
         documentId: String(newDocId),
+        title,
         status: "PROCESSING",
         isEnabled: true,
       },

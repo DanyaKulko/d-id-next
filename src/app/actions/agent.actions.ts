@@ -11,13 +11,14 @@ import {
   resolveExternalErrorDetails,
 } from "@/lib/logging/external-errors";
 import { didService } from "@/lib/services/did.service";
+import { normalizeDidChatText } from "@/lib/text/did-chat";
 import {
   assistantMessageSchema,
   chatSchema,
   closeSessionSchema,
+  streamScriptSchema,
   submitAnswerSchema,
   submitIceSchema,
-  streamScriptSchema,
 } from "@/lib/validators/agent.schema";
 
 const resolveDeviceLabel = (userAgent?: string | null) => {
@@ -294,7 +295,10 @@ export async function chatAction(
       history.length > 0
         ? history.map((message) => ({
             role: message.role.toLowerCase() as "system" | "user" | "assistant",
-            content: message.content,
+            content:
+              message.role === "ASSISTANT"
+                ? normalizeDidChatText(message.content)
+                : message.content,
             created_at: message.createdAt.toISOString(),
           }))
         : [
@@ -314,7 +318,10 @@ export async function chatAction(
     );
 
     if (activeSession) {
-      const assistantMessage = resolveAssistantMessage(data);
+      const assistantMessageRaw = resolveAssistantMessage(data);
+      const assistantMessage = assistantMessageRaw
+        ? normalizeDidChatText(assistantMessageRaw)
+        : null;
       if (assistantMessage) {
         await prisma.chatMessage.create({
           data: {
@@ -341,7 +348,8 @@ export async function appendAssistantMessageAction(
   try {
     await ensureClientAuth();
     const { chatId, streamId, sessionId, message } = result.data;
-    if (!message.trim()) return { success: true, skipped: true };
+    const normalizedMessage = normalizeDidChatText(message);
+    if (!normalizedMessage.trim()) return { success: true, skipped: true };
 
     let session = await prisma.chatSession.findUnique({
       where: { didChatId: chatId },
@@ -385,7 +393,10 @@ export async function appendAssistantMessageAction(
       orderBy: { createdAt: "desc" },
       select: { content: true },
     });
-    if (lastAssistant?.content === message.trim()) {
+    const lastMessageNormalized = lastAssistant?.content
+      ? normalizeDidChatText(lastAssistant.content)
+      : "";
+    if (lastMessageNormalized === normalizedMessage.trim()) {
       return { success: true, skipped: true };
     }
 
@@ -393,7 +404,7 @@ export async function appendAssistantMessageAction(
       data: {
         sessionId: session.id,
         role: "ASSISTANT",
-        content: message.trim(),
+        content: normalizedMessage.trim(),
       },
     });
 

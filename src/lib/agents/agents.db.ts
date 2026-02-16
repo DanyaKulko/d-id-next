@@ -39,6 +39,26 @@ const extractVoiceId = (agent: unknown) => {
   );
 };
 
+const extractVoiceLanguage = (agent: unknown) => {
+  if (!agent || typeof agent !== "object") return "";
+  const record = agent as Record<string, unknown>;
+  const presenter = record.presenter;
+  if (presenter && typeof presenter === "object") {
+    const presenterVoice = (presenter as Record<string, unknown>).voice;
+    if (presenterVoice && typeof presenterVoice === "object") {
+      return resolveString(
+        (presenterVoice as Record<string, unknown>).language,
+        "",
+      );
+    }
+  }
+  const voice = record.voice;
+  if (voice && typeof voice === "object") {
+    return resolveString((voice as Record<string, unknown>).language, "");
+  }
+  return resolveString(record.language, "");
+};
+
 const extractAvatarImageUrl = (agent: unknown) => {
   if (!agent || typeof agent !== "object") return "";
   const record = agent as Record<string, unknown>;
@@ -166,17 +186,25 @@ export async function fetchAgentSettingsFromDb(
       | null;
   }
 
-  if (
-    didAgent &&
-    (!agent.voiceID || !agent.voiceID.trim() || !agent.avatarImageUrl)
-  ) {
+  if (didAgent) {
     const voiceId = extractVoiceId(didAgent);
+    const voiceLanguage = extractVoiceLanguage(didAgent).trim();
     const avatarImageUrl = extractAvatarImageUrl(didAgent);
-    const updateData: { voiceID?: string; avatarImageUrl?: string } = {};
-    if (voiceId && (!agent.voiceID || !agent.voiceID.trim())) {
+    const updateData: {
+      voiceID?: string;
+      voiceLanguage?: string;
+      avatarImageUrl?: string;
+    } = {};
+    if (voiceId && voiceId !== (agent.voiceID ?? "")) {
       updateData.voiceID = voiceId;
     }
-    if (avatarImageUrl && !agent.avatarImageUrl) {
+    if (
+      voiceLanguage &&
+      voiceLanguage.toLowerCase() !== (agent.voiceLanguage ?? "").toLowerCase()
+    ) {
+      updateData.voiceLanguage = voiceLanguage;
+    }
+    if (avatarImageUrl && avatarImageUrl !== (agent.avatarImageUrl ?? "")) {
       updateData.avatarImageUrl = avatarImageUrl;
     }
     if (Object.keys(updateData).length > 0) {

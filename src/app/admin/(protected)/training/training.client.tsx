@@ -269,7 +269,6 @@ export default function LearningClient({
                   type="button"
                   className="btn btn-secondary"
                   onClick={() => {
-                    console.log('k', k)
                     if (k.url) {
                       window.open(k.url, "_blank", "noopener,noreferrer");
                     } else {

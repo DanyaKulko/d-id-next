@@ -176,7 +176,6 @@ const SLIDES_DATA = [
 export default function UserGuideModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
-    console.log('isOpen',isOpen)
 
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);

@@ -39,6 +39,23 @@ const resolveDocumentUrl = (
   return trimmed;
 };
 
+const resolveDocumentTitle = (
+  incoming: unknown,
+  current: string | null,
+  source: string,
+) => {
+  if (typeof incoming === "string" && incoming.trim()) {
+    return incoming.trim();
+  }
+  if (current?.trim()) {
+    return current.trim();
+  }
+  if (source.trim()) {
+    return source.trim();
+  }
+  return "Knowledge Document";
+};
+
 const normalizeDidDocumentId = (value: string) =>
   value.includes("#") ? (value.split("#").pop() ?? value) : value;
 
@@ -59,7 +76,6 @@ const videoTranscriptsSource = "Video transcripts";
 
 export async function POST(request: Request) {
   const raw = await request.json().catch(() => null);
-  console.log("raw", raw);
   const payload = resolvePayloadRecord(raw);
   if (!payload) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
@@ -90,16 +106,15 @@ export async function POST(request: Request) {
   const normalizedIncomingDocumentId =
     normalizeDidDocumentId(incomingDocumentId);
 
-  const title =
-    record.title ??
-    record.name ??
-    record.source ??
-    payload.title ??
-    payload.name ??
-    "Knowledge Document";
-
-  const normalizedSource = String(title ?? "").trim();
-  const sourceKey = normalizedSource.toLowerCase();
+  const title = record.title ?? record.name ?? payload.title ?? payload.name;
+  const normalizedTitle = String(title ?? "").trim();
+  const sourceLabelRaw = record.source ?? payload.source;
+  const normalizedSourceLabel = String(sourceLabelRaw ?? "").trim();
+  const sourceKey = (
+    normalizedSourceLabel ||
+    normalizedTitle ||
+    "Knowledge"
+  ).toLowerCase();
   const [manualDoc, externalSources] = await Promise.all([
     prisma.appSetting.findUnique({ where: { key: manualTrainingDocKey } }),
     prisma.externalSource.findMany(),
@@ -144,10 +159,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const canonicalSource =
-    knownDocMap.get(String(documentId)) ??
-    knownSources.get(sourceKey) ??
-    normalizedSource;
+  const trackedSourceById =
+    knownDocMap.get(incomingDocumentId) ??
+    knownDocMap.get(normalizedIncomingDocumentId);
 
   const expectedDocIds = expectedDocIdBySourceKey.get(sourceKey);
   if (expectedDocIds && expectedDocIds.length > 0) {
@@ -191,11 +205,34 @@ export async function POST(request: Request) {
   const storedDocumentId = normalizedIncomingDocumentId || incomingDocumentId;
 
   const existingBySource =
-    !existing && sourceKey === manualTrainingSource.toLowerCase()
+    !existing &&
+    sourceKey === manualTrainingSource.toLowerCase() &&
+    Boolean(manualDoc?.value)
       ? await prisma.knowledgeDocuments.findFirst({
-          where: { source: canonicalSource },
+          where: {
+            source: { equals: manualTrainingSource, mode: "insensitive" },
+          },
         })
       : null;
+  const canonicalSource =
+    knownSources.get(normalizedSourceLabel.toLowerCase()) ??
+    knownSources.get(normalizedTitle.toLowerCase()) ??
+    "";
+  const resolvedSource =
+    trackedSourceById ??
+    existing?.source ??
+    existingBySource?.source ??
+    (canonicalSource || "Knowledge");
+
+  if (existing && !existing.isEnabled) {
+    return NextResponse.json({ ok: true });
+  }
+  if (existingBySource && !existingBySource.isEnabled) {
+    return NextResponse.json({ ok: true });
+  }
+  if (!existing && !existingBySource && !trackedSourceById) {
+    return NextResponse.json({ ok: true });
+  }
 
   if (existing) {
     await prisma.knowledgeDocuments.update({
@@ -203,7 +240,8 @@ export async function POST(request: Request) {
       data: {
         status,
         documentUrl: resolveDocumentUrl(documentUrl, existing.documentUrl),
-        isEnabled: true,
+        source: resolvedSource,
+        title: resolveDocumentTitle(title, existing.title, resolvedSource),
       },
     });
   } else if (existingBySource) {
@@ -216,14 +254,19 @@ export async function POST(request: Request) {
           documentUrl,
           existingBySource.documentUrl,
         ),
-        source: canonicalSource,
-        isEnabled: true,
+        source: resolvedSource,
+        title: resolveDocumentTitle(
+          title,
+          existingBySource.title,
+          resolvedSource,
+        ),
       },
     });
   } else {
     await prisma.knowledgeDocuments.create({
       data: {
-        source: canonicalSource || "Knowledge Document",
+        source: resolvedSource,
+        title: resolveDocumentTitle(title, null, resolvedSource),
         documentId: storedDocumentId,
         documentUrl: resolveDocumentUrl(documentUrl, null),
         status,
@@ -232,10 +275,10 @@ export async function POST(request: Request) {
     });
   }
 
-  if (sourceKey === manualTrainingSource.toLowerCase()) {
+  if (resolvedSource.toLowerCase() === manualTrainingSource.toLowerCase()) {
     await prisma.knowledgeDocuments.deleteMany({
       where: {
-        source: { equals: canonicalSource, mode: "insensitive" },
+        source: { equals: manualTrainingSource, mode: "insensitive" },
         documentId: { not: storedDocumentId },
       },
     });

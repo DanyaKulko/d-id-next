@@ -28,6 +28,11 @@ const createDidClient = (): AxiosInstance => {
 const client = createDidClient();
 
 export const didService = {
+  async listVoices() {
+    const { data } = await client.get(`/tts/voices`);
+    return Array.isArray(data) ? data : [];
+  },
+
   async getAgent(agentId: string) {
     const { data } = await client.get(`/agents/${agentId}`);
     return data;
