@@ -207,6 +207,7 @@ export async function updateDidAgentFromRole(
     personalityStyle: string;
     voiceId?: string;
     voiceLanguage?: string;
+    clearVoiceLanguage?: boolean;
     llmModel?: string;
     llmTemplate?: string;
   },
@@ -256,8 +257,12 @@ export async function updateDidAgentFromRole(
     }
   }
 
-  if (input.role) {
-    promptCustomization.role = input.role;
+  const trimmedRole = input.role.trim();
+  const normalizedRole = /^\d+$/.test(trimmedRole) ? "" : trimmedRole;
+  if (normalizedRole) {
+    promptCustomization.role = normalizedRole;
+  } else if ("role" in promptCustomization) {
+    delete promptCustomization.role;
   }
 
   if (input.personalityStyle) {
@@ -266,6 +271,8 @@ export async function updateDidAgentFromRole(
 
   if (Object.keys(promptCustomization).length > 0) {
     llmPayload.prompt_customization = promptCustomization;
+  } else if ("prompt_customization" in llmPayload) {
+    delete llmPayload.prompt_customization;
   }
 
   if (input.llmModel) {
@@ -280,9 +287,7 @@ export async function updateDidAgentFromRole(
     payload.llm = llmPayload;
   }
 
-  delete llmPayload.prompt_customization;
-
-  if (input.voiceId || input.voiceLanguage) {
+  if (input.voiceId || input.voiceLanguage || input.clearVoiceLanguage) {
     const existingVoice =
       presenterPayload.voice && typeof presenterPayload.voice === "object"
         ? ({ ...presenterPayload.voice } as Record<string, unknown>)
@@ -292,6 +297,8 @@ export async function updateDidAgentFromRole(
     }
     if (input.voiceLanguage) {
       existingVoice.language = input.voiceLanguage;
+    } else if (input.clearVoiceLanguage && "language" in existingVoice) {
+      delete existingVoice.language;
     }
     presenterPayload.voice = existingVoice;
   }

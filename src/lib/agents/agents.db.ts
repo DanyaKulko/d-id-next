@@ -12,6 +12,15 @@ import {didService} from "@/lib/services/did.service";
 const resolveString = (value: unknown, fallback = "") =>
   typeof value === "string" ? value : fallback;
 
+const normalizeVoiceLanguage = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (trimmed.toLowerCase() === "multilingual") {
+    return "multilingual";
+  }
+  return trimmed;
+};
+
 const extractVoiceId = (agent: unknown) => {
   if (!agent || typeof agent !== "object") return "";
   const record = agent as Record<string, unknown>;
@@ -188,7 +197,7 @@ export async function fetchAgentSettingsFromDb(
 
   if (didAgent) {
     const voiceId = extractVoiceId(didAgent);
-    const voiceLanguage = extractVoiceLanguage(didAgent).trim();
+    const voiceLanguage = normalizeVoiceLanguage(extractVoiceLanguage(didAgent));
     const avatarImageUrl = extractAvatarImageUrl(didAgent);
     const updateData: {
       voiceID?: string;

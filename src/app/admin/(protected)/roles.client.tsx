@@ -56,17 +56,17 @@ const llmTemplateOptions = [
 ];
 
 const voiceLanguageSuggestions = [
-    "Multilingual",
-    "English",
-    "Russian",
-    "Spanish",
-    "French",
-    "German",
-    "Italian",
-    "Portuguese",
-    "Chinese",
-    "Japanese",
-    "Korean",
+    { value: "multilingual", label: "Multilingual" },
+    { value: "English", label: "English" },
+    { value: "Russian", label: "Russian" },
+    { value: "Spanish", label: "Spanish" },
+    { value: "French", label: "French" },
+    { value: "German", label: "German" },
+    { value: "Italian", label: "Italian" },
+    { value: "Portuguese", label: "Portuguese" },
+    { value: "Chinese", label: "Chinese" },
+    { value: "Japanese", label: "Japanese" },
+    { value: "Korean", label: "Korean" },
 ];
 
 const personalityAliases: Record<string, string> = {
@@ -782,12 +782,26 @@ function RoleContent({
                          isSyncing,
                          devModeEnabled,
                      }: RoleContentProps) {
-    const currentVoiceLanguage = (defaults?.voiceLanguage ?? "").trim();
-    const voiceLanguageOptions = currentVoiceLanguage
-        ? voiceLanguageSuggestions.includes(currentVoiceLanguage)
-            ? voiceLanguageSuggestions
-            : [currentVoiceLanguage, ...voiceLanguageSuggestions]
-        : voiceLanguageSuggestions;
+    const currentVoiceLanguageRaw = (defaults?.voiceLanguage ?? "").trim();
+    const currentVoiceLanguage =
+        currentVoiceLanguageRaw.toLowerCase() === "multilingual"
+            ? "multilingual"
+            : currentVoiceLanguageRaw;
+    const hasKnownVoiceLanguage = voiceLanguageSuggestions.some(
+        (option) =>
+            option.value.toLowerCase() === currentVoiceLanguage.toLowerCase(),
+    );
+    const voiceLanguageOptions = hasKnownVoiceLanguage
+        ? voiceLanguageSuggestions
+        : currentVoiceLanguage
+            ? [
+                {
+                    value: currentVoiceLanguage,
+                    label: `unknown - ${currentVoiceLanguageRaw}`,
+                },
+                ...voiceLanguageSuggestions,
+            ]
+            : voiceLanguageSuggestions;
     const isReadOnly = !devModeEnabled;
 
     return (
@@ -922,8 +936,8 @@ function RoleContent({
                 >
                     <option value="">Auto (Voice default)</option>
                     {voiceLanguageOptions.map((option) => (
-                        <option key={option} value={option}>
-                            {option}
+                        <option key={option.value} value={option.value}>
+                            {option.label}
                         </option>
                     ))}
                 </select>

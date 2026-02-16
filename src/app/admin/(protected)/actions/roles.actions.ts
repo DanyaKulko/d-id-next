@@ -78,7 +78,7 @@ const normalizeVoiceLanguage = (value?: string) => {
   if (!trimmed) return undefined;
   const key = trimmed.toLowerCase();
   if (key === "multilingual" || key === "multilang" || key === "multi") {
-    return "Multilingual";
+    return "multilingual";
   }
   return trimmed;
 };
@@ -121,6 +121,7 @@ export async function addAgentFromDidAction(formData: FormData) {
   ).trim();
   const didDescription = resolveString(didAgent.description).trim();
   const role = resolveString(promptCustomization.role).trim();
+  const isNumericRole = /^\d+$/.test(role);
   const personalityRaw = resolveString(promptCustomization.personality).trim();
   const personality = personalityRaw
     ? normalizePersonalityStyle(personalityRaw)
@@ -131,7 +132,7 @@ export async function addAgentFromDidAction(formData: FormData) {
   const instructions = stripSafetyRulesFromPrompt(instructionsRaw);
 
   const voiceId = extractVoiceId(didAgent);
-  const voiceLanguage = extractVoiceLanguage(didAgent);
+  const voiceLanguage = normalizeVoiceLanguage(extractVoiceLanguage(didAgent));
   const idleVideoUrl = extractIdleVideoUrl(didAgent);
   const avatarImageUrl = extractAvatarImageUrl(didAgent);
   const llmModel = extractLlmModel(didAgent);
@@ -154,11 +155,11 @@ export async function addAgentFromDidAction(formData: FormData) {
       displayName,
       description: description || didDescription,
       name: previewName || displayName,
-      roleDescription: role || null,
+      roleDescription: role && !isNumericRole ? role : null,
       instructions: instructions || null,
       personality: personality || null,
       voiceID: voiceId || "",
-      voiceLanguage: voiceLanguage || null,
+      voiceLanguage: normalizeVoiceLanguage(voiceLanguage) ?? null,
       llmModel: llmModel || null,
       llmTemplate: llmTemplate || null,
       backgroundEnabled: false,
@@ -181,6 +182,7 @@ export async function addAgentFromDidAction(formData: FormData) {
     safetyRules,
     personalityStyle: created.personality ?? "",
     voiceId: created.voiceID || undefined,
+    voiceLanguage: created.voiceLanguage ?? undefined,
   });
 
   const agentKey = created.slug ?? created.agentId ?? created.id;
@@ -220,7 +222,7 @@ export async function syncAgentFromDidAction(agentKey: AgentKey) {
   const updateData: {
     name?: string;
     description?: string;
-    roleDescription?: string;
+    roleDescription?: string | null;
     instructions?: string;
     personality?: string;
     voiceID?: string;
@@ -240,7 +242,14 @@ export async function syncAgentFromDidAction(agentKey: AgentKey) {
   if (description) updateData.description = description;
 
   const role = resolveString(promptCustomization.role).trim();
-  if (role) updateData.roleDescription = role;
+  if (role && !/^\d+$/.test(role)) updateData.roleDescription = role;
+  if (
+    (!role || /^\d+$/.test(role)) &&
+    typeof agent.roleDescription === "string" &&
+    /^\d+$/.test(agent.roleDescription.trim())
+  ) {
+    updateData.roleDescription = null;
+  }
 
   const personalityRaw = resolveString(promptCustomization.personality).trim();
   if (personalityRaw) {
@@ -256,7 +265,7 @@ export async function syncAgentFromDidAction(agentKey: AgentKey) {
   const voiceId = extractVoiceId(didAgent);
   if (voiceId) updateData.voiceID = voiceId;
 
-  const voiceLanguage = extractVoiceLanguage(didAgent);
+  const voiceLanguage = normalizeVoiceLanguage(extractVoiceLanguage(didAgent));
   if (voiceLanguage) updateData.voiceLanguage = voiceLanguage;
 
   const llmModel = extractLlmModel(didAgent);
@@ -301,6 +310,7 @@ export async function saveRoleSettingsAction(formData: FormData) {
   const systemPrompt = stripSafetyRulesFromPrompt(
     getString(formData.get("systemPrompt")).trim(),
   );
+  const normalizedPersona = /^\d+$/.test(persona) ? "" : persona;
   const personalityStyle = normalizePersonalityStyle(
     getString(formData.get("personalityStyle")),
   );
@@ -350,6 +360,8 @@ export async function saveRoleSettingsAction(formData: FormData) {
       : undefined
     : undefined;
   const voiceLanguage = normalizeVoiceLanguage(voiceLanguageRaw ?? undefined);
+  const clearVoiceLanguage =
+    typeof voiceLanguageRaw === "string" && voiceLanguageRaw.trim() === "";
   const safetySetting = await prisma.appSetting.findUnique({
     where: { key: safetyRulesKey },
   });
@@ -384,14 +396,7 @@ export async function saveRoleSettingsAction(formData: FormData) {
           .filter((value) => value.length > 0);
 
         const normalizedVoiceLanguage = voiceLanguage.toLowerCase();
-        if (normalizedVoiceLanguage === "multilingual") {
-          if (new Set(supportedLocales.map((value) => value.toLowerCase())).size <= 1) {
-            const supportedLabel = supportedNames.join(", ") || supportedLocales.join(", ");
-            throw new Error(
-              `Selected voice does not support multilingual mode. Supported languages: ${supportedLabel}`,
-            );
-          }
-        } else {
+        if (normalizedVoiceLanguage !== "multilingual") {
           const supportsLanguage =
             supportedNames.some(
               (value) => value.toLowerCase() === normalizedVoiceLanguage,
@@ -417,7 +422,7 @@ export async function saveRoleSettingsAction(formData: FormData) {
       displayName,
       description,
       name: agentName,
-      roleDescription: persona,
+      roleDescription: normalizedPersona || null,
       instructions: systemPrompt,
       personality: personalityStyle,
       voiceID: voiceId,
@@ -434,12 +439,13 @@ export async function saveRoleSettingsAction(formData: FormData) {
     await updateDidAgentFromRole(agent.agentId, {
       name: agentName,
       description,
-      role: persona, // Persona/Role Description maps to D-ID agent role.
+      role: normalizedPersona, // Persona/Role Description maps to D-ID agent role.
       systemPrompt,
       safetyRules,
       personalityStyle,
       voiceId,
       voiceLanguage,
+      clearVoiceLanguage,
       llmModel,
       llmTemplate,
     });
