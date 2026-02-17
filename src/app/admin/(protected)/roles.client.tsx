@@ -55,6 +55,10 @@ const llmTemplateOptions = [
     "assistant",
 ];
 
+const minMaxResponseLength = 50;
+const maxMaxResponseLength = 400;
+const defaultMaxResponseLength = 200;
+
 const voiceLanguageSuggestions = [
     { value: "multilingual", label: "Multilingual" },
     { value: "English", label: "English" },
@@ -782,6 +786,14 @@ function RoleContent({
                          isSyncing,
                          devModeEnabled,
                      }: RoleContentProps) {
+    const [maxResponseLength, setMaxResponseLength] = useState(
+        defaults?.maxResponseLength ?? defaultMaxResponseLength,
+    );
+    useEffect(() => {
+        const next = defaults?.maxResponseLength ?? defaultMaxResponseLength;
+        setMaxResponseLength(next);
+    }, [defaults?.maxResponseLength]);
+
     const currentVoiceLanguageRaw = (defaults?.voiceLanguage ?? "").trim();
     const currentVoiceLanguage =
         currentVoiceLanguageRaw.toLowerCase() === "multilingual"
@@ -803,6 +815,10 @@ function RoleContent({
             ]
             : voiceLanguageSuggestions;
     const isReadOnly = !devModeEnabled;
+    const sliderProgress =
+        ((maxResponseLength - minMaxResponseLength) /
+            (maxMaxResponseLength - minMaxResponseLength)) *
+        100;
 
     return (
         <form className="section" onSubmit={onSubmit}>
@@ -990,6 +1006,48 @@ function RoleContent({
                         type="hidden"
                         name="llmTemplate"
                         value={defaults?.llmTemplate ?? "rag-ungrounded"}
+                    />
+                )}
+            </div>
+            <div className="input-group max-response-control">
+                <TooltipLabel
+                    title="Max response length"
+                    text="Specify the maximum amount of words in the response."
+                />
+                <p className="max-response-description">
+                    Specify the maximum amount of words in the response.
+                </p>
+                <div className="max-response-slider-shell">
+                    <div className="max-response-slider-row">
+                        <span className="max-response-boundary">{minMaxResponseLength}</span>
+                        <input
+                            id="maxResponseLength"
+                            name="maxResponseLength"
+                            type="range"
+                            min={minMaxResponseLength}
+                            max={maxMaxResponseLength}
+                            step={1}
+                            value={maxResponseLength}
+                            className="MuiSlider-root custom-max-response-slider"
+                            style={{
+                                background: `linear-gradient(90deg, #4299e1 ${sliderProgress}%, #cbd5e0 ${sliderProgress}%)`,
+                            }}
+                            onChange={(event) =>
+                                setMaxResponseLength(Number(event.target.value))
+                            }
+                            disabled={isReadOnly}
+                        />
+                        <span className="max-response-boundary">{maxMaxResponseLength}</span>
+                    </div>
+                    <div className="max-response-current">
+                        {maxResponseLength} words
+                    </div>
+                </div>
+                {isReadOnly && (
+                    <input
+                        type="hidden"
+                        name="maxResponseLength"
+                        value={defaults?.maxResponseLength ?? defaultMaxResponseLength}
                     />
                 )}
             </div>

@@ -1,0 +1,2 @@
+ALTER TABLE "agents"
+ADD COLUMN "maxResponseLength" INTEGER NOT NULL DEFAULT 200;

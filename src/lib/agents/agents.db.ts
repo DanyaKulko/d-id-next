@@ -9,6 +9,9 @@ import type {
 import { prisma } from "@/lib/db/prisma";
 import {didService} from "@/lib/services/did.service";
 
+const minMaxResponseLength = 50;
+const maxMaxResponseLength = 400;
+
 const resolveString = (value: unknown, fallback = "") =>
   typeof value === "string" ? value : fallback;
 
@@ -19,6 +22,24 @@ const normalizeVoiceLanguage = (value: string) => {
     return "multilingual";
   }
   return trimmed;
+};
+
+const normalizeMaxResponseLength = (value: unknown) => {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number.parseInt(value, 10)
+        : Number.NaN;
+  if (!Number.isFinite(parsed)) return undefined;
+  const normalized = Math.trunc(parsed);
+  if (
+    normalized < minMaxResponseLength ||
+    normalized > maxMaxResponseLength
+  ) {
+    return undefined;
+  }
+  return normalized;
 };
 
 const extractVoiceId = (agent: unknown) => {
@@ -94,6 +115,20 @@ const extractAvatarImageUrl = (agent: unknown) => {
   );
 };
 
+const extractMaxResponseLength = (agent: unknown) => {
+  if (!agent || typeof agent !== "object") return undefined;
+  const record = agent as Record<string, unknown>;
+  const llm = record.llm;
+  if (!llm || typeof llm !== "object") return undefined;
+  const promptCustomization = (llm as Record<string, unknown>).prompt_customization;
+  if (!promptCustomization || typeof promptCustomization !== "object") {
+    return undefined;
+  }
+  return normalizeMaxResponseLength(
+    (promptCustomization as Record<string, unknown>).max_response_length,
+  );
+};
+
 const toAgentSettings = (
   key: AgentKey,
   agent: {
@@ -109,6 +144,7 @@ const toAgentSettings = (
     voiceLanguage: string | null;
     llmModel: string | null;
     llmTemplate: string | null;
+    maxResponseLength: number;
     mobileVideoOffsetPx?: number | null;
     backgroundEnabled: boolean;
     backgroundKeyColor: string | null;
@@ -129,7 +165,7 @@ const toAgentSettings = (
 
   return {
     key,
-      agentId: agent.agentId,
+    agentId: agent.agentId,
     displayName: agent.displayName,
     description: agent.description ?? "",
     agentName: agent.name,
@@ -140,6 +176,7 @@ const toAgentSettings = (
     voiceLanguage: agent.voiceLanguage ?? "",
     llmModel: agent.llmModel ?? "",
     llmTemplate: agent.llmTemplate ?? "",
+    maxResponseLength: agent.maxResponseLength ?? 200,
     mobileVideoOffsetPx: agent.mobileVideoOffsetPx ?? 0,
     backgroundsEnabled: agent.backgroundEnabled ?? false,
     backgroundKeyColor: agent.backgroundKeyColor
@@ -198,10 +235,12 @@ export async function fetchAgentSettingsFromDb(
   if (didAgent) {
     const voiceId = extractVoiceId(didAgent);
     const voiceLanguage = normalizeVoiceLanguage(extractVoiceLanguage(didAgent));
+    const maxResponseLength = extractMaxResponseLength(didAgent);
     const avatarImageUrl = extractAvatarImageUrl(didAgent);
     const updateData: {
       voiceID?: string;
       voiceLanguage?: string;
+      maxResponseLength?: number;
       avatarImageUrl?: string;
     } = {};
     if (voiceId && voiceId !== (agent.voiceID ?? "")) {
@@ -212,6 +251,12 @@ export async function fetchAgentSettingsFromDb(
       voiceLanguage.toLowerCase() !== (agent.voiceLanguage ?? "").toLowerCase()
     ) {
       updateData.voiceLanguage = voiceLanguage;
+    }
+    if (
+      typeof maxResponseLength === "number" &&
+      maxResponseLength !== agent.maxResponseLength
+    ) {
+      updateData.maxResponseLength = maxResponseLength;
     }
     if (avatarImageUrl && avatarImageUrl !== (agent.avatarImageUrl ?? "")) {
       updateData.avatarImageUrl = avatarImageUrl;

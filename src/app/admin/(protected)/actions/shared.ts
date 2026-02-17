@@ -208,6 +208,7 @@ export async function updateDidAgentFromRole(
     voiceId?: string;
     voiceLanguage?: string;
     clearVoiceLanguage?: boolean;
+    maxResponseLength?: number;
     llmModel?: string;
     llmTemplate?: string;
   },
@@ -267,6 +268,15 @@ export async function updateDidAgentFromRole(
 
   if (input.personalityStyle) {
     promptCustomization.personality = input.personalityStyle;
+  }
+
+  if (
+    typeof input.maxResponseLength === "number" &&
+    Number.isFinite(input.maxResponseLength)
+  ) {
+    promptCustomization.max_response_length = Math.trunc(
+      input.maxResponseLength,
+    );
   }
 
   if (Object.keys(promptCustomization).length > 0) {

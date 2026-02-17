@@ -73,6 +73,10 @@ const allowedLlmTemplates = new Set([
   "assistant",
 ]);
 
+const minMaxResponseLength = 50;
+const maxMaxResponseLength = 400;
+const defaultMaxResponseLength = 200;
+
 const normalizeVoiceLanguage = (value?: string) => {
   const trimmed = value?.trim();
   if (!trimmed) return undefined;
@@ -81,6 +85,24 @@ const normalizeVoiceLanguage = (value?: string) => {
     return "multilingual";
   }
   return trimmed;
+};
+
+const normalizeMaxResponseLength = (value: unknown) => {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number.parseInt(value, 10)
+        : Number.NaN;
+  if (!Number.isFinite(parsed)) return undefined;
+  const normalized = Math.trunc(parsed);
+  if (
+    normalized < minMaxResponseLength ||
+    normalized > maxMaxResponseLength
+  ) {
+    return undefined;
+  }
+  return normalized;
 };
 
 export async function addAgentFromDidAction(formData: FormData) {
@@ -137,6 +159,9 @@ export async function addAgentFromDidAction(formData: FormData) {
   const avatarImageUrl = extractAvatarImageUrl(didAgent);
   const llmModel = extractLlmModel(didAgent);
   const llmTemplate = extractLlmTemplate(didAgent);
+  const maxResponseLength =
+    normalizeMaxResponseLength(promptCustomization.max_response_length) ??
+    defaultMaxResponseLength;
 
   const slug =
     (await resolveUniqueSlug(displayName)) ??
@@ -162,6 +187,7 @@ export async function addAgentFromDidAction(formData: FormData) {
       voiceLanguage: normalizeVoiceLanguage(voiceLanguage) ?? null,
       llmModel: llmModel || null,
       llmTemplate: llmTemplate || null,
+      maxResponseLength,
       backgroundEnabled: false,
       idleVideoUrl: idleVideoUrl || null,
       avatarImageUrl: avatarImageUrl || null,
@@ -183,6 +209,7 @@ export async function addAgentFromDidAction(formData: FormData) {
     personalityStyle: created.personality ?? "",
     voiceId: created.voiceID || undefined,
     voiceLanguage: created.voiceLanguage ?? undefined,
+    maxResponseLength: created.maxResponseLength,
   });
 
   const agentKey = created.slug ?? created.agentId ?? created.id;
@@ -229,6 +256,7 @@ export async function syncAgentFromDidAction(agentKey: AgentKey) {
     voiceLanguage?: string;
     llmModel?: string;
     llmTemplate?: string;
+    maxResponseLength?: number;
     idleVideoUrl?: string;
     avatarImageUrl?: string;
   } = {};
@@ -274,6 +302,13 @@ export async function syncAgentFromDidAction(agentKey: AgentKey) {
   const llmTemplate = extractLlmTemplate(didAgent);
   if (llmTemplate) updateData.llmTemplate = llmTemplate;
 
+  const maxResponseLength = normalizeMaxResponseLength(
+    promptCustomization.max_response_length,
+  );
+  if (typeof maxResponseLength === "number") {
+    updateData.maxResponseLength = maxResponseLength;
+  }
+
   const idleVideoUrl = extractIdleVideoUrl(didAgent);
   if (idleVideoUrl) updateData.idleVideoUrl = idleVideoUrl;
 
@@ -318,6 +353,9 @@ export async function saveRoleSettingsAction(formData: FormData) {
   const llmModelRaw = getOptionalString(formData.get("llmModel"));
   const llmTemplateRaw = getOptionalString(formData.get("llmTemplate"));
   const voiceLanguageRaw = getOptionalString(formData.get("voiceLanguage"));
+  const maxResponseLengthRaw = getOptionalString(
+    formData.get("maxResponseLength"),
+  );
   const mobileOffsetRaw = getOptionalString(formData.get("mobileVideoOffsetPx"));
   const mobileVideoOffsetPx = Number.isFinite(Number(mobileOffsetRaw))
     ? Math.trunc(Number(mobileOffsetRaw))
@@ -359,6 +397,12 @@ export async function saveRoleSettingsAction(formData: FormData) {
       ? llmTemplateRaw.trim()
       : undefined
     : undefined;
+  const maxResponseLength = normalizeMaxResponseLength(maxResponseLengthRaw);
+  if (typeof maxResponseLength !== "number") {
+    throw new Error(
+      `Max response length must be a number between ${minMaxResponseLength} and ${maxMaxResponseLength}`,
+    );
+  }
   const voiceLanguage = normalizeVoiceLanguage(voiceLanguageRaw ?? undefined);
   const clearVoiceLanguage =
     typeof voiceLanguageRaw === "string" && voiceLanguageRaw.trim() === "";
@@ -429,6 +473,7 @@ export async function saveRoleSettingsAction(formData: FormData) {
       voiceLanguage: voiceLanguage ?? null,
       llmModel: llmModel ?? null,
       llmTemplate: llmTemplate ?? null,
+      maxResponseLength,
       mobileVideoOffsetPx,
       backgroundEnabled: backgroundsEnabled,
       backgroundKeyColor: normalizedBackgroundKeyColor,
@@ -448,6 +493,7 @@ export async function saveRoleSettingsAction(formData: FormData) {
       clearVoiceLanguage,
       llmModel,
       llmTemplate,
+      maxResponseLength,
     });
   } else {
   }

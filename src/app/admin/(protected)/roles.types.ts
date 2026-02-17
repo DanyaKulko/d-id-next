@@ -24,6 +24,7 @@ export type AgentSettings = {
   voiceLanguage?: string;
   llmModel?: string;
   llmTemplate?: string;
+  maxResponseLength: number;
   mobileVideoOffsetPx: number;
   backgroundsEnabled: boolean;
   backgroundKeyColor?: BackgroundKeyColor;
