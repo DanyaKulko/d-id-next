@@ -14,11 +14,10 @@ export async function createAdmin() {
 
   const user = await prisma.user.upsert({
     where: { email },
-    update: { passwordHash, twoFactorEmail: true },
+    update: { passwordHash },
     create: {
       email,
       passwordHash,
-      twoFactorEmail: true,
       roles: { create: [{ role: "ADMIN" }] },
     },
     select: { id: true, email: true },

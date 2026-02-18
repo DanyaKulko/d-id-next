@@ -33,7 +33,6 @@ model User {
   email        String @unique
   passwordHash String
 
-  twoFactorEmail Boolean @default(false)
   isActive       Boolean @default(true)
 
   createdAt DateTime @default(now())

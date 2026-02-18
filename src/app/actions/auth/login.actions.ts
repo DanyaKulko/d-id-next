@@ -3,9 +3,8 @@
 import { headers } from "next/headers";
 import { z } from "zod";
 import { auditAuth } from "@/lib/audit/auth";
-import { setPending2faCookie, setSessionCookie } from "@/lib/auth/cookies";
+import { setPending2faCookie } from "@/lib/auth/cookies";
 import { verifyPassword } from "@/lib/auth/passwords";
-import { createSession } from "@/lib/auth/session";
 import { startEmail2fa } from "@/lib/auth/twofactor";
 import { prisma } from "@/lib/db/prisma";
 import { verifyRecaptcha } from "@/lib/security/recaptcha";
@@ -20,7 +19,6 @@ const Schema = z.object({
 export async function loginStart(input: unknown) {
   const parsed = Schema.safeParse(input);
   if (!parsed.success) {
-      console.log('Login input validation failed:', parsed.error);
     return { ok: false as const, step: "login" as const };
   }
   const { email, password, recaptchaToken } = parsed.data;
@@ -29,7 +27,6 @@ export async function loginStart(input: unknown) {
   const ip = rawHeaders.get("x-forwarded-for")?.split(",")[0]?.trim();
   const ua = rawHeaders.get("user-agent") ?? undefined;
 
-    console.log({ email, password, recaptchaToken })
   if (process.env.NODE_ENV === "production") {
     const r = await verifyRecaptcha(recaptchaToken ?? "", ip);
     if (!r.ok) {
@@ -41,7 +38,6 @@ export async function loginStart(input: unknown) {
         ip,
         userAgent: ua,
       });
-      console.log(`Login failed: recaptcha failed for email ${email}`);
       return { ok: false as const, step: "login" as const };
     }
   }
@@ -52,11 +48,9 @@ export async function loginStart(input: unknown) {
       id: true,
       email: true,
       passwordHash: true,
-      twoFactorEmail: true,
       isActive: true,
     },
   });
-    console.log('user fetched for email', email, ':', user);
   if (!user) {
     await auditAuth({
       type: "LOGIN_PASSWORD",
@@ -66,12 +60,9 @@ export async function loginStart(input: unknown) {
       ip,
       userAgent: ua,
     });
-    console.log(`Login failed: user not found for email ${email}`);
     return { ok: false as const, step: "login" as const };
   }
-    console.log(123123123)
   if (!user.isActive) {
-      console.log('User inactive:', email);
     await auditAuth({
       type: "LOGIN_PASSWORD",
       success: false,
@@ -83,9 +74,7 @@ export async function loginStart(input: unknown) {
     });
     return { ok: false as const, step: "login" as const };
   }
-    console.log(1)
   const okPwd = await verifyPassword(user.passwordHash, password);
-    console.log('Password verification result for', email, ':', okPwd);
   await auditAuth({
     type: "LOGIN_PASSWORD",
     success: okPwd,
@@ -97,14 +86,7 @@ export async function loginStart(input: unknown) {
   });
   if (!okPwd) return { ok: false as const, step: "login" as const };
 
-  if (user.twoFactorEmail) {
-    const { tokenId, expiresAt } = await startEmail2fa(user.id, user.email);
-    await setPending2faCookie(`${user.id}:${tokenId}`, 10);
-    return { ok: true as const, step: "2fa" as const, expiresAt };
-  }
-
-  const session = await createSession({ userId: user.id, ip, userAgent: ua });
-  await setSessionCookie(session.rawToken, session.expiresAt);
-
-  return { ok: true as const, step: "done" as const };
+  const { tokenId, expiresAt } = await startEmail2fa(user.id, user.email);
+  await setPending2faCookie(`${user.id}:${tokenId}`, 10);
+  return { ok: true as const, step: "2fa" as const, expiresAt };
 }
