@@ -75,6 +75,18 @@ const resolveStoredKnowledgeFilePath = (documentUrl?: string | null) => {
   return absolutePath;
 };
 
+const isManagedKnowledgeUploadFile = (absolutePath: string) => {
+  const fileName = path.basename(absolutePath).toLowerCase();
+  return fileName.startsWith("manual-") || fileName.startsWith("knowledge-");
+};
+
+const removeManagedKnowledgeFile = async (documentUrl?: string | null) => {
+  const absolutePath = resolveStoredKnowledgeFilePath(documentUrl);
+  if (!absolutePath) return;
+  if (!isManagedKnowledgeUploadFile(absolutePath)) return;
+  await unlink(absolutePath).catch(() => undefined);
+};
+
 const resolveAgentKnowledgeBaseId = async (agent: {
   id: string;
   agentId: string | null;
@@ -370,12 +382,7 @@ export async function saveManualTrainingAction(formData: FormData) {
     ).catch(() => undefined);
   }
 
-  const previousFilePath = resolveStoredKnowledgeFilePath(
-    previousManualDoc?.documentUrl,
-  );
-  if (previousFilePath) {
-    await unlink(previousFilePath).catch(() => undefined);
-  }
+  await removeManagedKnowledgeFile(previousManualDoc?.documentUrl);
 
   let sourceUrlForDid = "";
   let manualDocumentUrl = "";
@@ -457,12 +464,7 @@ export async function saveManualTrainingAction(formData: FormData) {
 
   if (duplicateManualDocIds.length > 0) {
     for (const duplicateDoc of duplicateManualDocs) {
-      const duplicateFilePath = resolveStoredKnowledgeFilePath(
-        duplicateDoc.documentUrl,
-      );
-      if (duplicateFilePath) {
-        await unlink(duplicateFilePath).catch(() => undefined);
-      }
+      await removeManagedKnowledgeFile(duplicateDoc.documentUrl);
     }
 
     await prisma.processedPost.updateMany({
@@ -668,10 +670,7 @@ export async function deleteKnowledgeDocumentAction(formData: FormData) {
     });
 
     for (const doc of localDocs) {
-      const localFilePath = resolveStoredKnowledgeFilePath(doc.documentUrl);
-      if (localFilePath) {
-        await unlink(localFilePath).catch(() => undefined);
-      }
+      await removeManagedKnowledgeFile(doc.documentUrl);
     }
   }
 
