@@ -65,6 +65,11 @@ export const didService = {
     return Array.isArray(data?.documents) ? data.documents : data;
   },
 
+  async createKnowledgeBase(payload?: { name?: string; description?: string }) {
+    const { data } = await client.post(`/knowledge`, payload ?? {});
+    return data;
+  },
+
   async createKnowledgeDocument(
     knowledgeBaseId: string,
     payload: {

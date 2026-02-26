@@ -115,6 +115,16 @@ const extractAvatarImageUrl = (agent: unknown) => {
   );
 };
 
+const extractKnowledgeBaseId = (agent: unknown) => {
+  if (!agent || typeof agent !== "object") return "";
+  const record = agent as Record<string, unknown>;
+  const knowledge = record.knowledge;
+  if (knowledge && typeof knowledge === "object") {
+    return resolveString((knowledge as Record<string, unknown>).id, "");
+  }
+  return resolveString(record.knowledge_id ?? record.knowledgeId, "");
+};
+
 const extractMaxResponseLength = (agent: unknown) => {
   if (!agent || typeof agent !== "object") return undefined;
   const record = agent as Record<string, unknown>;
@@ -134,6 +144,7 @@ const toAgentSettings = (
   agent: {
     id: string;
     agentId: string | null;
+    knowledgeBaseId: string | null;
     displayName: string;
     description: string | null;
     name: string;
@@ -166,6 +177,7 @@ const toAgentSettings = (
   return {
     key,
     agentId: agent.agentId,
+    knowledgeBaseId: agent.knowledgeBaseId ?? undefined,
     displayName: agent.displayName,
     description: agent.description ?? "",
     agentName: agent.name,
@@ -236,11 +248,13 @@ export async function fetchAgentSettingsFromDb(
     const voiceId = extractVoiceId(didAgent);
     const voiceLanguage = normalizeVoiceLanguage(extractVoiceLanguage(didAgent));
     const maxResponseLength = extractMaxResponseLength(didAgent);
+    const knowledgeBaseId = extractKnowledgeBaseId(didAgent);
     const avatarImageUrl = extractAvatarImageUrl(didAgent);
     const updateData: {
       voiceID?: string;
       voiceLanguage?: string;
       maxResponseLength?: number;
+      knowledgeBaseId?: string;
       avatarImageUrl?: string;
     } = {};
     if (voiceId && voiceId !== (agent.voiceID ?? "")) {
@@ -257,6 +271,9 @@ export async function fetchAgentSettingsFromDb(
       maxResponseLength !== agent.maxResponseLength
     ) {
       updateData.maxResponseLength = maxResponseLength;
+    }
+    if (knowledgeBaseId && knowledgeBaseId !== (agent.knowledgeBaseId ?? "")) {
+      updateData.knowledgeBaseId = knowledgeBaseId;
     }
     if (avatarImageUrl && avatarImageUrl !== (agent.avatarImageUrl ?? "")) {
       updateData.avatarImageUrl = avatarImageUrl;

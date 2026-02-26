@@ -25,6 +25,19 @@
   margin-top: 0;
 }
 
+.training-navigation-block {
+  /*margin-bottom: 25px;*/
+  margin-bottom: -10px;
+}
+
+.training-navigation-block .role-tabs {
+  margin-bottom: 10px;
+}
+
+.training-navigation-block .tabs {
+  margin-bottom: 0;
+}
+
 .knowledge-meta {
   display: flex;
   gap: 20px;

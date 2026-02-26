@@ -1,9 +1,10 @@
 "use server";
 
+import { findAgentByKey } from "@/lib/agents/agents.db";
 import { prisma } from "@/lib/db/prisma";
-import { parseStoredDocumentIds } from "@/lib/external-sources/documents";
 import { didService } from "@/lib/services/did.service";
 import { normalizeDidChatText } from "@/lib/text/did-chat";
+import { defaultSafetyRules } from "./actions/shared";
 
 export type UserRow = {
   id: string;
@@ -22,6 +23,11 @@ export type KnowledgeItem = {
   status: "processing" | "error" | "active";
   url: string | undefined;
   isEnabled: boolean;
+};
+
+export type TrainingRoleOption = {
+  key: string;
+  name: string;
 };
 
 export type SessionMessageItem = {
@@ -87,26 +93,22 @@ export type ErrorLogPage = {
   totalPages: number;
 };
 
-const safetyRulesKey = "safetyRules";
-const manualTrainingKey = "manualTrainingText";
-const manualTrainingDocKey = "manualTrainingDocId";
 const authRequiredKey = "requireAuthentication";
-const textBlogEnabledKey = "textBlogEnabled";
-const manualTrainingSource = "Manual training";
-const textBlogSource = "Text blog";
-const videoTranscriptsSource = "Video transcripts";
-const defaultSafetyRules = `Do not discuss:
-- Political topics in aggressive form
-- Personal information of third parties
-- Financial advice as actionable recommendations
-
-Always:
-- Maintain a respectful tone
-- Avoid categorical judgments
-- Reference sources for factual claims`;
 
 const normalizeDidDocumentId = (value: string) =>
   value.includes("#") ? (value.split("#").pop() ?? value) : value;
+
+const resolveTrainingAgent = async (agentKey: string) => {
+  const key = agentKey.trim();
+  if (!key) {
+    throw new Error("Agent key is required");
+  }
+  const agent = await findAgentByKey(key);
+  if (!agent) {
+    throw new Error("Agent not found");
+  }
+  return agent;
+};
 
 const isCookieLikeValue = (value: string) => {
   const lower = value.toLowerCase();
@@ -206,177 +208,62 @@ export async function fetchUsers(): Promise<UserRow[]> {
   }));
 }
 
-export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
-  const knowledgeBaseId = process.env.DID_KNOWLEDGE_BASE_ID ?? "";
-  const [manualDoc, externalSources] = await Promise.all([
-    prisma.appSetting.findUnique({ where: { key: manualTrainingDocKey } }),
-    prisma.externalSource.findMany(),
-  ]);
+export async function fetchTrainingRoles(): Promise<TrainingRoleOption[]> {
+  const roles = await prisma.agent.findMany({
+    select: {
+      id: true,
+      slug: true,
+      agentId: true,
+      displayName: true,
+    },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+  });
 
-  const textSource = externalSources.find((item) => item.kind === "TEXT");
-  const videoSource = externalSources.find((item) => item.kind === "VIDEO");
-  const textDocIds = parseStoredDocumentIds(textSource?.documentId ?? null);
-  const videoDocIds = parseStoredDocumentIds(videoSource?.documentId ?? null);
+  return roles.map((role) => ({
+    key: role.slug ?? role.agentId ?? role.id,
+    name: role.displayName,
+  }));
+}
 
-  const knownDocIdMap = new Map<string, string>();
-  const registerDocId = (docId: string, label: string) => {
-    knownDocIdMap.set(docId, label);
-    knownDocIdMap.set(normalizeDidDocumentId(docId), label);
-  };
-  const registerDocIds = (docIds: string[], label: string) => {
-    for (const docId of docIds) {
-      registerDocId(docId, label);
-    }
-  };
-  if (manualDoc?.value) {
-    registerDocId(manualDoc.value, manualTrainingSource);
-  }
-  if (textDocIds.length > 0) {
-    registerDocIds(textDocIds, textBlogSource);
-  }
-  if (videoDocIds.length > 0) {
-    registerDocIds(videoDocIds, videoTranscriptsSource);
-  }
+export async function fetchKnowledgeArchive(
+  agentKey: string,
+): Promise<KnowledgeItem[]> {
+  const agent = await resolveTrainingAgent(agentKey);
+  const knowledgeBaseId = agent.knowledgeBaseId?.trim() ?? "";
+  const localDocs = await prisma.knowledgeDocuments.findMany({
+    where: { agentId: agent.id },
+    orderBy: { createdAt: "desc" },
+  });
 
-  const expectedDocIdBySourceKey = new Map<string, Set<string>>();
-  if (manualDoc?.value) {
-    expectedDocIdBySourceKey.set(
-      manualTrainingSource.toLowerCase(),
-      new Set([manualDoc.value, normalizeDidDocumentId(manualDoc.value)]),
-    );
-  }
-  if (textDocIds.length > 0) {
-    expectedDocIdBySourceKey.set(
-      textBlogSource.toLowerCase(),
-      new Set(textDocIds.flatMap((id) => [id, normalizeDidDocumentId(id)])),
-    );
-  }
-  if (videoDocIds.length > 0) {
-    expectedDocIdBySourceKey.set(
-      videoTranscriptsSource.toLowerCase(),
-      new Set(videoDocIds.flatMap((id) => [id, normalizeDidDocumentId(id)])),
-    );
-  }
+  const mapLocalDoc = (doc: (typeof localDocs)[number]): KnowledgeItem => ({
+    id: doc.id,
+    title: doc.title ?? doc.source,
+    sourceLabel: doc.source,
+    created: doc.createdAt.toISOString().split("T")[0],
+    status:
+      doc.status === "READY"
+        ? "active"
+        : doc.status === "FAILED"
+          ? "error"
+          : "processing",
+    url: doc.documentUrl ?? undefined,
+    isEnabled: doc.isEnabled,
+  });
 
-  const cleanupKnownSources = async () => {
-    const manualDocIds = manualDoc?.value
-      ? [manualDoc.value, normalizeDidDocumentId(manualDoc.value)]
-      : [];
-    const textDocIds = textSource?.documentId
-      ? parseStoredDocumentIds(textSource.documentId).flatMap((id) => [
-          id,
-          normalizeDidDocumentId(id),
-        ])
-      : [];
-    const videoDocIds = videoSource?.documentId
-      ? parseStoredDocumentIds(videoSource.documentId).flatMap((id) => [
-          id,
-          normalizeDidDocumentId(id),
-        ])
-      : [];
-
-    if (manualDocIds.length > 0) {
-      await prisma.knowledgeDocuments.deleteMany({
-        where: {
-          source: { equals: manualTrainingSource, mode: "insensitive" },
-          isEnabled: true,
-          documentId: { notIn: manualDocIds },
-        },
-      });
-    }
-    if (textDocIds.length > 0) {
-      await prisma.knowledgeDocuments.deleteMany({
-        where: {
-          source: { equals: textBlogSource, mode: "insensitive" },
-          isEnabled: true,
-          documentId: { notIn: textDocIds },
-        },
-      });
-    }
-    if (videoDocIds.length > 0) {
-      await prisma.knowledgeDocuments.deleteMany({
-        where: {
-          source: { equals: videoTranscriptsSource, mode: "insensitive" },
-          isEnabled: true,
-          documentId: { notIn: videoDocIds },
-        },
-      });
-    }
-  };
   if (!knowledgeBaseId) {
-    await cleanupKnownSources();
-    const localDocs = await prisma.knowledgeDocuments.findMany({
-      orderBy: { createdAt: "desc" },
-    });
-    return localDocs.map((doc) => ({
-      id: doc.documentId ?? doc.id,
-      title: doc.title ?? doc.source,
-      sourceLabel: doc.source,
-      created: doc.createdAt.toISOString().split("T")[0],
-      status:
-        doc.status === "READY"
-          ? "active"
-          : doc.status === "FAILED"
-            ? "error"
-            : "processing",
-      url: doc.documentUrl ?? undefined,
-      isEnabled: doc.isEnabled,
-    }));
+    return localDocs.map(mapLocalDoc);
   }
 
   try {
     const documents = await didService.listKnowledgeDocuments(knowledgeBaseId);
-    const documentList = Array.isArray(documents) ? documents : [];
-    const documentIds = documentList
-      .map((doc) => String(doc.id ?? doc.document_id ?? doc.documentId ?? ""))
-      .filter((id) => id);
-    const normalizedDocumentIds = documentIds.map((id) =>
-      normalizeDidDocumentId(id),
-    );
-    const queryDocumentIds = Array.from(
-      new Set([...documentIds, ...normalizedDocumentIds]),
-    );
-    const localDocs = queryDocumentIds.length
-      ? await prisma.knowledgeDocuments.findMany({
-          where: { documentId: { in: queryDocumentIds } },
-        })
-      : [];
-    const pickPreferredDoc = (
-      current: (typeof localDocs)[number] | undefined,
-      candidate: (typeof localDocs)[number],
-    ) => {
-      if (!current) return candidate;
-      const currentHasPublicUrl = Boolean(
-        current.documentUrl && !current.documentUrl.startsWith("s3://"),
-      );
-      const candidateHasPublicUrl = Boolean(
-        candidate.documentUrl && !candidate.documentUrl.startsWith("s3://"),
-      );
-      if (currentHasPublicUrl !== candidateHasPublicUrl) {
-        return candidateHasPublicUrl ? candidate : current;
-      }
-      const currentHasUrl = Boolean(current.documentUrl);
-      const candidateHasUrl = Boolean(candidate.documentUrl);
-      if (currentHasUrl !== candidateHasUrl) {
-        return candidateHasUrl ? candidate : current;
-      }
-      if (current.isEnabled !== candidate.isEnabled) {
-        return candidate.isEnabled ? candidate : current;
-      }
-      return candidate.updatedAt > current.updatedAt ? candidate : current;
-    };
-    const localMap = new Map<string, (typeof localDocs)[number]>();
-    for (const doc of localDocs) {
-      if (!doc.documentId) continue;
-      const normalizedDocId = normalizeDidDocumentId(doc.documentId);
-      localMap.set(
-        doc.documentId,
-        pickPreferredDoc(localMap.get(doc.documentId), doc),
-      );
-      localMap.set(
-        normalizedDocId,
-        pickPreferredDoc(localMap.get(normalizedDocId), doc),
-      );
+    const remoteDocs = Array.isArray(documents) ? documents : [];
+    const localByDocumentId = new Map<string, (typeof localDocs)[number]>();
+
+    for (const local of localDocs) {
+      if (!local.documentId) continue;
+      const normalized = normalizeDidDocumentId(local.documentId);
+      localByDocumentId.set(local.documentId, local);
+      localByDocumentId.set(normalized, local);
     }
 
     const statusMap: Record<string, KnowledgeItem["status"]> = {
@@ -390,162 +277,85 @@ export async function fetchKnowledgeArchive(): Promise<KnowledgeItem[]> {
       active: "active",
     };
 
-    const mapped = documentList
+    const mappedRemote: KnowledgeItem[] = remoteDocs
       .map((doc) => {
-        const docId = String(doc.id ?? doc.document_id ?? doc.documentId);
+        const remoteId = String(doc.id ?? doc.document_id ?? doc.documentId ?? "");
+        if (!remoteId) return null;
         const local =
-          localMap.get(docId) ?? localMap.get(normalizeDidDocumentId(docId));
-        const titleRaw = String(doc.title ?? doc.name ?? "").trim();
-        const titleKey = titleRaw.toLowerCase();
-        const labelFromId =
-          knownDocIdMap.get(docId) ??
-          knownDocIdMap.get(normalizeDidDocumentId(docId));
-        const labelFromTitle =
-          titleKey === manualTrainingSource.toLowerCase()
-            ? manualTrainingSource
-            : titleKey === textBlogSource.toLowerCase()
-              ? textBlogSource
-              : titleKey === videoTranscriptsSource.toLowerCase()
-                ? videoTranscriptsSource
-                : undefined;
-        const expectedDocIds = expectedDocIdBySourceKey.get(titleKey);
+          localByDocumentId.get(remoteId) ??
+          localByDocumentId.get(normalizeDidDocumentId(remoteId));
+        if (!local) return null;
+        if (local && !local.isEnabled) return null;
 
-        if (expectedDocIds && !expectedDocIds.has(docId)) {
-          if (!local || local.isEnabled) {
-            return null;
-          }
-        }
-
-        const sourceLabel =
-          labelFromId ??
-          labelFromTitle ??
-          doc.source ??
-          local?.source ??
-          "Knowledge";
+        const remoteStatus = String(doc.status ?? "").toLowerCase();
         const remoteUrlRaw = doc.documentUrl ?? doc.url ?? doc.document_url;
         const remoteUrl =
-          typeof remoteUrlRaw === "string" ? remoteUrlRaw : undefined;
-        const localUrl = local?.documentUrl ?? undefined;
+          typeof remoteUrlRaw === "string" && !remoteUrlRaw.startsWith("s3://")
+            ? remoteUrlRaw
+            : undefined;
+        const titleRaw = String(doc.title ?? doc.name ?? "").trim();
 
         return {
-          id: docId,
+          id: local?.id ?? remoteId,
           title:
-            titleRaw ||
-            local?.title ||
-            local?.source ||
-            sourceLabel ||
-            "Knowledge Document",
-          sourceLabel,
+            local?.title ?? (titleRaw || local?.source || "Knowledge Document"),
+          sourceLabel: local?.source ?? "Knowledge",
           created: doc.created_at
             ? new Date(doc.created_at).toISOString().split("T")[0]
-            : "",
-          status:
-            statusMap[String(doc.status ?? "").toLowerCase()] ?? "processing",
-          url:
-            localUrl ||
-            (remoteUrl?.startsWith("s3://") ? undefined : remoteUrl),
+            : local?.createdAt.toISOString().split("T")[0] ?? "",
+          status: statusMap[remoteStatus] ?? "processing",
+          url: local?.documentUrl ?? remoteUrl,
           isEnabled: local?.isEnabled ?? true,
-        };
-      })
-      .filter((item): item is KnowledgeItem => item !== null);
-
-    const extraLocal = await prisma.knowledgeDocuments.findMany({
-      where: { documentId: { notIn: queryDocumentIds } },
-      orderBy: { createdAt: "desc" },
-    });
-
-    const extraMapped = extraLocal
-      .map((doc) => {
-        const sourceKey = doc.source.trim().toLowerCase();
-        const expectedDocIds = expectedDocIdBySourceKey.get(sourceKey);
-        if (
-          expectedDocIds &&
-          doc.documentId &&
-          !expectedDocIds.has(doc.documentId) &&
-          !expectedDocIds.has(normalizeDidDocumentId(doc.documentId)) &&
-          doc.isEnabled
-        ) {
-          return null;
-        }
-
-        return {
-          id: doc.documentId ?? doc.id,
-          title: doc.title ?? doc.source,
-          sourceLabel: doc.source,
-          created: doc.createdAt.toISOString().split("T")[0],
-          status:
-            doc.status === "READY"
-              ? "active"
-              : doc.status === "FAILED"
-                ? "error"
-                : "processing",
-          url: doc.documentUrl ?? undefined,
-          isEnabled: doc.isEnabled,
-        };
+        } satisfies KnowledgeItem;
       })
       .filter((item): item is KnowledgeItem => Boolean(item));
 
-    await cleanupKnownSources();
-    const combined = [...mapped, ...extraMapped];
-    const seenIds = new Set<string>();
-    const unique = combined.filter((item) => {
-      if (seenIds.has(item.id)) return false;
-      seenIds.add(item.id);
-      return true;
-    });
-    const dedupeKeys = new Set(["manual training"]);
+    const remoteIds = new Set(
+      remoteDocs
+        .map((doc) => String(doc.id ?? doc.document_id ?? doc.documentId ?? ""))
+        .filter((value) => Boolean(value))
+        .flatMap((id) => [id, normalizeDidDocumentId(id)]),
+    );
+
+    const onlyLocal = localDocs
+      .filter((doc) => {
+        if (!doc.isEnabled) return true;
+        if (!doc.documentId) return true;
+        return !remoteIds.has(doc.documentId);
+      })
+      .map(mapLocalDoc);
+
+    const merged = [...mappedRemote, ...onlyLocal];
     const seen = new Set<string>();
-    return unique.filter((item) => {
-      const key = item.sourceLabel.trim().toLowerCase();
-      if (!dedupeKeys.has(key)) return true;
-      if (seen.has(key)) return false;
-      seen.add(key);
+    return merged.filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
       return true;
     });
   } catch {
-    await cleanupKnownSources();
-    const localDocs = await prisma.knowledgeDocuments.findMany({
-      orderBy: { createdAt: "desc" },
-    });
-    return localDocs.map((doc) => ({
-      id: doc.documentId ?? doc.id,
-      title: doc.title ?? doc.source,
-      sourceLabel: doc.source,
-      created: doc.createdAt.toISOString().split("T")[0],
-      status:
-        doc.status === "READY"
-          ? "active"
-          : doc.status === "FAILED"
-            ? "error"
-            : "processing",
-      url: doc.documentUrl ?? undefined,
-      isEnabled: doc.isEnabled,
-    }));
+    return localDocs.map(mapLocalDoc);
   }
 }
 
-export async function fetchSafetyInstructions(): Promise<string> {
-  const safetySetting = await prisma.appSetting.findUnique({
-    where: { key: safetyRulesKey },
-  });
-  return safetySetting?.value?.trim()
-    ? safetySetting.value
-    : defaultSafetyRules;
+export async function fetchSafetyInstructions(agentKey: string): Promise<string> {
+  const agent = await resolveTrainingAgent(agentKey);
+  return agent.safetyRules?.trim() ? agent.safetyRules : defaultSafetyRules;
 }
 
-export async function fetchManualTrainingTemplate(): Promise<string> {
-  const manualSetting = await prisma.appSetting.findUnique({
-    where: { key: manualTrainingKey },
+export async function fetchManualTrainingTemplate(
+  agentKey: string,
+): Promise<string> {
+  const agent = await resolveTrainingAgent(agentKey);
+  const manual = await prisma.agentTrainingManual.findUnique({
+    where: { agentId: agent.id },
+    select: { manualText: true },
   });
-  return manualSetting?.value?.trim() ? manualSetting.value : "";
+  return manual?.manualText?.trim() ? manual.manualText : "";
 }
 
-export async function fetchTextBlogEnabled(): Promise<boolean> {
-  const setting = await prisma.appSetting.findUnique({
-    where: { key: textBlogEnabledKey },
-  });
-  if (!setting?.value) return true;
-  return setting.value === "true";
+export async function fetchTextBlogEnabled(agentKey: string): Promise<boolean> {
+  const agent = await resolveTrainingAgent(agentKey);
+  return agent.blogKnowledgeEnabled;
 }
 
 const maskCentered = (str: string, unmaskedChars = 4) => {

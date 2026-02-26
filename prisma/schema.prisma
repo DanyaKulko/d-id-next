@@ -108,11 +108,15 @@ model LoginEvent {
 model Agent {
   id              String  @id @default(cuid())
   agentId         String  @unique
+  knowledgeBaseId String?
+  blogCategoryIds Int[]   @default([])
+  blogKnowledgeEnabled Boolean @default(true)
   slug            String? @unique
   displayName     String
   description     String?
   name            String
   roleDescription String?
+  safetyRules     String? @db.Text
   instructions    String?
   personality     String?
 
@@ -133,9 +137,25 @@ model Agent {
   updatedAt DateTime @updatedAt
 
   backgrounds  AgentBackground[]
+  trainingManual AgentTrainingManual?
   chatSessions ChatSession[]
+  knowledgeDocuments KnowledgeDocuments[]
+  processedPosts ProcessedPost[]
 
   @@map("agents")
+}
+
+model AgentTrainingManual {
+  id            String @id @default(cuid())
+  agentId       String @unique
+  agent         Agent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  baseKnowledge String @default("") @db.Text
+  manualText    String @default("") @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("agent_training_manual")
 }
 
 model AgentBackground {
@@ -240,6 +260,9 @@ model ExternalServiceLog {
 
 model KnowledgeDocuments {
   id          String                  @id @default(cuid())
+  agentId     String?
+  agent       Agent?                  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  categoryId  Int?
   source      String
   title       String?
   documentId  String?
@@ -255,12 +278,17 @@ model KnowledgeDocuments {
 
   posts ProcessedPost[]
 
+  @@index([agentId, source, isEnabled])
+  @@index([agentId, categoryId])
   @@map("knowledge_bases")
 }
 
 model ProcessedPost {
   id         String @id @default(cuid())
-  externalId String @unique
+  agentId    String?
+  agent      Agent?  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  categoryId Int?
+  externalId String
 
   content   String @db.Text
   charCount Int
@@ -270,6 +298,8 @@ model ProcessedPost {
 
   createdAt DateTime @default(now())
 
+  @@unique([agentId, externalId, categoryId])
+  @@index([agentId, categoryId, knowledgeDocumentId])
   @@map("processed_posts")
 }
 

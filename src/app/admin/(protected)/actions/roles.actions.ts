@@ -9,8 +9,10 @@ import { prisma } from "@/lib/db/prisma";
 import { didService } from "@/lib/services/did.service";
 import type { AgentKey } from "../roles.types";
 import {
+  defaultSafetyRules,
   extractAvatarImageUrl,
   extractIdleVideoUrl,
+  extractKnowledgeBaseId,
   extractLlmModel,
   extractLlmTemplate,
   extractVoiceId,
@@ -20,7 +22,6 @@ import {
   normalizePersonalityStyle,
   requireAdmin,
   resolveString,
-  safetyRulesKey,
   stripSafetyRulesFromPrompt,
   updateDidAgentFromRole,
   withDidLogging,
@@ -159,6 +160,7 @@ export async function addAgentFromDidAction(formData: FormData) {
   const avatarImageUrl = extractAvatarImageUrl(didAgent);
   const llmModel = extractLlmModel(didAgent);
   const llmTemplate = extractLlmTemplate(didAgent);
+  const knowledgeBaseId = extractKnowledgeBaseId(didAgent);
   const maxResponseLength =
     normalizeMaxResponseLength(promptCustomization.max_response_length) ??
     defaultMaxResponseLength;
@@ -187,6 +189,8 @@ export async function addAgentFromDidAction(formData: FormData) {
       voiceLanguage: normalizeVoiceLanguage(voiceLanguage) ?? null,
       llmModel: llmModel || null,
       llmTemplate: llmTemplate || null,
+      knowledgeBaseId: knowledgeBaseId || null,
+      safetyRules: defaultSafetyRules,
       maxResponseLength,
       backgroundEnabled: false,
       idleVideoUrl: idleVideoUrl || null,
@@ -195,21 +199,17 @@ export async function addAgentFromDidAction(formData: FormData) {
     },
   });
 
-  const safetySetting = await prisma.appSetting.findUnique({
-    where: { key: safetyRulesKey },
-  });
-  const safetyRules = safetySetting?.value ?? "";
-
   await updateDidAgentFromRole(created.agentId, {
     name: created.name,
     description: created.description ?? "",
     role: created.roleDescription ?? "",
     systemPrompt: created.instructions ?? "",
-    safetyRules,
+    safetyRules: created.safetyRules?.trim() || defaultSafetyRules,
     personalityStyle: created.personality ?? "",
     voiceId: created.voiceID || undefined,
     voiceLanguage: created.voiceLanguage ?? undefined,
     maxResponseLength: created.maxResponseLength,
+    knowledgeBaseId: created.knowledgeBaseId ?? undefined,
   });
 
   const agentKey = created.slug ?? created.agentId ?? created.id;
@@ -256,6 +256,7 @@ export async function syncAgentFromDidAction(agentKey: AgentKey) {
     voiceLanguage?: string;
     llmModel?: string;
     llmTemplate?: string;
+    knowledgeBaseId?: string | null;
     maxResponseLength?: number;
     idleVideoUrl?: string;
     avatarImageUrl?: string;
@@ -301,6 +302,8 @@ export async function syncAgentFromDidAction(agentKey: AgentKey) {
 
   const llmTemplate = extractLlmTemplate(didAgent);
   if (llmTemplate) updateData.llmTemplate = llmTemplate;
+  const knowledgeBaseId = extractKnowledgeBaseId(didAgent);
+  if (knowledgeBaseId) updateData.knowledgeBaseId = knowledgeBaseId;
 
   const maxResponseLength = normalizeMaxResponseLength(
     promptCustomization.max_response_length,
@@ -406,10 +409,7 @@ export async function saveRoleSettingsAction(formData: FormData) {
   const voiceLanguage = normalizeVoiceLanguage(voiceLanguageRaw ?? undefined);
   const clearVoiceLanguage =
     typeof voiceLanguageRaw === "string" && voiceLanguageRaw.trim() === "";
-  const safetySetting = await prisma.appSetting.findUnique({
-    where: { key: safetyRulesKey },
-  });
-  const safetyRules = safetySetting?.value ?? "";
+  const safetyRules = agent.safetyRules?.trim() || defaultSafetyRules;
 
   if (voiceId && voiceLanguage) {
     const voices = await withDidLogging("List Voices", () =>
@@ -494,6 +494,7 @@ export async function saveRoleSettingsAction(formData: FormData) {
       llmModel,
       llmTemplate,
       maxResponseLength,
+      knowledgeBaseId: agent.knowledgeBaseId ?? undefined,
     });
   } else {
   }

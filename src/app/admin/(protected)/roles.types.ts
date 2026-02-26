@@ -14,6 +14,7 @@ export type BackgroundItem = {
 export type AgentSettings = {
   key: AgentKey;
   agentId: string | null;
+  knowledgeBaseId?: string;
   displayName: string;
   description: string;
   agentName: string;

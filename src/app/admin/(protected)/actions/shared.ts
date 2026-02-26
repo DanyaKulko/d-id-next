@@ -13,16 +13,17 @@ export const getString = (value: FormDataEntryValue | null) =>
 export const getOptionalString = (value: FormDataEntryValue | null) =>
   typeof value === "string" ? value : undefined;
 
-export const safetyRulesKey = "safetyRules";
-export const manualTrainingKey = "manualTrainingText";
-export const manualTrainingDocKey = "manualTrainingDocId";
-export const manualTrainingFileKey = "manualTrainingFilePath";
 export const authRequiredKey = "requireAuthentication";
-export const textBlogEnabledKey = "textBlogEnabled";
-export const manualTrainingSource = "Manual training";
-export const textBlogSource = "Text blog";
-export const videoTranscriptsSource = "Video transcripts";
 export const defaultPersonalityStyle = "Friendly and Professional";
+export const defaultSafetyRules = `Do not discuss:
+- Political topics in aggressive form
+- Personal information of third parties
+- Financial advice as actionable recommendations
+
+Always:
+- Maintain a respectful tone
+- Avoid categorical judgments
+- Reference sources for factual claims`;
 
 const personalityAliases: Record<string, string> = {
   friendly: defaultPersonalityStyle,
@@ -147,6 +148,14 @@ export const extractLlmTemplate = (agent: Record<string, unknown>) => {
   return "";
 };
 
+export const extractKnowledgeBaseId = (agent: Record<string, unknown>) => {
+  const knowledge = agent.knowledge;
+  if (knowledge && typeof knowledge === "object") {
+    return resolveString((knowledge as Record<string, unknown>).id, "");
+  }
+  return resolveString(agent.knowledge_id ?? agent.knowledgeId, "");
+};
+
 export const extractIdleVideoUrl = (agent: Record<string, unknown>) => {
   const presenter = agent.presenter;
   if (!presenter || typeof presenter !== "object") return "";
@@ -211,6 +220,7 @@ export async function updateDidAgentFromRole(
     maxResponseLength?: number;
     llmModel?: string;
     llmTemplate?: string;
+    knowledgeBaseId?: string;
   },
 ) {
   const existing = await withDidLogging("Get Agent", () =>
@@ -342,8 +352,11 @@ export async function updateDidAgentFromRole(
       fullPayload[field] = existingAgent[field];
     }
   }
-  if (process.env.DID_KNOWLEDGE_BASE_ID) {
-    fullPayload.knowledge = { id: process.env.DID_KNOWLEDGE_BASE_ID };
+  const existingKnowledgeBaseId = extractKnowledgeBaseId(existingAgent);
+  const resolvedKnowledgeBaseId =
+    input.knowledgeBaseId?.trim() || existingKnowledgeBaseId;
+  if (resolvedKnowledgeBaseId) {
+    fullPayload.knowledge = { id: resolvedKnowledgeBaseId };
   }
 
   if (Object.keys(fullPayload).length === 0) return;

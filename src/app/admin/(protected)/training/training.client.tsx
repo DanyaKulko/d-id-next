@@ -16,6 +16,7 @@ import type { TrainingTabId } from "./training.tabs";
 
 type TrainingClientProps = {
   initialTab: TrainingTabId;
+  roleKey: string;
   initialKnowledge: KnowledgeItem[];
   initialSafetyRules: string;
   initialManualText: string;
@@ -24,6 +25,7 @@ type TrainingClientProps = {
 
 export default function LearningClient({
   initialTab,
+  roleKey,
   initialKnowledge,
   initialSafetyRules,
   initialManualText,
@@ -86,6 +88,7 @@ export default function LearningClient({
     const formData = new FormData();
     formData.set("documentId", item.id);
     formData.set("enabled", String(enabled));
+    formData.set("roleKey", roleKey);
 
     startSaving(async () => {
       const promise = toggleKnowledgeDocumentEnabledAction(formData);
@@ -123,6 +126,7 @@ export default function LearningClient({
     const formData = new FormData();
     formData.set("documentId", item.id);
     formData.set("sourceLabel", item.sourceLabel);
+    formData.set("roleKey", roleKey);
 
     startSaving(async () => {
       await deleteKnowledgeDocumentAction(formData)
@@ -143,6 +147,7 @@ export default function LearningClient({
 
     const formData = new FormData();
     formData.set("enabled", String(enabled));
+    formData.set("roleKey", roleKey);
 
     startToggling(async () => {
       try {
@@ -372,6 +377,7 @@ export default function LearningClient({
               toast.error("Safety rules cannot be empty");
               return;
             }
+            formData.set("roleKey", roleKey);
 
             startSaving(() => {
               saveSafetyInstructionsAction(formData)
@@ -395,7 +401,7 @@ export default function LearningClient({
           </h2>
 
           <div className="info-box">
-            ℹ️ Safety instructions common to all roles
+            ℹ️ Safety instructions for the selected avatar role
           </div>
 
           <div className="input-group">
@@ -406,7 +412,7 @@ export default function LearningClient({
               id="safetyRules"
               name="safetyRules"
               value={safetyRules}
-              placeholder="Enter safety instructions for all avatar roles..."
+              placeholder="Enter safety instructions for this avatar role..."
               onChange={(event) => setSafetyRules(event.target.value)}
             />
           </div>
@@ -422,18 +428,20 @@ export default function LearningClient({
           className="section"
           onSubmit={(event) => {
             event.preventDefault();
-            if (!manualText.trim()) {
-              toast.error("Manual training text is required");
-              return;
-            }
-
             const formData = new FormData(event.currentTarget);
             formData.set("manualLearning", manualText);
+            formData.set("roleKey", roleKey);
 
             startSaving(async () => {
               await saveManualTrainingAction(formData)
                 .then(() => toast.success("Manual training saved"))
-                .catch(() => toast.error("Failed to save training"));
+                .catch((error) =>
+                  toast.error(
+                    error instanceof Error
+                      ? error.message
+                      : "Failed to save training",
+                  ),
+                );
             });
           }}
         >
@@ -487,6 +495,17 @@ export default function LearningClient({
                 🎙️ {interimTranscript}
               </div>
             )}
+          </div>
+
+          <div className="input-group">
+            <label htmlFor="manualFiles">Upload text files (.txt, .md)</label>
+            <input
+              id="manualFiles"
+              name="manualFiles"
+              type="file"
+              accept=".txt,.md,text/plain,text/markdown"
+              multiple
+            />
           </div>
 
           <div className="btn-group">
