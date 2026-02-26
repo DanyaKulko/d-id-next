@@ -15,7 +15,7 @@ export const trainingLimits = {
   knowledgeBucketCharLimit: 470000,
   maxBlogKnowledgeDocuments: 4,
   manualTrainingCharLimit: 350000,
-  fundamentalBriefReserveChars: 150000,
+  fundamentalBriefReserveChars: 200000,
 } as const;
 
 export type BlogCategoryDescriptor = {
@@ -43,5 +43,5 @@ export const resolveBlogCategoryById = (categoryId: number) =>
 
 export const resolveBlogCategoryTitle = (categoryId: number) =>
   categoryId > 0
-    ? resolveBlogCategoryById(categoryId)?.title ?? `Category ${categoryId}`
+    ? (resolveBlogCategoryById(categoryId)?.title ?? `Category ${categoryId}`)
     : "";

@@ -302,17 +302,29 @@ export async function saveManualTrainingAction(formData: FormData) {
     where: { agentId: agent.id },
     select: { baseKnowledge: true },
   });
-  const baseKnowledgeSetting = manualSettings?.baseKnowledge ?? "";
-  const baseKnowledge = await resolveBaseKnowledgeText(baseKnowledgeSetting);
+  const baseKnowledgeSetting = (manualSettings?.baseKnowledge ?? "").trim();
+  const isBaseKnowledgeUrl = /^https?:\/\//i.test(baseKnowledgeSetting);
   const manualText = getString(formData.get("manualLearning"));
   const uploadedFiles = await readUploadedManualFiles(formData);
-  const { manualPayload, fullPayload } = buildManualTrainingPayload(
-    manualText,
-    uploadedFiles,
-    baseKnowledge,
-  );
-  const baseKnowledgeUrl = baseKnowledgeSetting.trim();
-  const isBaseKnowledgeUrl = /^https?:\/\//i.test(baseKnowledgeUrl);
+  const hasManualInput =
+    manualText.trim().length > 0 || uploadedFiles.length > 0;
+
+  let manualPayload = "";
+  let fullPayload = "";
+
+  if (isBaseKnowledgeUrl && !hasManualInput) {
+    manualPayload = "";
+    fullPayload = "";
+  } else {
+    const baseKnowledge = await resolveBaseKnowledgeText(baseKnowledgeSetting);
+    const builtPayload = buildManualTrainingPayload(
+      manualText,
+      uploadedFiles,
+      baseKnowledge,
+    );
+    manualPayload = builtPayload.manualPayload;
+    fullPayload = builtPayload.fullPayload;
+  }
 
   await prisma.agentTrainingManual.upsert({
     where: { agentId: agent.id },
@@ -354,14 +366,17 @@ export async function saveManualTrainingAction(formData: FormData) {
 
   let sourceUrlForDid = "";
   let manualDocumentUrl = "";
+  let manualDocumentCharCount = 0;
 
   if (isBaseKnowledgeUrl && !manualPayload) {
-    sourceUrlForDid = baseKnowledgeUrl;
-    manualDocumentUrl = baseKnowledgeUrl;
+    sourceUrlForDid = baseKnowledgeSetting;
+    manualDocumentUrl = baseKnowledgeSetting;
+    manualDocumentCharCount = 0;
   } else {
     const { publicPath } = await writeManualTrainingFile(agent.id, fullPayload);
     sourceUrlForDid = `${baseUrl}${publicPath}`;
     manualDocumentUrl = sourceUrlForDid;
+    manualDocumentCharCount = fullPayload.length;
   }
 
   const webhookUrl = `${baseUrl}/api/webhooks/did/knowledge`;
@@ -398,7 +413,7 @@ export async function saveManualTrainingAction(formData: FormData) {
         documentUrl: manualDocumentUrl,
         status: "PROCESSING",
         isEnabled: true,
-        charCount: fullPayload.length,
+        charCount: manualDocumentCharCount,
         isFull: false,
         categoryId: null,
       },
@@ -414,7 +429,7 @@ export async function saveManualTrainingAction(formData: FormData) {
         documentUrl: manualDocumentUrl,
         status: "PROCESSING",
         isEnabled: true,
-        charCount: fullPayload.length,
+        charCount: manualDocumentCharCount,
         isFull: false,
         categoryId: null,
       },
