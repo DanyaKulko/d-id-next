@@ -142,6 +142,18 @@ const resolveAgentKnowledgeBaseId = async (agent: {
   return createdKnowledgeBaseId;
 };
 
+const ensureDidAgentKnowledgeBaseId = async (
+  agent: { agentId: string | null },
+  knowledgeBaseId: string,
+) => {
+  if (!agent.agentId) return;
+  await withDidLogging("Attach Knowledge Base", () =>
+    didService.updateAgent(agent.agentId as string, {
+      knowledge: { id: knowledgeBaseId },
+    }),
+  );
+};
+
 const writeManualTrainingFile = async (agentId: string, text: string) => {
   await mkdir(knowledgeUploadRoot, { recursive: true });
   const filename = `manual-${agentId}-${Date.now()}-${randomUUID()}.txt`;
@@ -337,6 +349,7 @@ export async function saveManualTrainingAction(formData: FormData) {
   });
 
   const knowledgeBaseId = await resolveAgentKnowledgeBaseId(agent);
+  await ensureDidAgentKnowledgeBaseId(agent, knowledgeBaseId);
   const baseUrl = await resolveBaseUrl();
 
   const existingManualDocs = await prisma.knowledgeDocuments.findMany({
@@ -514,6 +527,7 @@ export async function toggleTextBlogKnowledgeAction(formData: FormData) {
   }
 
   const knowledgeBaseId = await resolveAgentKnowledgeBaseId(agent);
+  await ensureDidAgentKnowledgeBaseId(agent, knowledgeBaseId);
   const baseUrl = await resolveBaseUrl();
   const webhookUrl = `${baseUrl}/api/webhooks/did/knowledge`;
 
@@ -699,6 +713,7 @@ export async function toggleKnowledgeDocumentEnabledAction(formData: FormData) {
     }
 
     const knowledgeBaseId = await resolveAgentKnowledgeBaseId(agent);
+    await ensureDidAgentKnowledgeBaseId(agent, knowledgeBaseId);
     const baseUrl = await resolveBaseUrl();
     const webhookUrl = `${baseUrl}/api/webhooks/did/knowledge`;
     const title =
