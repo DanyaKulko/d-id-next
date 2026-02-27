@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import {
-  fetchTrainingRoles,
   fetchKnowledgeArchive,
   fetchManualTrainingTemplate,
   fetchSafetyInstructions,
   fetchTextBlogEnabled,
+  fetchTrainingRoles,
   type KnowledgeItem,
 } from "@/app/admin/(protected)/admin-data";
 import TrainingClient from "../training.client";
@@ -33,7 +33,9 @@ export default async function TrainingTabPage({
 
   const fallbackRole = roles[0]?.key ?? "";
   const roleKey =
-    rawRole && roles.some((role) => role.key === rawRole) ? rawRole : fallbackRole;
+    rawRole && roles.some((role) => role.key === rawRole)
+      ? rawRole
+      : fallbackRole;
   if (!roleKey) {
     redirect("/admin/roles");
   }

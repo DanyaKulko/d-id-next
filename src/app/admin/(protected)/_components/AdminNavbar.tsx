@@ -2,12 +2,15 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState, useTransition } from "react";
 import { Toaster } from "react-hot-toast";
+import { logout } from "@/app/actions/auth/logout.actions";
 
 export default function AdminNavbar() {
+  const router = useRouter();
   const pathname = usePathname();
+  const [isLoggingOut, startLogoutTransition] = useTransition();
   const [creditsStatus, setCreditsStatus] = useState<
     "loading" | "ready" | "error"
   >("loading");
@@ -64,56 +67,89 @@ export default function AdminNavbar() {
             </div>
             <span>Gokhale CMS</span>
           </Link>
-          <div className="gokhale-nav-credits">
-            {creditsStatus === "loading" && (
-              <div className="credits-pill credits-skeleton" />
-            )}
-            {creditsStatus === "error" && (
-              <div className="credits-pill credits-error">Credits: —</div>
-            )}
-            {creditsStatus === "ready" && credits && (
-              <div className="credits-pill">
-                <span>Credits</span>
-                <strong>
-                  {credits.remaining.toFixed(1)}/{credits.total.toFixed(1)}
-                </strong>
-                {credits.expireAt && (
-                  <span className="credits-expiry">
-                    exp {new Date(credits.expireAt).toLocaleDateString()}
-                  </span>
-                )}
-              </div>
-            )}
+          <div className="gokhale-nav-center">
+            <div className="gokhale-nav-credits">
+              {creditsStatus === "loading" && (
+                <div className="credits-pill credits-skeleton" />
+              )}
+              {creditsStatus === "error" && (
+                <div className="credits-pill credits-error">Credits: —</div>
+              )}
+              {creditsStatus === "ready" && credits && (
+                <div className="credits-pill">
+                  <span>Credits</span>
+                  <strong>
+                    {credits.remaining.toFixed(1)}/{credits.total.toFixed(1)}
+                  </strong>
+                  {credits.expireAt && (
+                    <span className="credits-expiry">
+                      exp {new Date(credits.expireAt).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-          <ul className="gokhale-nav-links">
-            <li>
-              <Link
-                href="/admin/roles"
-                className={`gokhale-nav-link ${isActive("/admin/roles")}`}
+          <div className="gokhale-nav-right">
+            <ul className="gokhale-nav-links">
+              <li>
+                <Link
+                  href="/admin/roles"
+                  className={`gokhale-nav-link ${isActive("/admin/roles")}`}
+                >
+                  <span className="icon">👤</span>
+                  <span>Roles</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/admin/training"
+                  className={`gokhale-nav-link ${isActive("/admin/training")}`}
+                >
+                  <span className="icon">🎓</span>
+                  <span>Training</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/admin/settings"
+                  className={`gokhale-nav-link ${isActive("/admin/settings")}`}
+                >
+                  <span className="icon">⚙️</span>
+                  <span>Settings</span>
+                </Link>
+              </li>
+            </ul>
+            <button
+              type="button"
+              className="gokhale-logout-btn"
+              disabled={isLoggingOut}
+              aria-label={isLoggingOut ? "Signing out" : "Sign out"}
+              title={isLoggingOut ? "Signing out..." : "Sign out"}
+              onClick={() => {
+                startLogoutTransition(async () => {
+                  await logout().catch(() => undefined);
+                  router.replace("/admin/login");
+                  router.refresh();
+                });
+              }}
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                className="gokhale-logout-icon"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.9"
               >
-                <span className="icon">👤</span>
-                <span>Roles</span>
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/admin/training"
-                className={`gokhale-nav-link ${isActive("/admin/training")}`}
-              >
-                <span className="icon">🎓</span>
-                <span>Training</span>
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/admin/settings"
-                className={`gokhale-nav-link ${isActive("/admin/settings")}`}
-              >
-                <span className="icon">⚙️</span>
-                <span>Settings</span>
-              </Link>
-            </li>
-          </ul>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M10.5 7.5L6 12l4.5 4.5M6.5 12H20M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
       </nav>
       <Toaster position="top-right" />

@@ -279,7 +279,9 @@ export async function fetchKnowledgeArchive(
 
     const mappedRemote: KnowledgeItem[] = remoteDocs
       .map((doc) => {
-        const remoteId = String(doc.id ?? doc.document_id ?? doc.documentId ?? "");
+        const remoteId = String(
+          doc.id ?? doc.document_id ?? doc.documentId ?? "",
+        );
         if (!remoteId) return null;
         const local =
           localByDocumentId.get(remoteId) ??
@@ -302,7 +304,7 @@ export async function fetchKnowledgeArchive(
           sourceLabel: local?.source ?? "Knowledge",
           created: doc.created_at
             ? new Date(doc.created_at).toISOString().split("T")[0]
-            : local?.createdAt.toISOString().split("T")[0] ?? "",
+            : (local?.createdAt.toISOString().split("T")[0] ?? ""),
           status: statusMap[remoteStatus] ?? "processing",
           url: local?.documentUrl ?? remoteUrl,
           isEnabled: local?.isEnabled ?? true,
@@ -337,7 +339,9 @@ export async function fetchKnowledgeArchive(
   }
 }
 
-export async function fetchSafetyInstructions(agentKey: string): Promise<string> {
+export async function fetchSafetyInstructions(
+  agentKey: string,
+): Promise<string> {
   const agent = await resolveTrainingAgent(agentKey);
   return agent.safetyRules?.trim() ? agent.safetyRules : defaultSafetyRules;
 }

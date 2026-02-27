@@ -103,18 +103,23 @@ interface ApiPost {
   updated_at?: string | null;
 }
 
+const normalizeBrokenPunctuation = (value: string) =>
+  value
+    .replace(/\uFEFF/g, "")
+    .replace(/вЂ—|вЂ”|â€”|Ђ—|Ђ”|—|–/g, "-")
+    .replace(/вЂ“|â€“|Ђ“/g, "-")
+    .replace(/вЂ¦|â€¦|Ђ¦|…/g, "...")
+    .replace(/вЂњ|вЂќ|â€œ|â€|Ђњ|Ђќ/g, '"')
+    .replace(/вЂ˜|вЂ™|â€˜|â€™|Ђ˜|Ђ™|Ђљ/g, "'")
+    .replace(/[“”«»„‟]/g, '"')
+    .replace(/[‘’‚‛]/g, "'")
+    .replace(/Â/g, " ");
+
 const decodeHtmlEntities = (value: string) => {
-  let text = value
+  let text = normalizeBrokenPunctuation(value)
     .replace(/Ђ™/g, "'")
     .replace(/â€™/g, "'")
-    .replace(/Ã¢â‚¬â„¢/g, "'")
-    // Fix common UTF-8 mojibake sequences that appear after broken cp1251/cp1252 decoding.
-    .replace(/вЂ”|â€”/g, "--")
-    .replace(/вЂ“|â€“/g, "-")
-    .replace(/вЂ¦|â€¦/g, "...")
-    .replace(/вЂњ|вЂќ|â€œ|â€/g, '"')
-    .replace(/вЂ˜|вЂ™|â€˜|â€™/g, "'")
-    .replace(/Â/g, " ");
+    .replace(/Ã¢â‚¬â„¢/g, "'");
 
   text = text
     .replace(/&nbsp;/gi, " ")
@@ -127,10 +132,10 @@ const decodeHtmlEntities = (value: string) => {
     .replace(/&lsquo;/gi, "'")
     .replace(/&rdquo;/gi, '"')
     .replace(/&ldquo;/gi, '"')
-    .replace(/&mdash;/gi, "--")
+    .replace(/&mdash;/gi, "-")
     .replace(/&ndash;/gi, "-");
 
-  return text;
+  return normalizeBrokenPunctuation(text);
 };
 
 const normalizeTypography = (value: string) => {
@@ -138,7 +143,7 @@ const normalizeTypography = (value: string) => {
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[\u201C\u201D]/g, '"')
     .replace(/\u2013/g, "-")
-    .replace(/\u2014/g, "--")
+    .replace(/\u2014/g, "-")
     .replace(/\u2026/g, "...");
 };
 
@@ -148,6 +153,16 @@ const stripHtml = (value: string) => {
   const decoded = decodeHtmlEntities(withoutTags);
   const normalized = normalizeTypography(decoded);
   return normalized.replace(/\s+/g, " ").trim();
+};
+
+const normalizeKnowledgeText = (value: string) => {
+  if (!value) return "";
+  const decoded = decodeHtmlEntities(value);
+  const normalized = normalizeTypography(decoded);
+  return normalized
+    .replace(/\r\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 };
 
 const resolvePostDate = (post: ApiPost) =>
@@ -266,7 +281,10 @@ async function summarizePostWithLlm(rawSource: string, postId: number) {
       temperature: 0.3,
     });
 
-    const cleaned = completion.choices[0]?.message?.content?.trim() ?? "";
+    const cleanedRaw = completion.choices[0]?.message?.content?.trim() ?? "";
+    if (!cleanedRaw) return "";
+
+    const cleaned = normalizeKnowledgeText(cleanedRaw);
     if (!cleaned) return "";
 
     if (cleaned.length > trainingLimits.maxSummarizedPostChars) {
@@ -288,8 +306,14 @@ async function summarizePostWithLlm(rawSource: string, postId: number) {
 }
 
 const buildProcessedPostBlock = (post: ApiPost, cleanedText: string) => {
-  const title = stripHtml(post.title || "") || `Post #${post.id}`;
-  return `## ${title}\n${cleanedText}\n`;
+  const normalizedText = normalizeKnowledgeText(cleanedText);
+  return [
+    "# DOCUMENT TYPE: <JOURNAL_RECORD>",
+    `--- START (ID: ${post.id}) ---`,
+    normalizedText,
+    "--- END ---",
+    "",
+  ].join("\n");
 };
 
 const inferBlogCategoryIdsForAgent = (agent: {
@@ -615,7 +639,7 @@ const syncTextBlogDocumentsForAgent = async (input: {
     .map((doc) => doc.id);
   const enabledDocs = documents.filter((doc) => doc.isEnabled);
 
-  const posts = await prisma.processedPost.findMany({
+  const postsRaw = await prisma.processedPost.findMany({
     where: {
       agentId: input.agent.id,
       categoryId: { in: input.categoryIds },
@@ -631,6 +655,17 @@ const syncTextBlogDocumentsForAgent = async (input: {
       charCount: true,
     },
   });
+
+  const posts = postsRaw
+    .map((post) => {
+      const normalizedContent = normalizeKnowledgeText(post.content);
+      return {
+        ...post,
+        content: normalizedContent,
+        charCount: normalizedContent.length,
+      };
+    })
+    .filter((post) => post.charCount > 0);
 
   const buckets = buildTextBlogBuckets(posts);
   const activeDocs = enabledDocs.slice(

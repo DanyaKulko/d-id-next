@@ -55,13 +55,13 @@ const languages = [
 ];
 
 const greetingByLanguage: Record<string, string> = {
-    "en-US": "Hi. Let’s talk — ask me anything.",
-    "hi-IN": "नमस्ते। चलिए बात करते हैं — मुझसे कुछ भी पूछिए।",
-    "mr-IN": "नमस्कार. चला बोलूया — मला काहीही विचारा.",
-    "es-ES": "Hola. Hablemos — pregúntame lo que quieras.",
-    "fr-FR": "Bonjour. Parlons — demandez-moi ce que vous voulez.",
-    "ru-RU": "Привет. Давай поговорим — спрашивай что угодно.",
-    "id-ID": "Halo. Mari berbincang — tanyakan apa saja.",
+    "en-US": "Hi there. Thank you for taking time to visit with me. I suggest starting with your questions.",
+    "hi-IN": "नमस्ते। मुझसे मिलने के लिए समय निकालने के लिए धन्यवाद। मेरा सुझाव है कि आप अपने सवालों से शुरुआत करें।",
+    "mr-IN": "नमस्कार. मला भेटण्यासाठी वेळ दिल्याबद्दल धन्यवाद. माझा सल्ला आहे की तुम्ही तुमच्या प्रश्नांपासून सुरुवात करा.",
+    "es-ES": "Hola. Gracias por tomarte el tiempo de hablar conmigo. Te sugiero empezar con tus preguntas.",
+    "fr-FR": "Bonjour. Merci de prendre le temps de venir me parler. Je vous suggère de commencer par vos questions.",
+    "ru-RU": "Привет. Спасибо, что нашёл время поговорить со мной. Предлагаю начать с твоих вопросов.",
+    "id-ID": "Halo. Terima kasih sudah meluangkan waktu untuk berbincang dengan saya. Saya sarankan mulai dengan pertanyaan Anda.",
 };
 
 export const AvatarPageClient = ({

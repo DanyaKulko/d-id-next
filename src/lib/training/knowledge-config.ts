@@ -1,5 +1,6 @@
 export const trainingSourceLabels = {
   manual: "Manual training",
+  manualFile: "Manual file",
   textBlog: "Text blog",
   videoTranscripts: "Video transcripts",
 } as const;
@@ -14,7 +15,7 @@ export const trainingLimits = {
   maxSummarizedPostChars: 3000,
   knowledgeBucketCharLimit: 470000,
   maxBlogKnowledgeDocuments: 4,
-  manualTrainingCharLimit: 350000,
+  manualTrainingCharLimit: 300000,
   fundamentalBriefReserveChars: 200000,
 } as const;
 

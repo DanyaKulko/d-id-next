@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import toast from "react-hot-toast";
 import { useAzureSTT } from "@/app/(client)/[avatarSlug]/_hooks/useAzureSTT";
 import { useDevMode } from "@/app/admin/(protected)/_components/dev-mode";
@@ -12,6 +12,7 @@ import {
   toggleTextBlogKnowledgeAction,
 } from "@/app/admin/(protected)/actions";
 import type { KnowledgeItem } from "@/app/admin/(protected)/admin-data";
+import { trainingLimits } from "@/lib/training/knowledge-config";
 import type { TrainingTabId } from "./training.tabs";
 
 type TrainingClientProps = {
@@ -23,6 +24,39 @@ type TrainingClientProps = {
   initialTextBlogEnabled: boolean;
 };
 
+type ParsedManualFile = {
+  name: string;
+  content: string;
+  contribution: number;
+};
+
+const parseManualPayload = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return { manualText: "", file: null as ParsedManualFile | null };
+  }
+
+  const match = trimmed.match(
+    /^([\s\S]*?)(?:\n\n)?## File: ([^\n]+)\n\n([\s\S]+)$/,
+  );
+  if (!match) {
+    return { manualText: trimmed, file: null as ParsedManualFile | null };
+  }
+
+  const name = match[2]?.trim() ?? "";
+  const content = match[3]?.trim() ?? "";
+  if (!name || !content) {
+    return { manualText: trimmed, file: null as ParsedManualFile | null };
+  }
+
+  const manualText = (match[1] ?? "").trim();
+  const contribution = `## File: ${name}\n\n${content}`.length;
+  return {
+    manualText,
+    file: { name, content, contribution },
+  };
+};
+
 export default function LearningClient({
   initialTab,
   roleKey,
@@ -31,11 +65,22 @@ export default function LearningClient({
   initialManualText,
   initialTextBlogEnabled,
 }: TrainingClientProps) {
+  const initialParsedManual = useMemo(
+    () => parseManualPayload(initialManualText),
+    [initialManualText],
+  );
   const activeTab = initialTab;
   const [search, setSearch] = useState("");
   const [knowledge, setKnowledge] = useState<KnowledgeItem[]>(initialKnowledge);
   const [safetyRules, setSafetyRules] = useState(initialSafetyRules);
-  const [manualText, setManualText] = useState(initialManualText);
+  const [manualText, setManualText] = useState(initialParsedManual.manualText);
+  const [savedManualFile, setSavedManualFile] =
+    useState<ParsedManualFile | null>(initialParsedManual.file);
+  const [selectedManualFile, setSelectedManualFile] = useState<File | null>(
+    null,
+  );
+  const [selectedManualFileContribution, setSelectedManualFileContribution] =
+    useState(0);
   const [textBlogEnabled, setTextBlogEnabled] = useState(
     initialTextBlogEnabled,
   );
@@ -45,6 +90,7 @@ export default function LearningClient({
     null,
   );
   const { enabled: devModeEnabled } = useDevMode();
+  const manualFilesInputRef = useRef<HTMLInputElement | null>(null);
   const canEditKnowledgeArchive = devModeEnabled;
   const notifyDevModeRequired = useCallback(() => {
     toast.error("Enable Dev Mode to manage knowledge files");
@@ -70,6 +116,39 @@ export default function LearningClient({
   }, [knowledge, search]);
 
   const visibleKnowledge = filteredKnowledge;
+  const selectedManualFilePreviews = useMemo(
+    () =>
+      selectedManualFile
+        ? [
+            {
+              key: `${selectedManualFile.name}-${selectedManualFile.size}-${selectedManualFile.lastModified}`,
+              name: selectedManualFile.name,
+              sizeBytes: selectedManualFile.size,
+            },
+          ]
+        : [],
+    [selectedManualFile],
+  );
+  const activeManualFileContribution =
+    selectedManualFileContribution || savedManualFile?.contribution || 0;
+  const manualCombinedCharCount =
+    manualText.trim().length + activeManualFileContribution;
+  const manualCombinedLimit = trainingLimits.manualTrainingCharLimit;
+  const manualRemainingChars = manualCombinedLimit - manualCombinedCharCount;
+  const manualLimitRatio =
+    manualCombinedLimit > 0 ? manualCombinedCharCount / manualCombinedLimit : 0;
+  const manualCounterState =
+    manualRemainingChars < 0
+      ? "over"
+      : manualLimitRatio >= 0.9
+        ? "warning"
+        : "normal";
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
 
   const handleDelete = (item: KnowledgeItem) => {
     if (!canEditKnowledgeArchive) {
@@ -431,10 +510,31 @@ export default function LearningClient({
             const formData = new FormData(event.currentTarget);
             formData.set("manualLearning", manualText);
             formData.set("roleKey", roleKey);
+            if (savedManualFile && !selectedManualFile) {
+              formData.set("existingManualFileName", savedManualFile.name);
+              formData.set(
+                "existingManualFileContent",
+                savedManualFile.content,
+              );
+            }
+            formData.set(
+              "removeExistingManualFile",
+              String(!savedManualFile && !selectedManualFile),
+            );
 
             startSaving(async () => {
               await saveManualTrainingAction(formData)
-                .then(() => toast.success("Manual training saved"))
+                .then((result) => {
+                  const parsed = parseManualPayload(result.manualText);
+                  setManualText(parsed.manualText);
+                  setSavedManualFile(parsed.file);
+                  setSelectedManualFile(null);
+                  setSelectedManualFileContribution(0);
+                  if (manualFilesInputRef.current) {
+                    manualFilesInputRef.current.value = "";
+                  }
+                  toast.success("Manual training saved");
+                })
                 .catch((error) =>
                   toast.error(
                     error instanceof Error
@@ -498,15 +598,144 @@ export default function LearningClient({
           </div>
 
           <div className="input-group">
-            <label htmlFor="manualFiles">Upload text files (.txt, .md)</label>
+            <label htmlFor="manualFiles">Upload text file (.txt, .md)</label>
             <input
+              ref={manualFilesInputRef}
               id="manualFiles"
               name="manualFiles"
               type="file"
               accept=".txt,.md,text/plain,text/markdown"
-              multiple
+              onChange={async (event) => {
+                const file = event.target.files?.[0] ?? null;
+                setSelectedManualFile(file);
+                if (!file) {
+                  setSelectedManualFileContribution(0);
+                  return;
+                }
+
+                try {
+                  const content = (await file.text()).trim();
+                  if (!content) {
+                    setSelectedManualFile(null);
+                    setSelectedManualFileContribution(0);
+                    if (manualFilesInputRef.current) {
+                      manualFilesInputRef.current.value = "";
+                    }
+                    toast.error("Selected file is empty");
+                    return;
+                  }
+                  const fileBlockPrefix = `## File: ${file.name}\n\n`;
+                  setSelectedManualFileContribution(
+                    fileBlockPrefix.length + content.length,
+                  );
+                } catch {
+                  setSelectedManualFile(null);
+                  setSelectedManualFileContribution(0);
+                  if (manualFilesInputRef.current) {
+                    manualFilesInputRef.current.value = "";
+                  }
+                  toast.error("Failed to read selected file");
+                }
+              }}
             />
+            <div className="manual-file-picker-actions">
+              {selectedManualFile && (
+                <button
+                  type="button"
+                  className="manual-file-clear-btn"
+                  onClick={() => {
+                    setSelectedManualFile(null);
+                    setSelectedManualFileContribution(0);
+                    if (manualFilesInputRef.current) {
+                      manualFilesInputRef.current.value = "";
+                    }
+                  }}
+                >
+                  Cancel selected file
+                </button>
+              )}
+              {!selectedManualFile && savedManualFile && (
+                <div className="manual-file-picker-hint">
+                  Saved file: <strong>{savedManualFile.name}</strong>
+                </div>
+              )}
+            </div>
           </div>
+
+          <div
+            className={`manual-char-counter manual-char-counter-${manualCounterState}`}
+          >
+            <span>
+              Combined manual input:{" "}
+              <strong>
+                {manualCombinedCharCount.toLocaleString("en-US")} /{" "}
+                {manualCombinedLimit.toLocaleString("en-US")}
+              </strong>
+            </span>
+            <span>
+              {manualRemainingChars >= 0
+                ? `${manualRemainingChars.toLocaleString("en-US")} left`
+                : `${Math.abs(manualRemainingChars).toLocaleString("en-US")} over limit`}
+            </span>
+          </div>
+
+          {selectedManualFilePreviews.length > 0 && (
+            <div className="input-group">
+              <div className="manual-files-label">
+                Selected File (Pending Save)
+              </div>
+              <div className="manual-files-grid">
+                {selectedManualFilePreviews.map((file) => (
+                  <div
+                    key={file.key}
+                    className="manual-file-card manual-file-card-pending"
+                  >
+                    <div className="manual-file-title">{file.name}</div>
+                    <div className="manual-file-meta">
+                      New upload · {formatFileSize(file.sizeBytes)}
+                    </div>
+                    <button
+                      type="button"
+                      className="manual-file-clear-btn"
+                      onClick={() => {
+                        setSelectedManualFile(null);
+                        setSelectedManualFileContribution(0);
+                        if (manualFilesInputRef.current) {
+                          manualFilesInputRef.current.value = "";
+                        }
+                      }}
+                    >
+                      Remove selection
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!selectedManualFile && savedManualFile && (
+            <div className="input-group">
+              <div className="manual-files-label">Current Uploaded File</div>
+              <div className="manual-files-grid">
+                <div className="manual-file-card manual-file-card-static">
+                  <div className="manual-file-title">
+                    {savedManualFile.name}
+                  </div>
+                  <div className="manual-file-meta">
+                    Saved ·{" "}
+                    {savedManualFile.contribution.toLocaleString("en-US")} chars
+                  </div>
+                  <button
+                    type="button"
+                    className="manual-file-clear-btn"
+                    onClick={() => setSavedManualFile(null)}
+                  >
+                    Remove saved file (save to apply)
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="btn-group">
             <button
@@ -521,6 +750,12 @@ export default function LearningClient({
               className="btn btn-secondary"
               onClick={() => {
                 setManualText("");
+                setSavedManualFile(null);
+                setSelectedManualFile(null);
+                setSelectedManualFileContribution(0);
+                if (manualFilesInputRef.current) {
+                  manualFilesInputRef.current.value = "";
+                }
                 stopListening();
               }}
             >

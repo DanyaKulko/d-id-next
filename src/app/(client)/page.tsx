@@ -29,11 +29,10 @@ export default async function Home() {
             </Link>
             <div className="na-header-title">
               <h1 className="na-title-display na-glow">
-                Choose Your Neil Avatar Role
+                How to pick NeilAvatar role to talk to?
               </h1>
               <p className="na-subtitle">
-                Select one of five specialized versions of Neil to begin your
-                conversation
+                Click on any image below. Start conversing with Neil Avatar.
               </p>
             </div>
           </div>

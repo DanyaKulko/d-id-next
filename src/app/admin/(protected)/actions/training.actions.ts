@@ -32,8 +32,8 @@ const knowledgeUploadRoot = path.join(
   "knowledge",
 );
 
-const knowledgeUploadRootPrefix = path.normalize(
-  `${knowledgeUploadRoot}${path.sep}`,
+const uploadsRootPrefix = path.normalize(
+  `${path.join(process.cwd(), "public", "uploads")}${path.sep}`,
 );
 
 const normalizeDidDocumentId = (value: string) =>
@@ -61,15 +61,19 @@ const resolveTrainingAgentFromFormData = async (formData: FormData) => {
 
 const resolveStoredKnowledgeFilePath = (documentUrl?: string | null) => {
   if (!documentUrl) return null;
-  const marker = "/uploads/knowledge/";
+  const marker =
+    ["/uploads/knowledge/", "/uploads/manual-training/"].find((item) =>
+      documentUrl.includes(item),
+    ) ?? null;
+  if (!marker) return null;
+
   const markerIndex = documentUrl.indexOf(marker);
-  if (markerIndex < 0) return null;
 
   const relativePath = documentUrl.slice(markerIndex + 1);
   const absolutePath = path.normalize(
     path.join(process.cwd(), "public", relativePath),
   );
-  if (!absolutePath.startsWith(knowledgeUploadRootPrefix)) {
+  if (!absolutePath.startsWith(uploadsRootPrefix)) {
     return null;
   }
   return absolutePath;
@@ -77,7 +81,11 @@ const resolveStoredKnowledgeFilePath = (documentUrl?: string | null) => {
 
 const isManagedKnowledgeUploadFile = (absolutePath: string) => {
   const fileName = path.basename(absolutePath).toLowerCase();
-  return fileName.startsWith("manual-") || fileName.startsWith("knowledge-");
+  return (
+    fileName.startsWith("manual-") ||
+    fileName.startsWith("knowledge-") ||
+    fileName.startsWith("manual-file-")
+  );
 };
 
 const removeManagedKnowledgeFile = async (documentUrl?: string | null) => {
@@ -193,11 +201,30 @@ const readUploadedManualFiles = async (formData: FormData) => {
     }
 
     const content = (await entry.text()).trim();
-    if (!content) continue;
+    if (!content) {
+      throw new Error(`Uploaded file is empty: ${name}`);
+    }
     files.push({ name, text: content });
   }
 
-  return files;
+  if (files.length > 1) {
+    throw new Error("Only one manual file is allowed");
+  }
+
+  return files[0] ?? null;
+};
+
+const normalizeManualKnowledgeText = (value: string) => {
+  return value
+    .replace(/\uFEFF/g, "")
+    .replace(/вЂ—|вЂ”|â€”|Ђ—|Ђ”|—|–/g, "-")
+    .replace(/вЂ“|â€“|Ђ“/g, "-")
+    .replace(/вЂ¦|â€¦|Ђ¦|…/g, "...")
+    .replace(/вЂњ|вЂќ|â€œ|â€|Ђњ|Ђќ/g, '"')
+    .replace(/вЂ˜|вЂ™|â€˜|â€™|Ђ˜|Ђ™|Ђљ/g, "'")
+    .replace(/[“”«»„‟]/g, '"')
+    .replace(/[‘’‚‛]/g, "'")
+    .replace(/Â/g, " ");
 };
 
 const resolveBaseKnowledgeText = async (value: string) => {
@@ -205,7 +232,7 @@ const resolveBaseKnowledgeText = async (value: string) => {
   if (!trimmed) return "";
 
   if (!/^https?:\/\//i.test(trimmed)) {
-    return trimmed;
+    return normalizeManualKnowledgeText(trimmed);
   }
 
   const response = await fetch(trimmed, { cache: "no-store" });
@@ -213,7 +240,7 @@ const resolveBaseKnowledgeText = async (value: string) => {
     throw new Error("Failed to load base knowledge file");
   }
 
-  const text = (await response.text()).trim();
+  const text = normalizeManualKnowledgeText(await response.text()).trim();
   if (!text) {
     throw new Error("Base knowledge file is empty");
   }
@@ -223,18 +250,20 @@ const resolveBaseKnowledgeText = async (value: string) => {
 
 const buildManualTrainingPayload = (
   manualText: string,
-  uploadedFiles: { name: string; text: string }[],
+  uploadedFile: { name: string; text: string } | null,
   baseKnowledge = "",
 ) => {
+  const normalizedManualText = normalizeManualKnowledgeText(manualText).trim();
+  const normalizedFileText = uploadedFile
+    ? normalizeManualKnowledgeText(uploadedFile.text).trim()
+    : "";
+
   const manualParts: string[] = [];
-  const trimmedManual = manualText.trim();
-
-  if (trimmedManual) {
-    manualParts.push(trimmedManual);
+  if (normalizedManualText) {
+    manualParts.push(normalizedManualText);
   }
-
-  for (const file of uploadedFiles) {
-    manualParts.push(`## File: ${file.name}\n\n${file.text}`);
+  if (uploadedFile && normalizedFileText) {
+    manualParts.push(`## File: ${uploadedFile.name}\n\n${normalizedFileText}`);
   }
 
   const manualPayload = manualParts.join("\n\n").trim();
@@ -254,9 +283,7 @@ const buildManualTrainingPayload = (
   }
 
   if (!manualPayload && !trimmedBaseKnowledge) {
-    throw new Error(
-      "Manual training text, files, or base knowledge are required",
-    );
+    throw new Error("Manual training text or base knowledge are required");
   }
 
   const fullPayload =
@@ -324,31 +351,62 @@ export async function saveManualTrainingAction(formData: FormData) {
   const agent = await resolveTrainingAgentFromFormData(formData);
   const manualSettings = await prisma.agentTrainingManual.findUnique({
     where: { agentId: agent.id },
-    select: { baseKnowledge: true },
+    select: { baseKnowledge: true, manualText: true },
   });
   const baseKnowledgeSetting = (manualSettings?.baseKnowledge ?? "").trim();
   const isBaseKnowledgeUrl = /^https?:\/\//i.test(baseKnowledgeSetting);
-  const manualText = getString(formData.get("manualLearning"));
-  const uploadedFiles = await readUploadedManualFiles(formData);
-  const hasManualInput =
-    manualText.trim().length > 0 || uploadedFiles.length > 0;
+  const manualText = getString(formData.get("manualLearning")).trim();
+  const uploadedFile = await readUploadedManualFiles(formData);
+  const existingManualFileName = getString(
+    formData.get("existingManualFileName"),
+  ).trim();
+  const existingManualFileContent = getString(
+    formData.get("existingManualFileContent"),
+  ).trim();
+  const removeExistingManualFile =
+    getString(formData.get("removeExistingManualFile")).trim() === "true";
+  const persistedManualFile =
+    !removeExistingManualFile &&
+    existingManualFileName &&
+    existingManualFileContent
+      ? {
+          name: existingManualFileName,
+          text: existingManualFileContent,
+        }
+      : null;
+  const effectiveManualFile = uploadedFile ?? persistedManualFile;
+  const hasManualDocumentInput =
+    manualText.length > 0 ||
+    Boolean(effectiveManualFile) ||
+    baseKnowledgeSetting.length > 0;
 
   let manualPayload = "";
   let fullPayload = "";
 
-  if (isBaseKnowledgeUrl && !hasManualInput) {
+  if (!hasManualDocumentInput) {
+    manualPayload = "";
+    fullPayload = "";
+  } else if (
+    isBaseKnowledgeUrl &&
+    manualText.length === 0 &&
+    !effectiveManualFile
+  ) {
+    // Keep base knowledge as direct URL without generating a local merged file.
     manualPayload = "";
     fullPayload = "";
   } else {
     const baseKnowledge = await resolveBaseKnowledgeText(baseKnowledgeSetting);
     const builtPayload = buildManualTrainingPayload(
       manualText,
-      uploadedFiles,
+      effectiveManualFile,
       baseKnowledge,
     );
     manualPayload = builtPayload.manualPayload;
     fullPayload = builtPayload.fullPayload;
   }
+
+  const previousManualText = (manualSettings?.manualText ?? "").trim();
+  const manualTextChanged = manualPayload !== previousManualText;
 
   await prisma.agentTrainingManual.upsert({
     where: { agentId: agent.id },
@@ -372,112 +430,235 @@ export async function saveManualTrainingAction(formData: FormData) {
     orderBy: { updatedAt: "desc" },
   });
 
-  const previousManualDoc = existingManualDocs[0] ?? null;
-  if (previousManualDoc?.documentId) {
-    await withDidLogging("Delete Knowledge Document", () =>
-      didService.deleteKnowledgeDocument(
-        knowledgeBaseId,
-        previousManualDoc.documentId as string,
-      ),
-    ).catch(() => undefined);
-  }
+  const primaryManualDoc = existingManualDocs[0] ?? null;
+  const isDirectBaseUrlMode =
+    isBaseKnowledgeUrl && manualText.length === 0 && !effectiveManualFile;
+  const expectedManualDocumentCharCount =
+    hasManualDocumentInput && !isDirectBaseUrlMode ? fullPayload.length : 0;
 
-  await removeManagedKnowledgeFile(previousManualDoc?.documentUrl);
-
-  let sourceUrlForDid = "";
-  let manualDocumentUrl = "";
-  let manualDocumentCharCount = 0;
-
-  if (isBaseKnowledgeUrl && !manualPayload) {
-    sourceUrlForDid = baseKnowledgeSetting;
-    manualDocumentUrl = baseKnowledgeSetting;
-    manualDocumentCharCount = 0;
-  } else {
-    const { publicPath } = await writeManualTrainingFile(agent.id, fullPayload);
-    sourceUrlForDid = `${baseUrl}${publicPath}`;
-    manualDocumentUrl = sourceUrlForDid;
-    manualDocumentCharCount = fullPayload.length;
-  }
+  const shouldDeleteManualDoc =
+    !hasManualDocumentInput && Boolean(primaryManualDoc);
+  const shouldResyncBaseUrlDoc =
+    isDirectBaseUrlMode &&
+    manualPayload.length === 0 &&
+    baseKnowledgeSetting.length > 0 &&
+    (primaryManualDoc?.documentUrl !== baseKnowledgeSetting ||
+      primaryManualDoc?.charCount !== 0);
+  const shouldResyncGeneratedDocByCharCount =
+    hasManualDocumentInput &&
+    !isDirectBaseUrlMode &&
+    primaryManualDoc?.charCount !== expectedManualDocumentCharCount;
+  const shouldSyncManualDocument =
+    hasManualDocumentInput &&
+    (manualTextChanged ||
+      shouldResyncBaseUrlDoc ||
+      shouldResyncGeneratedDocByCharCount ||
+      !primaryManualDoc ||
+      !primaryManualDoc.documentId ||
+      !primaryManualDoc.isEnabled ||
+      primaryManualDoc.status === "FAILED");
 
   const webhookUrl = `${baseUrl}/api/webhooks/did/knowledge`;
-  const created = await withDidLogging("Create Knowledge Document", () =>
-    didService.createKnowledgeDocument(knowledgeBaseId, {
-      documentType: "text",
-      source_url: sourceUrlForDid,
-      title: trainingDocumentTitles.manualKnowledge,
-      webhook: webhookUrl,
-    }),
-  );
 
-  const createdDocumentId = String(
-    (created as Record<string, unknown>)?.id ??
-      (created as Record<string, unknown>)?.document_id ??
-      (created as Record<string, unknown>)?.documentId ??
-      "",
-  ).trim();
+  if (shouldDeleteManualDoc && primaryManualDoc) {
+    if (primaryManualDoc.documentId) {
+      await withDidLogging("Delete Knowledge Document", () =>
+        didService.deleteKnowledgeDocument(
+          knowledgeBaseId,
+          primaryManualDoc.documentId as string,
+        ),
+      ).catch(() => undefined);
+    }
 
-  if (!createdDocumentId) {
-    throw new Error("D-ID did not return document id");
+    await removeManagedKnowledgeFile(primaryManualDoc.documentUrl);
+    await prisma.processedPost.updateMany({
+      where: { knowledgeDocumentId: primaryManualDoc.id },
+      data: { knowledgeDocumentId: null },
+    });
+    await prisma.knowledgeDocuments.delete({
+      where: { id: primaryManualDoc.id },
+    });
   }
 
-  let manualDocId = previousManualDoc?.id ?? "";
+  if (shouldSyncManualDocument) {
+    let sourceUrlForDid = "";
+    let manualDocumentUrl = "";
+    let manualDocumentCharCount = 0;
+    let generatedManualFilePath: string | null = null;
 
-  if (previousManualDoc) {
-    await prisma.knowledgeDocuments.update({
-      where: { id: previousManualDoc.id },
-      data: {
-        agentId: agent.id,
-        source: trainingSourceLabels.manual,
-        title: trainingDocumentTitles.manualKnowledge,
-        documentId: createdDocumentId,
-        documentUrl: manualDocumentUrl,
-        status: "PROCESSING",
-        isEnabled: true,
-        charCount: manualDocumentCharCount,
-        isFull: false,
-        categoryId: null,
-      },
-    });
-    manualDocId = previousManualDoc.id;
-  } else {
-    const createdDoc = await prisma.knowledgeDocuments.create({
-      data: {
-        agentId: agent.id,
-        source: trainingSourceLabels.manual,
-        title: trainingDocumentTitles.manualKnowledge,
-        documentId: createdDocumentId,
-        documentUrl: manualDocumentUrl,
-        status: "PROCESSING",
-        isEnabled: true,
-        charCount: manualDocumentCharCount,
-        isFull: false,
-        categoryId: null,
-      },
-    });
-    manualDocId = createdDoc.id;
+    if (isBaseKnowledgeUrl && !manualPayload) {
+      sourceUrlForDid = baseKnowledgeSetting;
+      manualDocumentUrl = baseKnowledgeSetting;
+      manualDocumentCharCount = 0;
+    } else {
+      const { filePath, publicPath } = await writeManualTrainingFile(
+        agent.id,
+        fullPayload,
+      );
+      generatedManualFilePath = filePath;
+      sourceUrlForDid = `${baseUrl}${publicPath}`;
+      manualDocumentUrl = sourceUrlForDid;
+      manualDocumentCharCount = fullPayload.length;
+    }
+
+    if (!sourceUrlForDid) {
+      throw new Error("Manual training source is empty");
+    }
+
+    const created = await withDidLogging("Create Knowledge Document", () =>
+      didService
+        .createKnowledgeDocument(knowledgeBaseId, {
+          documentType: "text",
+          source_url: sourceUrlForDid,
+          title: trainingDocumentTitles.manualKnowledge,
+          webhook: webhookUrl,
+        })
+        .catch(async (error) => {
+          if (generatedManualFilePath) {
+            await unlink(generatedManualFilePath).catch(() => undefined);
+          }
+          throw error;
+        }),
+    );
+
+    const createdDocumentId = String(
+      (created as Record<string, unknown>)?.id ??
+        (created as Record<string, unknown>)?.document_id ??
+        (created as Record<string, unknown>)?.documentId ??
+        "",
+    ).trim();
+
+    if (!createdDocumentId) {
+      if (generatedManualFilePath) {
+        await unlink(generatedManualFilePath).catch(() => undefined);
+      }
+      throw new Error("D-ID did not return document id");
+    }
+
+    const previousDidDocumentId = primaryManualDoc?.documentId?.trim() ?? "";
+    const previousDocumentUrl = primaryManualDoc?.documentUrl ?? null;
+
+    if (primaryManualDoc) {
+      await prisma.knowledgeDocuments.update({
+        where: { id: primaryManualDoc.id },
+        data: {
+          source: trainingSourceLabels.manual,
+          title: trainingDocumentTitles.manualKnowledge,
+          documentId: createdDocumentId,
+          documentUrl: manualDocumentUrl,
+          status: "PROCESSING",
+          isEnabled: true,
+          charCount: manualDocumentCharCount,
+          isFull: false,
+          categoryId: null,
+        },
+      });
+    } else {
+      await prisma.knowledgeDocuments.create({
+        data: {
+          agentId: agent.id,
+          source: trainingSourceLabels.manual,
+          title: trainingDocumentTitles.manualKnowledge,
+          documentId: createdDocumentId,
+          documentUrl: manualDocumentUrl,
+          status: "PROCESSING",
+          isEnabled: true,
+          charCount: manualDocumentCharCount,
+          isFull: false,
+          categoryId: null,
+        },
+      });
+    }
+
+    if (
+      previousDidDocumentId &&
+      normalizeDidDocumentId(previousDidDocumentId) !==
+        normalizeDidDocumentId(createdDocumentId)
+    ) {
+      await withDidLogging("Delete Knowledge Document", () =>
+        didService.deleteKnowledgeDocument(
+          knowledgeBaseId,
+          previousDidDocumentId,
+        ),
+      ).catch(() => undefined);
+    }
+
+    if (previousDocumentUrl && previousDocumentUrl !== manualDocumentUrl) {
+      await removeManagedKnowledgeFile(previousDocumentUrl);
+    }
   }
 
-  const duplicateManualDocs = existingManualDocs.filter(
-    (doc) => doc.id !== manualDocId,
-  );
-  const duplicateManualDocIds = duplicateManualDocs.map((doc) => doc.id);
-
-  if (duplicateManualDocIds.length > 0) {
-    for (const duplicateDoc of duplicateManualDocs) {
-      await removeManagedKnowledgeFile(duplicateDoc.documentUrl);
+  const legacyManualFileDocs = await prisma.knowledgeDocuments.findMany({
+    where: {
+      agentId: agent.id,
+      source: { equals: trainingSourceLabels.manualFile, mode: "insensitive" },
+    },
+    select: {
+      id: true,
+      documentId: true,
+      documentUrl: true,
+    },
+  });
+  if (legacyManualFileDocs.length > 0) {
+    for (const legacyDoc of legacyManualFileDocs) {
+      if (legacyDoc.documentId) {
+        await withDidLogging("Delete Knowledge Document", () =>
+          didService.deleteKnowledgeDocument(
+            knowledgeBaseId,
+            legacyDoc.documentId as string,
+          ),
+        ).catch(() => undefined);
+      }
+      await removeManagedKnowledgeFile(legacyDoc.documentUrl);
     }
 
     await prisma.processedPost.updateMany({
-      where: { knowledgeDocumentId: { in: duplicateManualDocIds } },
+      where: {
+        knowledgeDocumentId: { in: legacyManualFileDocs.map((doc) => doc.id) },
+      },
       data: { knowledgeDocumentId: null },
     });
     await prisma.knowledgeDocuments.deleteMany({
-      where: { id: { in: duplicateManualDocIds } },
+      where: { id: { in: legacyManualFileDocs.map((doc) => doc.id) } },
+    });
+  }
+
+  const manualDocsForCleanup = await prisma.knowledgeDocuments.findMany({
+    where: {
+      agentId: agent.id,
+      source: { equals: trainingSourceLabels.manual, mode: "insensitive" },
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+  const docsToCleanup = shouldDeleteManualDoc
+    ? manualDocsForCleanup
+    : manualDocsForCleanup.slice(1);
+  const docsToCleanupIds = docsToCleanup.map((doc) => doc.id);
+
+  if (docsToCleanupIds.length > 0) {
+    for (const doc of docsToCleanup) {
+      if (doc.documentId) {
+        await withDidLogging("Delete Knowledge Document", () =>
+          didService.deleteKnowledgeDocument(
+            knowledgeBaseId,
+            doc.documentId as string,
+          ),
+        ).catch(() => undefined);
+      }
+      await removeManagedKnowledgeFile(doc.documentUrl);
+    }
+
+    await prisma.processedPost.updateMany({
+      where: { knowledgeDocumentId: { in: docsToCleanupIds } },
+      data: { knowledgeDocumentId: null },
+    });
+    await prisma.knowledgeDocuments.deleteMany({
+      where: { id: { in: docsToCleanupIds } },
     });
   }
 
   revalidateTrainingPaths();
-  return { ok: true };
+  return { ok: true, manualText: manualPayload };
 }
 
 export async function toggleTextBlogKnowledgeAction(formData: FormData) {
