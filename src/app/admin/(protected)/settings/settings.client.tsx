@@ -10,6 +10,7 @@ import {
     saveAdminCredentialsAction,
     saveAuthRequirementAction,
     saveExternalSourcesConfigAction,
+    saveUserTwoFactorRequirementAction,
     saveUserUpdateAction,
 } from "@/app/admin/(protected)/actions";
 import type {
@@ -27,6 +28,7 @@ type SettingsClientProps = {
     initialUsers?: UserRow[];
     initialIntegrationConfig?: { apiKey: string; azureRegion?: string };
     initialAuthRequired?: boolean;
+    initialUserTwoFactorRequired?: boolean;
     initialAdminEmail?: string;
     initialSessions?: SessionPage;
     initialSessionFilters?: SessionFilters;
@@ -40,6 +42,7 @@ export default function SettingsClient({
                                            initialUsers,
                                            initialIntegrationConfig,
                                            initialAuthRequired,
+                                           initialUserTwoFactorRequired,
                                            initialAdminEmail,
                                            initialSessions,
                                            initialSessionFilters,
@@ -61,6 +64,9 @@ export default function SettingsClient({
     // auth required toggle
     const [authRequired, setAuthRequired] = useState(
         initialAuthRequired ?? false,
+    );
+    const [userTwoFactorRequired, setUserTwoFactorRequired] = useState(
+        initialUserTwoFactorRequired ?? true,
     );
     const [users, setUsers] = useState<UserRow[]>(initialUsers ?? []);
     const [integrationConfig] = useState(
@@ -198,6 +204,20 @@ export default function SettingsClient({
                 .catch(() => {
                     setAuthRequired((prev) => !prev);
                     toast.error("Failed to update authentication settings");
+                });
+        });
+    };
+
+    const onUserTwoFactorToggle = (checked: boolean) => {
+        setUserTwoFactorRequired(checked);
+        const formData = new FormData();
+        formData.set("enabled", checked ? "true" : "false");
+        startSaving(async () => {
+            await saveUserTwoFactorRequirementAction(formData)
+                .then(() => toast.success("2FA requirement updated"))
+                .catch(() => {
+                    setUserTwoFactorRequired((prev) => !prev);
+                    toast.error("Failed to update 2FA requirement");
                 });
         });
     };
@@ -919,9 +939,28 @@ export default function SettingsClient({
                         </div>
                     </div>
 
+                    <div className="toggle-container" style={{marginBottom: 30}}>
+                        <label className="toggle-switch">
+                            <input
+                                type="checkbox"
+                                checked={userTwoFactorRequired}
+                                onChange={(e) => onUserTwoFactorToggle(e.target.checked)}
+                            />
+                            <span className="slider"/>
+                        </label>
+                        <div>
+                            <div className="toggle-label">Require 2FA for User Login</div>
+                            <div className="toggle-description">
+                                When enabled, users must enter a one-time code from email after
+                                username/password. When disabled, users login with
+                                username/password only.
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="info-box">
-                        ℹ️ When authentication is enabled, users receive a 2FA code via email
-                        for verification. Each session lasts 24 hours.
+                        ℹ️ Authentication and 2FA are configured separately. 2FA affects only
+                        the user login page and works after successful password check.
                     </div>
 
                     <button

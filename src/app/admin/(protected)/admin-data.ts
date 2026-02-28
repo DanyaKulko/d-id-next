@@ -94,6 +94,7 @@ export type ErrorLogPage = {
 };
 
 const authRequiredKey = "requireAuthentication";
+const userTwoFactorRequiredKey = "requireUserTwoFactorAuthentication";
 
 const normalizeDidDocumentId = (value: string) =>
   value.includes("#") ? (value.split("#").pop() ?? value) : value;
@@ -384,6 +385,14 @@ export async function fetchAuthRequirement(): Promise<boolean> {
     where: { key: authRequiredKey },
   });
   return setting?.value === "true";
+}
+
+export async function fetchUserTwoFactorRequirement(): Promise<boolean> {
+  const setting = await prisma.appSetting.findUnique({
+    where: { key: userTwoFactorRequiredKey },
+  });
+  if (!setting) return true;
+  return setting.value === "true";
 }
 
 export async function fetchSessionRoles(): Promise<SessionRoleOption[]> {

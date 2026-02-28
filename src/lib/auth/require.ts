@@ -21,7 +21,9 @@ export async function requireUser() {
     if (!sessionCookie) {
       throw new Error("UNAUTHORIZED");
     }
-    await setSessionCookie(sessionCookie, newExpiresAt);
+    const sessionOnly =
+      x.user.roles.includes("USER") && !x.user.roles.includes("ADMIN");
+    await setSessionCookie(sessionCookie, newExpiresAt, { sessionOnly });
   }
 
   return x.user;

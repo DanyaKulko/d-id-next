@@ -7,6 +7,7 @@ import {
     fetchIntegrationConfig,
     fetchSessionRecords,
     fetchSessionRoles,
+    fetchUserTwoFactorRequirement,
     fetchUsers,
     type SessionFilters,
     type SessionPage,
@@ -19,7 +20,7 @@ import {type SettingsTabId, settingsTabs} from "../settings.tabs";
 
 type SettingsTabPageProps = {
     params: Promise<{ tab: string }>;
-    searchParams?: Promise<any>;
+    searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
 type IntegrationConfig = Awaited<ReturnType<typeof fetchIntegrationConfig>>;
@@ -42,6 +43,7 @@ export default async function SettingsTabPage({
                                                   searchParams,
                                               }: SettingsTabPageProps) {
     const {tab: rawTab} = await params;
+    const resolvedSearchParams = searchParams ? await searchParams : {};
     const {
         role,
         from: rawFrom,
@@ -49,7 +51,7 @@ export default async function SettingsTabPage({
         language: rawLanguage,
         limit: rawLimit,
         page: rawPage,
-    } = await searchParams
+    } = resolvedSearchParams;
     const tab = rawTab as SettingsTabId;
     if (!settingsTabs.includes(tab)) {
         redirect("/admin/settings/integrations");
@@ -58,6 +60,7 @@ export default async function SettingsTabPage({
     let users: UserRow[] | undefined;
     let integrationConfig: IntegrationConfig | undefined;
     let authRequired: boolean | undefined;
+    let userTwoFactorRequired: boolean | undefined;
     let adminEmail: string | undefined;
     let sessionsPage: SessionPage | undefined;
     let sessionRoles: SessionRoleOption[] | undefined;
@@ -70,9 +73,10 @@ export default async function SettingsTabPage({
     }
 
     if (tab === "user-access") {
-        [users, authRequired] = await Promise.all([
+        [users, authRequired, userTwoFactorRequired] = await Promise.all([
             fetchUsers(),
             fetchAuthRequirement(),
+            fetchUserTwoFactorRequirement(),
         ]);
     }
 
@@ -119,6 +123,7 @@ export default async function SettingsTabPage({
             initialUsers={users}
             initialIntegrationConfig={integrationConfig}
             initialAuthRequired={authRequired}
+            initialUserTwoFactorRequired={userTwoFactorRequired}
             initialAdminEmail={adminEmail}
             initialSessions={sessionsPage}
             initialSessionFilters={sessionFilters}

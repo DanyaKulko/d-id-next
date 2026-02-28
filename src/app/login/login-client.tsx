@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import ReCAPTCHA from "react-google-recaptcha";
@@ -12,13 +13,17 @@ type LoginState =
 
 const initialState: LoginState = { phase: "login" };
 
-export default function LoginClient() {
+type LoginClientProps = {
+  twoFactorRequired: boolean;
+};
+
+export default function LoginClient({ twoFactorRequired }: LoginClientProps) {
   const router = useRouter();
   const search = useSearchParams();
 
   const nextUrl = useMemo(() => {
-    const n = search.get("next");
-    return n?.startsWith("/") ? n : "/";
+    const next = search.get("next");
+    return next?.startsWith("/") ? next : "/";
   }, [search]);
 
   const isProd = process.env.NODE_ENV === "production";
@@ -34,20 +39,28 @@ export default function LoginClient() {
         .toLowerCase();
       const password = String(formData.get("password") ?? "");
 
-      if (!email || !password)
+      if (!email || !password) {
         return { phase: "login", error: "Email and password are required" };
+      }
 
-      const res = await loginStart({
-        email,
-        password,
-        recaptchaToken: isProd ? recaptchaToken : undefined,
-      });
+      let result: Awaited<ReturnType<typeof loginStart>>;
+      try {
+        result = await loginStart({
+          email,
+          password,
+          recaptchaToken: isProd ? recaptchaToken : undefined,
+          scope: "user",
+        });
+      } catch {
+        return { phase: "login", error: "Login is temporarily unavailable" };
+      }
 
-      if (!res.ok)
+      if (!result.ok) {
         return { phase: "login", error: "Invalid email/password or captcha" };
+      }
 
-      if (res.step === "2fa") {
-        return { phase: "otp", expiresAt: res.expiresAt?.toString() };
+      if (result.step === "2fa") {
+        return { phase: "otp", expiresAt: result.expiresAt?.toString() };
       }
 
       router.replace(nextUrl);
@@ -59,12 +72,22 @@ export default function LoginClient() {
   const [otpState, otpAction, otpPending] = useActionState(
     async (_prev: LoginState, formData: FormData): Promise<LoginState> => {
       const code = String(formData.get("code") ?? "").trim();
-
-      if (!/^\d{6}$/.test(code))
+      if (!/^\d{6}$/.test(code)) {
         return { phase: "otp", error: "Enter the 6-digit code" };
+      }
 
-      const res = await twoFactorVerify({ code });
-      if (!res.ok) return { phase: "otp", error: "Invalid or expired code" };
+      let result: Awaited<ReturnType<typeof twoFactorVerify>>;
+      try {
+        result = await twoFactorVerify({ code, scope: "user" });
+      } catch {
+        return {
+          phase: "otp",
+          error: "Verification is temporarily unavailable",
+        };
+      }
+      if (!result.ok) {
+        return { phase: "otp", error: "Invalid or expired code" };
+      }
 
       router.replace(nextUrl);
       return { phase: "otp" };
@@ -79,131 +102,158 @@ export default function LoginClient() {
     }
   }, [state]);
 
-  const current = state.phase === "otp" ? otpState : state;
+  const currentState = state.phase === "otp" ? otpState : state;
   const isOtp = state.phase === "otp";
 
   return (
-    <div className="auth-shell">
-      <div className="auth-panel">
-        <div className="auth-panel-inner">
-          <div className="auth-badge">Neil Avatar</div>
-          <h1>Access your avatar workspace</h1>
-          <p>
-            Secure login keeps your avatar knowledge, roles, and training
-            settings protected. Use your email and one-time code to continue.
-          </p>
-          <div className="auth-panel-grid">
-            <div>
-              <span>Lock</span>
-              <strong>Two-step access</strong>
-              <p>
-                Every login is verified by a one-time code sent to your email.
-              </p>
-            </div>
-            <div>
-              <span>Speed</span>
-              <strong>Fast sessions</strong>
-              <p>
-                Stay connected while keeping protected routes locked for guests.
-              </p>
-            </div>
+    <div className="na-login-shell">
+      <h1 className="na-login-title">Neil Avatar</h1>
+
+      <div className="na-login-container">
+        <div className="na-login-left">
+          <div className="na-login-lamp" aria-hidden="true">
+            <Image
+              src="/login-lamp.svg"
+              alt=""
+              width={512}
+              height={512}
+              priority
+            />
           </div>
         </div>
-      </div>
 
-      <div className="auth-card">
-        <div className="auth-brand">
-          <div>
-            <div className="auth-title">User Login</div>
-            <div className="auth-subtitle">Neil Avatar Access Portal</div>
+        <div className="na-login-card">
+          <div className="na-login-card-header">
+            <div className="na-login-card-title">
+              <h1>User Login</h1>
+              <p>Neil Avatar Access Portal</p>
+            </div>
+            <span className="na-login-secure-badge">Secure</span>
           </div>
-          <div className="auth-chip">Secure</div>
-        </div>
 
-        <div className={`auth-error ${current.error ? "show" : ""}`}>
-          {current.error ?? ""}
-        </div>
+          <div className={`na-login-error ${currentState.error ? "show" : ""}`}>
+            {currentState.error ?? ""}
+          </div>
 
-        {!isOtp ? (
-          <form action={loginAction} className="auth-form">
-            <div className="input-group">
-              <label htmlFor="email">Email</label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="you@company.com"
-                autoComplete="username"
-                required
-                pattern="^[^@\s]+@[^@\s]+\.[^@\s]+$"
-                title="Enter a valid email address"
-              />
-            </div>
-
-            <div className="input-group">
-              <label htmlFor="password">Password</label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                placeholder="Enter your password"
-                minLength={6}
-                autoComplete="current-password"
-                required
-              />
-            </div>
-
-            {isProd && siteKey ? (
-              <div className="auth-captcha">
-                <ReCAPTCHA
-                  ref={recaptchaRef}
-                  sitekey={siteKey}
-                  onChange={(token) => setRecaptchaToken(token ?? "")}
-                  onExpired={() => setRecaptchaToken("")}
-                />
+          {!isOtp ? (
+            <>
+              <div className="na-login-instructions">
+                <h2>How to Get Access to NeilAvatar</h2>
+                <ol>
+                  <li>
+                    Type in your email address. Use the same email address that
+                    you typically correspond with Neil.
+                  </li>
+                  <li>
+                    Type in the password which Neil has sent you via email. Keep
+                    password safe.
+                  </li>
+                  <li>Check the Captcha box to confirm you are human.</li>
+                  <li>Click Login.</li>
+                  <li>
+                    {twoFactorRequired
+                      ? "Enter the 6-digit code from your email."
+                      : "Enjoy NeilAvatar."}
+                  </li>
+                </ol>
               </div>
-            ) : null}
 
-            <button
-              type="submit"
-              className="auth-submit"
-              disabled={
-                loginPending || (isProd && siteKey ? !recaptchaToken : false)
-              }
-            >
-              {loginPending ? "Signing in..." : "Continue"}
-            </button>
-          </form>
-        ) : (
-          <form action={otpAction} className="auth-form">
-            <div className="input-group">
-              <label htmlFor="code">One-time code</label>
-              <input
-                id="code"
-                name="code"
-                type="text"
-                placeholder="6-digit code"
-                required
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                maxLength={6}
-                minLength={6}
-              />
-            </div>
+              <form action={loginAction} id="loginForm">
+                <div className="na-login-form-group">
+                  <label htmlFor="email">Email</label>
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    placeholder="you@company.com"
+                    required
+                    autoComplete="username"
+                    pattern="^[^@\s]+@[^@\s]+\.[^@\s]+$"
+                    title="Enter a valid email address"
+                  />
+                </div>
 
-            <button type="submit" className="auth-submit" disabled={otpPending}>
-              {otpPending ? "Verifying..." : "Verify & Enter"}
-            </button>
+                <div className="na-login-form-group">
+                  <label htmlFor="password">Password</label>
+                  <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="Enter your password"
+                    required
+                    minLength={6}
+                    autoComplete="current-password"
+                  />
+                </div>
 
-            <p className="auth-hint">
-              A verification code was sent to your email. Check your inbox or
-              spam folder.
-            </p>
-          </form>
-        )}
+                {isProd && siteKey ? (
+                  <div className="na-login-form-group na-login-captcha-group">
+                    <ReCAPTCHA
+                      ref={recaptchaRef}
+                      sitekey={siteKey}
+                      onChange={(token) => setRecaptchaToken(token ?? "")}
+                      onExpired={() => setRecaptchaToken("")}
+                    />
+                  </div>
+                ) : null}
 
-        <div className="auth-footer">
-          <span>Need access?</span> Contact the administrator to get an invite.
+                <button
+                  type="submit"
+                  className="na-login-submit"
+                  disabled={
+                    loginPending ||
+                    (isProd && siteKey ? !recaptchaToken : false)
+                  }
+                >
+                  {loginPending ? "Signing in..." : "Login"}
+                </button>
+              </form>
+            </>
+          ) : (
+            <>
+              <div className="na-login-instructions na-login-otp-instructions">
+                <h2>Email Verification</h2>
+                <ol>
+                  <li>Enter the 6-digit one-time code sent to your email.</li>
+                  <li>If needed, check your spam folder.</li>
+                  <li>Click Verify to continue.</li>
+                </ol>
+              </div>
+
+              <form action={otpAction} id="otpForm">
+                <div className="na-login-form-group">
+                  <label htmlFor="code">One-time code</label>
+                  <input
+                    type="text"
+                    id="code"
+                    name="code"
+                    placeholder="Enter 6-digit code"
+                    required
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    minLength={6}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="na-login-submit"
+                  disabled={otpPending}
+                >
+                  {otpPending ? "Verifying..." : "Verify"}
+                </button>
+
+                <p className="na-login-otp-hint">
+                  Code was sent on email. Check Inbox/Spam.
+                </p>
+              </form>
+            </>
+          )}
+
+          <div className="na-login-footer-text">
+            Contact Neil with Login issues.
+          </div>
         </div>
       </div>
     </div>

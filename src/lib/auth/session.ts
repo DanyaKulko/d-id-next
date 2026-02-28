@@ -1,5 +1,8 @@
 import crypto from "node:crypto";
+import { auditAuth } from "@/lib/audit/auth";
 import { prisma } from "@/lib/db/prisma";
+import { sendNeilUserLogoutEmail } from "@/lib/email/smtp";
+import { logExternalServiceError } from "@/lib/logging/external-errors";
 
 const TTL_DAYS = Number(process.env.SESSION_TTL_DAYS ?? 30);
 const ROLLING_DAYS = Number(process.env.SESSION_ROLLING_DAYS ?? 7);
@@ -12,6 +15,9 @@ function randomToken(bytes = 32) {
 }
 
 export type SessionUser = { id: string; email: string; roles: string[] };
+
+const isRegularUserRoles = (roles: string[]) =>
+  roles.includes("USER") && !roles.includes("ADMIN");
 
 export async function createSession(params: {
   userId: string;
@@ -69,7 +75,57 @@ export async function getSession(rawToken: string) {
     },
   });
 
-  if (!s) return null;
+  if (!s) {
+    const expired = await prisma.session.findFirst({
+      where: { tokenHash, revokedAt: null, expiresAt: { lte: new Date() } },
+      select: {
+        id: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            roles: { select: { role: true } },
+          },
+        },
+      },
+    });
+
+    if (expired?.id && expired.user) {
+      await prisma.session
+        .update({
+          where: { id: expired.id },
+          data: { revokedAt: new Date() },
+        })
+        .catch(() => undefined);
+
+      const roles = expired.user.roles.map((item) => item.role);
+      await auditAuth({
+        type: "LOGOUT",
+        success: true,
+        reason: "session_expired",
+        email: expired.user.email,
+        userId: expired.user.id,
+      }).catch(() => undefined);
+
+      if (isRegularUserRoles(roles)) {
+        await sendNeilUserLogoutEmail(expired.user.email).catch(
+          async (error) => {
+            await logExternalServiceError({
+              source: "SMTP",
+              type: "USER_EXPIRED_SESSION_NOTIFY",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Failed to send expired-session notification",
+              level: "WARNING",
+            });
+          },
+        );
+      }
+    }
+
+    return null;
+  }
   if (!s.user.isActive) return null;
 
   return {

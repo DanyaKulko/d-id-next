@@ -13,11 +13,24 @@ const base = {
 export async function getSessionCookie() {
   return (await cookies()).get(SESSION_COOKIE)?.value ?? null;
 }
-export async function setSessionCookie(rawToken: string, expiresAt: Date) {
-  (await cookies()).set(SESSION_COOKIE, rawToken, {
-    ...base,
-    expires: expiresAt,
-  });
+export async function setSessionCookie(
+  rawToken: string,
+  expiresAt: Date,
+  options?: { sessionOnly?: boolean },
+) {
+  const sessionOnly = options?.sessionOnly ?? false;
+  (await cookies()).set(
+    SESSION_COOKIE,
+    rawToken,
+    sessionOnly
+      ? {
+          ...base,
+        }
+      : {
+          ...base,
+          expires: expiresAt,
+        },
+  );
 }
 export async function clearSessionCookie() {
   (await cookies()).set(SESSION_COOKIE, "", { ...base, expires: new Date(0) });

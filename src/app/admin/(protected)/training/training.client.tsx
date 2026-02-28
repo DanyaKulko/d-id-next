@@ -288,11 +288,6 @@ export default function LearningClient({
                 type="checkbox"
                 checked={textBlogEnabled}
                 disabled={isToggling}
-                onClick={(event) => {
-                  if (canEditKnowledgeArchive) return;
-                  event.preventDefault();
-                  notifyDevModeRequired();
-                }}
                 onChange={(e) => handleTextBlogToggle(e.target.checked)}
               />
               <span className="slider" />

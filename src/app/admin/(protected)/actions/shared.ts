@@ -14,6 +14,7 @@ export const getOptionalString = (value: FormDataEntryValue | null) =>
   typeof value === "string" ? value : undefined;
 
 export const authRequiredKey = "requireAuthentication";
+export const userTwoFactorRequiredKey = "requireUserTwoFactorAuthentication";
 export const defaultPersonalityStyle = "Friendly and Professional";
 export const defaultSafetyRules = `Do not discuss:
 - Political topics in aggressive form

@@ -1,16 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getAzureSpeechToken } from "@/app/actions/azure.actions";
 import { hashPassword, verifyPassword } from "@/lib/auth/passwords";
 import { prisma } from "@/lib/db/prisma";
 import { externalSourcesSeeds } from "@/lib/external-sources/config";
 import { didService } from "@/lib/services/did.service";
-import { getAzureSpeechToken } from "@/app/actions/azure.actions";
 import {
   authRequiredKey,
   getOptionalString,
   getString,
   requireAdmin,
+  userTwoFactorRequiredKey,
   withDidLogging,
 } from "./shared";
 
@@ -230,6 +231,21 @@ export async function saveAuthRequirementAction(formData: FormData) {
 
   revalidatePath("/admin/settings");
   revalidatePath("/admin/settings/user-access");
+  return { ok: true };
+}
+
+export async function saveUserTwoFactorRequirementAction(formData: FormData) {
+  await requireAdmin();
+  const enabled = getString(formData.get("enabled")).trim();
+  await prisma.appSetting.upsert({
+    where: { key: userTwoFactorRequiredKey },
+    update: { value: enabled },
+    create: { key: userTwoFactorRequiredKey, value: enabled },
+  });
+
+  revalidatePath("/admin/settings");
+  revalidatePath("/admin/settings/user-access");
+  revalidatePath("/login");
   return { ok: true };
 }
 

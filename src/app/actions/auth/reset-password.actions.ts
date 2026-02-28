@@ -39,7 +39,9 @@ export async function changePassword(input: unknown) {
   });
 
   const session = await createSession({ userId: user.id });
-  await setSessionCookie(session.rawToken, session.expiresAt);
+  const sessionOnly =
+    user.roles.includes("USER") && !user.roles.includes("ADMIN");
+  await setSessionCookie(session.rawToken, session.expiresAt, { sessionOnly });
 
   return { ok: true as const };
 }

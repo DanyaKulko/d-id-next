@@ -4,7 +4,6 @@ import Image from "next/image";
 import {useRouter, useSearchParams} from "next/navigation";
 import {useActionState, useEffect, useMemo, useRef, useState} from "react";
 import ReCAPTCHA from "react-google-recaptcha";
-import {createAdmin} from "@/app/actions/auth/create-admin.actions";
 import {loginStart} from "@/app/actions/auth/login.actions";
 import {twoFactorVerify} from "@/app/actions/auth/two-factor.actions";
 import logo from "@/assets/img/neil_avatar_logo.png";
@@ -44,6 +43,7 @@ export default function LoginClient() {
                 email,
                 password,
                 recaptchaToken: isProd ? recaptchaToken : undefined,
+                scope: "admin",
             });
 
             if (!res.ok)
@@ -66,7 +66,7 @@ export default function LoginClient() {
             if (!/^\d{6}$/.test(code))
                 return {phase: "otp", error: "Enter 6-digit code"};
 
-            const res = await twoFactorVerify({code});
+            const res = await twoFactorVerify({code, scope: "admin"});
             if (!res.ok) return {phase: "otp", error: "Wrong or expired code"};
 
             router.replace(nextUrl);
@@ -74,11 +74,6 @@ export default function LoginClient() {
         },
         state,
     );
-
-    const handleCreateAdmin = async () => {
-        const res = await createAdmin();
-        console.log(res);
-    };
 
     useEffect(() => {
         if (state.phase === "login" && state.error && recaptchaRef.current) {
