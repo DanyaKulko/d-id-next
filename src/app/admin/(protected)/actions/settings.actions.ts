@@ -1,8 +1,12 @@
 "use server";
 
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { getAzureSpeechToken } from "@/app/actions/azure.actions";
+import { setSessionCookie } from "@/lib/auth/cookies";
 import { hashPassword, verifyPassword } from "@/lib/auth/passwords";
+import { createSession, revokeAllUserSessions } from "@/lib/auth/session";
+import { endAllUserWebSessions } from "@/lib/auth/user-web-session";
 import { prisma } from "@/lib/db/prisma";
 import { externalSourcesSeeds } from "@/lib/external-sources/config";
 import { didService } from "@/lib/services/did.service";
@@ -131,14 +135,20 @@ export async function saveUserUpdateAction(formData: FormData) {
     }
 
     const updateData: { email: string; passwordHash?: string } = { email };
-    if (password) {
-      updateData.passwordHash = await hashPassword(password);
+    const hasPasswordChange = Boolean(password);
+    if (hasPasswordChange) {
+      updateData.passwordHash = await hashPassword(password as string);
     }
 
     await prisma.user.update({
       where: { id: userId },
       data: updateData,
     });
+
+    if (hasPasswordChange) {
+      await revokeAllUserSessions(userId);
+      await endAllUserWebSessions(userId, "ADMIN_PASSWORD_CHANGE");
+    }
 
     await prisma.loginEvent.create({
       data: {
@@ -168,10 +178,16 @@ export async function saveUserUpdateAction(formData: FormData) {
       throw new Error("Cannot edit admin users here");
     }
 
+    const nextIsActive = !user.isActive;
     await prisma.user.update({
       where: { id: userId },
-      data: { isActive: !user.isActive },
+      data: { isActive: nextIsActive },
     });
+
+    if (!nextIsActive) {
+      await revokeAllUserSessions(userId);
+      await endAllUserWebSessions(userId, "ADMIN_DEACTIVATE");
+    }
 
     await prisma.loginEvent.create({
       data: {
@@ -201,6 +217,8 @@ export async function saveUserUpdateAction(formData: FormData) {
       throw new Error("Cannot delete admin users here");
     }
 
+    await revokeAllUserSessions(userId);
+    await endAllUserWebSessions(userId, "ADMIN_DELETE");
     await prisma.user.delete({ where: { id: userId } });
 
     await prisma.loginEvent.create({
@@ -250,7 +268,7 @@ export async function saveUserTwoFactorRequirementAction(formData: FormData) {
 }
 
 export async function saveAdminCredentialsAction(formData: FormData) {
-  await requireAdmin();
+  const currentAdmin = await requireAdmin();
   const email = getString(formData.get("email")).trim().toLowerCase();
   const currentPassword = getString(formData.get("currentPassword"));
   const newPassword = getString(formData.get("newPassword"));
@@ -273,18 +291,42 @@ export async function saveAdminCredentialsAction(formData: FormData) {
   }
 
   const updateData: { email?: string; passwordHash?: string } = {};
+  const hasPasswordChange = Boolean(newPassword);
   if (email !== admin.email) {
     updateData.email = email;
   }
-  if (newPassword) {
+  if (hasPasswordChange) {
     updateData.passwordHash = await hashPassword(newPassword);
   }
 
   if (Object.keys(updateData).length > 0) {
-    await prisma.user.update({
-      where: { id: admin.id },
-      data: updateData,
-    });
+    if (hasPasswordChange) {
+      await prisma.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: admin.id },
+          data: updateData,
+        });
+        await tx.session.updateMany({
+          where: { userId: admin.id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      });
+
+      const rawHeaders = await headers();
+      const ip = rawHeaders.get("x-forwarded-for")?.split(",")[0]?.trim();
+      const userAgent = rawHeaders.get("user-agent") ?? undefined;
+      const session = await createSession({
+        userId: currentAdmin.id,
+        ip,
+        userAgent,
+      });
+      await setSessionCookie(session.rawToken, session.expiresAt);
+    } else {
+      await prisma.user.update({
+        where: { id: admin.id },
+        data: updateData,
+      });
+    }
   }
 
   revalidatePath("/admin/settings");

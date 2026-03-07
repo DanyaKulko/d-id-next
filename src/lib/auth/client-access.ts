@@ -4,11 +4,16 @@ import { prisma } from "@/lib/db/prisma";
 
 const authRequiredKey = "requireAuthentication";
 
-export async function enforceClientAuth(pathname: string) {
+export async function isClientAuthRequired() {
   const setting = await prisma.appSetting.findUnique({
     where: { key: authRequiredKey },
+    select: { value: true },
   });
-  if (setting?.value !== "true") return;
+  return setting?.value === "true";
+}
+
+export async function enforceClientAuth(pathname: string) {
+  if (!(await isClientAuthRequired())) return;
 
   const session = await getCurrentUser();
   if (session) return;
@@ -18,10 +23,7 @@ export async function enforceClientAuth(pathname: string) {
 }
 
 export async function ensureClientAuth() {
-  const setting = await prisma.appSetting.findUnique({
-    where: { key: authRequiredKey },
-  });
-  if (setting?.value !== "true") return;
+  if (!(await isClientAuthRequired())) return;
 
   const session = await getCurrentUser();
   if (!session) {

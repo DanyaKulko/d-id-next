@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 
 export const SESSION_COOKIE = "session";
 export const PENDING_2FA_COOKIE = "pending_2fa";
+export const WEB_SESSION_COOKIE = "web_session";
 
 const base = {
   httpOnly: true,
@@ -16,24 +17,18 @@ export async function getSessionCookie() {
 export async function setSessionCookie(
   rawToken: string,
   expiresAt: Date,
-  options?: { sessionOnly?: boolean },
+  _options?: { sessionOnly?: boolean },
 ) {
-  const sessionOnly = options?.sessionOnly ?? false;
-  (await cookies()).set(
-    SESSION_COOKIE,
-    rawToken,
-    sessionOnly
-      ? {
-          ...base,
-        }
-      : {
-          ...base,
-          expires: expiresAt,
-        },
-  );
+  (await cookies()).set(SESSION_COOKIE, rawToken, {
+    ...base,
+    expires: expiresAt,
+  });
 }
 export async function clearSessionCookie() {
-  (await cookies()).set(SESSION_COOKIE, "", { ...base, expires: new Date(0) });
+  (await cookies()).set(SESSION_COOKIE, "", {
+    ...base,
+    expires: new Date(0),
+  });
 }
 
 export async function getPending2faCookie() {
@@ -47,6 +42,23 @@ export async function setPending2faCookie(value: string, ttlMinutes = 10) {
 }
 export async function clearPending2faCookie() {
   (await cookies()).set(PENDING_2FA_COOKIE, "", {
+    ...base,
+    expires: new Date(0),
+  });
+}
+
+export async function getWebSessionCookie() {
+  return (await cookies()).get(WEB_SESSION_COOKIE)?.value ?? null;
+}
+
+export async function setWebSessionCookie(value: string) {
+  (await cookies()).set(WEB_SESSION_COOKIE, value, {
+    ...base,
+  });
+}
+
+export async function clearWebSessionCookie() {
+  (await cookies()).set(WEB_SESSION_COOKIE, "", {
     ...base,
     expires: new Date(0),
   });

@@ -871,6 +871,19 @@ function RoleContent({
                         />
                     )}
                 </div>
+
+                <div className="input-group form-full">
+                    <TooltipLabel
+                        title="Hints Script URL"
+                        text="Optional external JS file loaded only on this avatar page. Leave empty to disable script injection for this avatar."
+                    />
+                    <input
+                        name="hintsScriptUrl"
+                        type="url"
+                        defaultValue={defaults?.hintsScriptUrl ?? ""}
+                        placeholder="https://roliki.ua/s/neil-hints-basic.js"
+                    />
+                </div>
             </div>
 
             <h2 className="section-title">Personalization</h2>

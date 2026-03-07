@@ -17,6 +17,7 @@ export type AgentSettings = {
   knowledgeBaseId?: string;
   displayName: string;
   description: string;
+  hintsScriptUrl: string;
   agentName: string;
   persona: string;
   systemPrompt: string;

@@ -48,56 +48,42 @@ export async function sendOtpEmail(params: {
   code: string;
   ttlMinutes: number;
 }) {
+  const message = `Your OTP code: ${params.code}\nValid for ${params.ttlMinutes} minutes.`
+  console.log(message) // TODO: delete on prod
   await sendMail({
     to: params.to,
     subject: "Confirmation Code",
-    text: `Your OTP code: ${params.code}\nValid for ${params.ttlMinutes} minutes.`,
+    text: message
   });
 }
 
 const neilSecurityEmail =
   resolveEnv("NEIL_SECURITY_EMAIL") || "neil.marathe1@gmail.com";
 
-const buildUserLabel = (userLoginOrEmail: string) => {
-  const normalized = userLoginOrEmail.trim();
-  if (!normalized.includes("@")) return normalized;
-  const login = normalized.split("@")[0]?.trim();
-  if (!login) return normalized;
-  return `${login}/${normalized}`;
-};
+export async function sendNeilUserLoginEmail(email: string) {
+  const message = `Hello, Neil.
 
-export async function sendNeilUserLoginEmail(userLoginOrEmail: string) {
-  const userLabel = buildUserLabel(userLoginOrEmail);
-  console.log(`Hello, Neil.
+User ${email} has started a new session in NeilAvatar.
 
-User ${userLabel} has started a new session in NeilAvatar.
-
-If the login was unauthorized, we recommend checking the logs and changing your password.`)
+If the login was unauthorized, we recommend checking the logs and changing your password.`
+  console.log(message)
   await sendMail({
     to: neilSecurityEmail,
-    subject: `New user login: ${userLabel} - NeilAvatar`,
-    text: `Hello, Neil.
-
-User ${userLabel} has started a new session in NeilAvatar.
-
-If the login was unauthorized, we recommend checking the logs and changing your password.`,
+    subject: `New user login: ${email} - NeilAvatar`,
+    text: message,
   });
 }
 
-export async function sendNeilUserLogoutEmail(userLoginOrEmail: string) {
-  const userLabel = buildUserLabel(userLoginOrEmail);
-  console.log(`Hello, Neil.
+export async function sendNeilUserLogoutEmail(email: string) {
+  const message = `Hello, Neil.
 
-User ${userLabel} has ended the session in NeilAvatar.
+User ${email} has ended the session in NeilAvatar.
 
-If this action was unauthorized, we recommend checking the system logs.`)
+If this action was unauthorized, we recommend checking the system logs.`
+  console.log(message)
   await sendMail({
     to: neilSecurityEmail,
-    subject: `Session ended: ${userLabel} - NeilAvatar`,
-    text: `Hello, Neil.
-
-User ${userLabel} has ended the session in NeilAvatar.
-
-If this action was unauthorized, we recommend checking the system logs.`,
+    subject: `Session ended: ${email} - NeilAvatar`,
+    text: message,
   });
 }

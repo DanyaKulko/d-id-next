@@ -39,10 +39,33 @@ model User {
   updatedAt DateTime @updatedAt
 
   sessions        Session[]
+  webSessions     UserWebSession[]
   twoFactorTokens TwoFactorToken[]
   roles           UserRole[]
   LoginEvent      LoginEvent[]
   chatSessions    ChatSession[]
+}
+
+model UserWebSession {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash String   @unique
+  ip        String?
+  userAgent String?
+
+  startedAt DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  endedAt   DateTime?
+  endReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, endedAt, lastSeenAt])
+  @@index([endedAt, lastSeenAt])
+  @@map("user_web_sessions")
 }
 
 model Session {
@@ -132,6 +155,7 @@ model Agent {
 
   idleVideoUrl   String?
   avatarImageUrl String?
+  hintsScriptUrl String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

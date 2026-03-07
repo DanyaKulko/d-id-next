@@ -78,6 +78,24 @@ const minMaxResponseLength = 50;
 const maxMaxResponseLength = 400;
 const defaultMaxResponseLength = 200;
 
+const normalizeHintsScriptUrl = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    throw new Error("Hint script URL must be a valid URL");
+  }
+
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error("Hint script URL must start with http:// or https://");
+  }
+
+  return url.toString();
+};
+
 const normalizeVoiceLanguage = (value?: string) => {
   const trimmed = value?.trim();
   if (!trimmed) return undefined;
@@ -343,6 +361,9 @@ export async function saveRoleSettingsAction(formData: FormData) {
 
   const displayName = getString(formData.get("displayName")).trim();
   const description = getString(formData.get("description")).trim();
+  const hintsScriptUrl = normalizeHintsScriptUrl(
+    getString(formData.get("hintsScriptUrl")),
+  );
   const agentName = getString(formData.get("agentName")).trim();
   const persona = getString(formData.get("persona")).trim();
   const systemPrompt = stripSafetyRulesFromPrompt(
@@ -465,6 +486,7 @@ export async function saveRoleSettingsAction(formData: FormData) {
     data: {
       displayName,
       description,
+      hintsScriptUrl,
       name: agentName,
       roleDescription: normalizedPersona || null,
       instructions: systemPrompt,

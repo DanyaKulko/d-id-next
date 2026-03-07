@@ -148,6 +148,7 @@ const toAgentSettings = (
     displayName: string;
     description: string | null;
     name: string;
+    hintsScriptUrl: string | null;
     roleDescription: string | null;
     instructions: string | null;
     personality: string | null;
@@ -180,6 +181,7 @@ const toAgentSettings = (
     knowledgeBaseId: agent.knowledgeBaseId ?? undefined,
     displayName: agent.displayName,
     description: agent.description ?? "",
+    hintsScriptUrl: agent.hintsScriptUrl ?? "",
     agentName: agent.name,
     persona: agent.roleDescription ?? "",
     systemPrompt: agent.instructions ?? "",

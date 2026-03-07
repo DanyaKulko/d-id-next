@@ -1,8 +1,6 @@
 import crypto from "node:crypto";
 import { auditAuth } from "@/lib/audit/auth";
 import { prisma } from "@/lib/db/prisma";
-import { sendNeilUserLogoutEmail } from "@/lib/email/smtp";
-import { logExternalServiceError } from "@/lib/logging/external-errors";
 
 const TTL_DAYS = Number(process.env.SESSION_TTL_DAYS ?? 30);
 const ROLLING_DAYS = Number(process.env.SESSION_ROLLING_DAYS ?? 7);
@@ -15,9 +13,6 @@ function randomToken(bytes = 32) {
 }
 
 export type SessionUser = { id: string; email: string; roles: string[] };
-
-const isRegularUserRoles = (roles: string[]) =>
-  roles.includes("USER") && !roles.includes("ADMIN");
 
 export async function createSession(params: {
   userId: string;
@@ -84,7 +79,6 @@ export async function getSession(rawToken: string) {
           select: {
             id: true,
             email: true,
-            roles: { select: { role: true } },
           },
         },
       },
@@ -98,7 +92,6 @@ export async function getSession(rawToken: string) {
         })
         .catch(() => undefined);
 
-      const roles = expired.user.roles.map((item) => item.role);
       await auditAuth({
         type: "LOGOUT",
         success: true,
@@ -106,22 +99,6 @@ export async function getSession(rawToken: string) {
         email: expired.user.email,
         userId: expired.user.id,
       }).catch(() => undefined);
-
-      if (isRegularUserRoles(roles)) {
-        await sendNeilUserLogoutEmail(expired.user.email).catch(
-          async (error) => {
-            await logExternalServiceError({
-              source: "SMTP",
-              type: "USER_EXPIRED_SESSION_NOTIFY",
-              message:
-                error instanceof Error
-                  ? error.message
-                  : "Failed to send expired-session notification",
-              level: "WARNING",
-            });
-          },
-        );
-      }
     }
 
     return null;

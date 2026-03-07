@@ -12,7 +12,6 @@ import { verifyPassword } from "@/lib/auth/passwords";
 import { createSession } from "@/lib/auth/session";
 import { startEmail2fa } from "@/lib/auth/twofactor";
 import { prisma } from "@/lib/db/prisma";
-import { sendNeilUserLoginEmail } from "@/lib/email/smtp";
 import { logExternalServiceError } from "@/lib/logging/external-errors";
 import { verifyRecaptcha } from "@/lib/security/recaptcha";
 
@@ -21,13 +20,9 @@ const userTwoFactorRequiredKey = "requireUserTwoFactorAuthentication";
 const Schema = z.object({
   email: z.email().toLowerCase(),
   password: z.string().min(6).max(200),
-  // password: z.string().min(8).max(200),
   recaptchaToken: z.string().optional(),
   scope: z.enum(["user", "admin"]).optional(),
 });
-
-const isRegularUserRoles = (roles: string[]) =>
-  roles.includes("USER") && !roles.includes("ADMIN");
 
 export async function loginStart(input: unknown) {
   const parsed = Schema.safeParse(input);
@@ -102,9 +97,6 @@ export async function loginStart(input: unknown) {
     });
     if (!okPwd) return { ok: false as const, step: "login" as const };
 
-    const userRoles = user.roles.map((item) => item.role);
-    const isRegularUser = isRegularUserRoles(userRoles);
-
     const userTwoFactorSetting = await prisma.appSetting.findUnique({
       where: { key: userTwoFactorRequiredKey },
       select: { value: true },
@@ -121,25 +113,8 @@ export async function loginStart(input: unknown) {
         ip,
         userAgent: ua,
       });
-      await setSessionCookie(session.rawToken, session.expiresAt, {
-        sessionOnly: scope === "user" && isRegularUser,
-      });
+      await setSessionCookie(session.rawToken, session.expiresAt);
       await clearPending2faCookie();
-
-      if (scope === "user" && isRegularUser) {
-        await sendNeilUserLoginEmail(user.email).catch(async (error) => {
-          await logExternalServiceError({
-            source: "SMTP",
-            type: "USER_LOGIN_NOTIFY",
-            message:
-              error instanceof Error
-                ? error.message
-                : "Failed to send login notification",
-            level: "WARNING",
-          });
-        });
-      }
-
       return { ok: true as const, step: "done" as const };
     }
 

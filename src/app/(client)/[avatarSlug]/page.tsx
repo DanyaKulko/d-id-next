@@ -1,5 +1,6 @@
 import "./page.css";
 import Link from "next/link";
+import Script from "next/script";
 import { notFound } from "next/navigation";
 import { AvatarPageClient } from "@/app/(client)/[avatarSlug]/page.client";
 import { findAgentByKey } from "@/lib/agents/agents.db";
@@ -25,6 +26,12 @@ export default async function AvatarPage({ params }: AvatarPageProps) {
 
   return (
     <>
+      {agentRecord.hintsScriptUrl ? (
+        <Script
+          src={agentRecord.hintsScriptUrl}
+          strategy="afterInteractive"
+        />
+      ) : null}
       <ClientPreloader />
       <header className="na-header">
         <div className="na-container">
