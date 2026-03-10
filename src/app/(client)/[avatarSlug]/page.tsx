@@ -1,12 +1,12 @@
 import "./page.css";
 import Link from "next/link";
-import Script from "next/script";
 import { notFound } from "next/navigation";
 import { AvatarPageClient } from "@/app/(client)/[avatarSlug]/page.client";
 import { findAgentByKey } from "@/lib/agents/agents.db";
 import { enforceClientAuth } from "@/lib/auth/client-access";
 import LottieLogo from "@/components/LottieLogo/LottieLogo";
 import ClientPreloader from "@/components/ClientPreloader/ClientPreloader";
+import { AgentHintsScript } from "./_components/AgentHintsScript";
 
 type AvatarPageProps = {
   params: Promise<{ avatarSlug: string }>;
@@ -27,10 +27,7 @@ export default async function AvatarPage({ params }: AvatarPageProps) {
   return (
     <>
       {agentRecord.hintsScriptUrl ? (
-        <Script
-          src={agentRecord.hintsScriptUrl}
-          strategy="afterInteractive"
-        />
+        <AgentHintsScript src={agentRecord.hintsScriptUrl} />
       ) : null}
       <ClientPreloader />
       <header className="na-header">
