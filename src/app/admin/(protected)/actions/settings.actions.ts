@@ -19,6 +19,43 @@ import {
   withDidLogging,
 } from "./shared";
 
+const formatDateOnly = (date: Date) => date.toISOString().split("T")[0];
+
+const buildUserRow = async (userId: string) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      email: true,
+      isActive: true,
+      createdAt: true,
+    },
+  });
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  const lastLogin = await prisma.loginEvent.findFirst({
+    where: {
+      userId,
+      success: true,
+      type: "LOGIN_PASSWORD",
+    },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true },
+  });
+
+  return {
+    id: user.id,
+    login: user.email.split("@")[0] ?? user.email,
+    email: user.email,
+    createdDate: formatDateOnly(user.createdAt),
+    lastLogin: lastLogin ? formatDateOnly(lastLogin.createdAt) : "Never",
+    status: user.isActive ? ("active" as const) : ("inactive" as const),
+  };
+};
+
 export async function checkDidConnectionAction() {
   await requireAdmin();
   await withDidLogging("Check Status", () => didService.checkStatus());
@@ -108,7 +145,7 @@ export async function saveUserUpdateAction(formData: FormData) {
 
     revalidatePath("/admin/settings");
     revalidatePath("/admin/settings/user-access");
-    return { ok: true };
+    return { ok: true, user: await buildUserRow(created.id) };
   }
 
   if (action === "update") {
@@ -161,7 +198,7 @@ export async function saveUserUpdateAction(formData: FormData) {
 
     revalidatePath("/admin/settings");
     revalidatePath("/admin/settings/user-access");
-    return { ok: true };
+    return { ok: true, user: await buildUserRow(userId) };
   }
 
   if (action === "toggle-status") {
@@ -200,7 +237,7 @@ export async function saveUserUpdateAction(formData: FormData) {
 
     revalidatePath("/admin/settings");
     revalidatePath("/admin/settings/user-access");
-    return { ok: true };
+    return { ok: true, user: await buildUserRow(userId) };
   }
 
   if (action === "delete") {
@@ -219,7 +256,6 @@ export async function saveUserUpdateAction(formData: FormData) {
 
     await revokeAllUserSessions(userId);
     await endAllUserWebSessions(userId, "ADMIN_DELETE");
-    await prisma.user.delete({ where: { id: userId } });
 
     await prisma.loginEvent.create({
       data: {
@@ -230,9 +266,17 @@ export async function saveUserUpdateAction(formData: FormData) {
       },
     });
 
+    await prisma.$transaction([
+      prisma.userRole.deleteMany({ where: { userId } }),
+      prisma.twoFactorToken.deleteMany({ where: { userId } }),
+      prisma.userWebSession.deleteMany({ where: { userId } }),
+      prisma.session.deleteMany({ where: { userId } }),
+      prisma.user.delete({ where: { id: userId } }),
+    ]);
+
     revalidatePath("/admin/settings");
     revalidatePath("/admin/settings/user-access");
-    return { ok: true };
+    return { ok: true, deletedUserId: userId };
   }
 
   throw new Error("Unsupported action");

@@ -46,7 +46,9 @@ export function AgentHintsScript({ src }: AgentHintsScriptProps) {
     observer.observe(document.body, { childList: true });
 
     const script = document.createElement("script");
-    script.src = src;
+    const scriptUrl = new URL(src, window.location.href);
+    scriptUrl.searchParams.set("ver", Date.now().toString());
+    script.src = scriptUrl.toString();
     script.async = true;
     script.dataset.agentHintsScript = "true";
 

@@ -250,7 +250,17 @@ export default function SettingsClient({
 
         startSaving(async () => {
             await saveUserUpdateAction(formData)
-                .then(() => toast.success(`User "${email}" created`))
+                .then((result) => {
+                    if (!result?.ok || !("user" in result) || !result.user) {
+                        throw new Error("Create user failed");
+                    }
+                    setUsers((prev) => [...prev, result.user]);
+                    setShowAddUser(false);
+                    setNewUserEmail("");
+                    setNewUserPassword("");
+                    setNewUserPasswordConfirm("");
+                    toast.success(`User "${email}" created`);
+                })
                 .catch(() => toast.error("Failed to create user"));
         });
     };
@@ -298,7 +308,20 @@ export default function SettingsClient({
 
         startSaving(async () => {
             await saveUserUpdateAction(formData)
-                .then(() => toast.success("User updated"))
+                .then((result) => {
+                    if (!result?.ok || !("user" in result) || !result.user) {
+                        throw new Error("Update user failed");
+                    }
+                    setUsers((prev) =>
+                        prev.map((user) =>
+                            user.id === result.user.id ? result.user : user,
+                        ),
+                    );
+                    setEditUserCandidate(null);
+                    setEditUserPassword("");
+                    setEditUserPasswordConfirm("");
+                    toast.success("User updated");
+                })
                 .catch(() => toast.error("Failed to update user"));
         });
     };
@@ -334,7 +357,17 @@ export default function SettingsClient({
 
         startSaving(async () => {
             await saveUserUpdateAction(formData)
-                .then(() =>  toast.success("User status updated"))
+                .then((result) => {
+                    if (!result?.ok || !("user" in result) || !result.user) {
+                        throw new Error("Toggle user failed");
+                    }
+                    setUsers((prev) =>
+                        prev.map((user) =>
+                            user.id === result.user.id ? result.user : user,
+                        ),
+                    );
+                    toast.success("User status updated");
+                })
                 .catch(() => toast.error("Failed to update user status"));
         });
     };

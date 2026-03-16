@@ -6,12 +6,17 @@ import LottieLogo from "@/components/LottieLogo/LottieLogo";
 import UserGuideModal from "@/components/UserGuideModal/UserGuideModal";
 import ClientPreloader from "@/components/ClientPreloader/ClientPreloader";
 import { fetchHomeAgents } from "@/lib/agents/agents.db";
-import { enforceClientAuth } from "@/lib/auth/client-access";
+import {
+  enforceClientAuth,
+  isClientAuthRequired,
+} from "@/lib/auth/client-access";
+import ClientLogoutButton from "./_components/ClientLogoutButton";
 
 export const dynamic = 'force-dynamic';
 
 export default async function Home() {
   await enforceClientAuth("/");
+  const authRequired = await isClientAuthRequired();
   const avatars = await fetchHomeAgents();
   const mediaUrls = avatars.flatMap((avatar) =>
     [avatar.videoUrl, avatar.imageUrl].filter(Boolean),
@@ -23,19 +28,40 @@ export default async function Home() {
       <HomeMediaPrefetch urls={mediaUrls} />
       <header className="na-header">
         <div className="na-container">
-          <div className="na-header-content">
-            <Link href="/" className="na-logo-text" aria-label="Neil Avatar">
-              Neil Avatar
-            </Link>
-            <div className="na-header-title">
-              <h1 className="na-title-display na-glow">
-                How to pick NeilAvatar role to talk to?
-              </h1>
-              <p className="na-subtitle">
-                Click on any image below. Start conversing with Neil Avatar.
-              </p>
+          {authRequired ? (
+            <div className="na-header-content na-header-content--with-actions">
+              <div className="na-header-side">
+                <Link href="/" className="na-logo-text" aria-label="Neil Avatar">
+                  Neil Avatar
+                </Link>
+              </div>
+              <div className="na-header-title na-header-title--centered">
+                <h1 className="na-title-display na-glow">
+                  How to pick NeilAvatar role to talk to?
+                </h1>
+                <p className="na-subtitle">
+                  Click on any image below. Start conversing with Neil Avatar.
+                </p>
+              </div>
+              <div className="na-header-side na-header-side--end">
+                <ClientLogoutButton />
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="na-header-content">
+              <Link href="/" className="na-logo-text" aria-label="Neil Avatar">
+                Neil Avatar
+              </Link>
+              <div className="na-header-title">
+                <h1 className="na-title-display na-glow">
+                  How to pick NeilAvatar role to talk to?
+                </h1>
+                <p className="na-subtitle">
+                  Click on any image below. Start conversing with Neil Avatar.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </header>
 

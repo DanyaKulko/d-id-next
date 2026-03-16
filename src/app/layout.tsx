@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Local from "next/font/local";
 
@@ -11,6 +11,12 @@ const nasalization = Local({
 export const metadata: Metadata = {
   title: "Neil avatar",
   description: "AI-powered avatars for personalized interactions",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({

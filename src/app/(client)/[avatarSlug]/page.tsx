@@ -7,6 +7,8 @@ import { enforceClientAuth } from "@/lib/auth/client-access";
 import LottieLogo from "@/components/LottieLogo/LottieLogo";
 import ClientPreloader from "@/components/ClientPreloader/ClientPreloader";
 import { AgentHintsScript } from "./_components/AgentHintsScript";
+import ClientLogoutButton from "../_components/ClientLogoutButton";
+import { isClientAuthRequired } from "@/lib/auth/client-access";
 
 type AvatarPageProps = {
   params: Promise<{ avatarSlug: string }>;
@@ -15,6 +17,7 @@ type AvatarPageProps = {
 export default async function AvatarPage({ params }: AvatarPageProps) {
   const { avatarSlug } = await params;
   await enforceClientAuth(`/${avatarSlug}`);
+  const authRequired = await isClientAuthRequired();
   const agentRecord = await findAgentByKey(avatarSlug);
   if (!agentRecord?.agentId) {
     notFound();
@@ -32,14 +35,28 @@ export default async function AvatarPage({ params }: AvatarPageProps) {
       <ClientPreloader />
       <header className="na-header">
         <div className="na-container">
+          {authRequired ? (
             <div className="na-header-content">
-            <Link href="/" className="na-logo-text" aria-label="Neil Avatar">
-              Neil Avatar
-            </Link>
-            <Link href="/" className="na-back-link">
-              ← Back to Roles
-            </Link>
-          </div>
+              <div className="na-header-left">
+                <Link href="/" className="na-logo-text" aria-label="Neil Avatar">
+                  Neil Avatar
+                </Link>
+                <Link href="/" className="na-back-link">
+                  ← Back to Roles
+                </Link>
+              </div>
+              <ClientLogoutButton />
+            </div>
+          ) : (
+            <div className="na-header-content">
+              <Link href="/" className="na-logo-text" aria-label="Neil Avatar">
+                Neil Avatar
+              </Link>
+              <Link href="/" className="na-back-link">
+                ← Back to Roles
+              </Link>
+            </div>
+          )}
         </div>
       </header>
 

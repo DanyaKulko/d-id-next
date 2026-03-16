@@ -128,6 +128,28 @@ body {
   align-items: center;
 }
 
+.na-header-content--with-actions {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) minmax(0, auto);
+  gap: var(--na-space-md);
+}
+
+.na-header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--na-space-md);
+  min-width: 0;
+}
+
+.na-header-side {
+  min-width: 0;
+}
+
+.na-header-side--end {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .na-logo-text {
   font-size: 32px;
   font-weight: 700;
@@ -163,6 +185,69 @@ body {
 
 .na-back-link:hover {
   text-shadow: 0 0 8px rgba(83, 187, 225, 0.6);
+}
+
+.na-logout-link {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: #d14b4b;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: inherit;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  font-family: inherit;
+}
+
+.na-logout-link:hover {
+  color: #b53d3d;
+}
+
+.na-logout-link:focus-visible {
+  outline: 2px solid rgba(209, 75, 75, 0.35);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+.na-password-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.na-password-input input {
+  padding-right: 88px;
+}
+
+.na-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #d14b4b;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  padding: 0;
+}
+
+.na-password-toggle:hover {
+  color: #b53d3d;
+}
+
+.na-password-toggle:focus-visible {
+  outline: 2px solid rgba(209, 75, 75, 0.35);
+  outline-offset: 4px;
+  border-radius: 6px;
 }
 
 /* Buttons */

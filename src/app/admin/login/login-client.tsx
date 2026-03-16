@@ -7,6 +7,7 @@ import ReCAPTCHA from "react-google-recaptcha";
 import {loginStart} from "@/app/actions/auth/login.actions";
 import {twoFactorVerify} from "@/app/actions/auth/two-factor.actions";
 import logo from "@/assets/img/neil_avatar_logo.png";
+import PasswordInput from "@/components/PasswordInput";
 
 type LoginState =
     | { phase: "login"; error?: string; expiresAt?: string }
@@ -129,8 +130,7 @@ export default function LoginClient() {
 
                             <div className="form-group">
                                 <label htmlFor="password">Password</label>
-                                <input
-                                    type="password"
+                                <PasswordInput
                                     id="password"
                                     name="password"
                                     placeholder="Enter your password"
