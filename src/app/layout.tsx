@@ -11,6 +11,11 @@ const nasalization = Local({
 export const metadata: Metadata = {
   title: "Neil avatar",
   description: "AI-powered avatars for personalized interactions",
+  icons: {
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/favicon.ico",
+  },
 };
 
 export const viewport: Viewport = {
