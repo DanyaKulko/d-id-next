@@ -38,9 +38,9 @@ export default async function AvatarPage({ params }: AvatarPageProps) {
           {authRequired ? (
             <div className="na-header-content">
               <div className="na-header-left">
-                <Link href="/" className="na-logo-text" aria-label="Neil Avatar">
-                  Neil Avatar
-                </Link>
+                {/*<Link href="/" className="na-logo-text" aria-label="Neil Avatar">*/}
+                {/*  Neil Avatar*/}
+                {/*</Link>*/}
                 <Link href="/" className="na-back-link">
                   ← Back to Roles
                 </Link>

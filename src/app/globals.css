@@ -146,6 +146,7 @@ body {
 }
 
 .na-header-side--end {
+  z-index: 2;
   display: flex;
   justify-content: flex-end;
 }
