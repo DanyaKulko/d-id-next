@@ -16,6 +16,7 @@ export const getOptionalString = (value: FormDataEntryValue | null) =>
 export const authRequiredKey = "requireAuthentication";
 export const userTwoFactorRequiredKey = "requireUserTwoFactorAuthentication";
 export const defaultPersonalityStyle = "Friendly and Professional";
+export const defaultPresenterVoiceModelId = "eleven_flash_v2_5";
 export const defaultSafetyRules = `Do not discuss:
 - Political topics in aggressive form
 - Personal information of third parties
@@ -308,21 +309,31 @@ export async function updateDidAgentFromRole(
     payload.llm = llmPayload;
   }
 
+  const existingVoice =
+    presenterPayload.voice && typeof presenterPayload.voice === "object"
+      ? ({ ...presenterPayload.voice } as Record<string, unknown>)
+      : {};
+
   if (input.voiceId || input.voiceLanguage || input.clearVoiceLanguage) {
-    const existingVoice =
-      presenterPayload.voice && typeof presenterPayload.voice === "object"
-        ? ({ ...presenterPayload.voice } as Record<string, unknown>)
-        : {};
+    const nextVoice = { ...existingVoice };
     if (input.voiceId) {
-      existingVoice.voice_id = input.voiceId;
+      nextVoice.voice_id = input.voiceId;
     }
     if (input.voiceLanguage) {
-      existingVoice.language = input.voiceLanguage;
-    } else if (input.clearVoiceLanguage && "language" in existingVoice) {
-      delete existingVoice.language;
+      nextVoice.language = input.voiceLanguage;
+    } else if (input.clearVoiceLanguage && "language" in nextVoice) {
+      delete nextVoice.language;
     }
-    presenterPayload.voice = existingVoice;
+    presenterPayload.voice = nextVoice;
   }
+
+  presenterPayload.voice =
+    presenterPayload.voice && typeof presenterPayload.voice === "object"
+      ? ({ ...presenterPayload.voice } as Record<string, unknown>)
+      : { ...existingVoice };
+  (presenterPayload.voice as Record<string, unknown>).model_id =
+    defaultPresenterVoiceModelId;
+  payload.presenter = presenterPayload;
 
   if (Object.keys(presenterPayload).length > 0) {
     payload.presenter = presenterPayload;
