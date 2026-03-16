@@ -119,7 +119,21 @@ export async function loginStart(input: unknown) {
     }
 
     try {
-      const { tokenId, expiresAt } = await startEmail2fa(user.id, user.email);
+      const { tokenId, expiresAt, emailSent } = await startEmail2fa(
+        user.id,
+        user.email,
+      );
+      if (!emailSent) {
+        await auditAuth({
+          type: "LOGIN_OTP_SENT",
+          success: false,
+          reason: "otp_send_failed",
+          email: user.email,
+          userId: user.id,
+          ip,
+          userAgent: ua,
+        });
+      }
       await setPending2faCookie(`${user.id}:${tokenId}`, 10);
       return { ok: true as const, step: "2fa" as const, expiresAt };
     } catch (error) {
@@ -134,10 +148,10 @@ export async function loginStart(input: unknown) {
       });
       await clearPending2faCookie();
       await logExternalServiceError({
-        source: "SMTP",
-        type: "OTP_SEND",
+        source: "AUTH",
+        type: "OTP_PREPARE",
         message:
-          error instanceof Error ? error.message : "Failed to send OTP email",
+          error instanceof Error ? error.message : "Failed to prepare OTP flow",
       });
       return { ok: false as const, step: "login" as const };
     }

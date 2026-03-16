@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { prisma } from "@/lib/db/prisma";
-
 import { sendOtpEmail } from "@/lib/email/smtp";
+import { logExternalServiceError } from "@/lib/logging/external-errors";
 
 function sha256(input: string) {
   return crypto.createHash("sha256").update(input).digest("base64url");
@@ -27,9 +27,20 @@ export async function startEmail2fa(userId: string, email: string) {
   });
 
   console.log("code", code);
-  await sendOtpEmail({ to: email, code, ttlMinutes: OTP_TTL_MIN });
+  let emailSent = true;
+  try {
+    await sendOtpEmail({ to: email, code, ttlMinutes: OTP_TTL_MIN });
+  } catch (error) {
+    emailSent = false;
+    await logExternalServiceError({
+      source: "SMTP",
+      type: "OTP_SEND",
+      message:
+        error instanceof Error ? error.message : "Failed to send OTP email",
+    }).catch(() => undefined);
+  }
 
-  return { tokenId: t.id, expiresAt: t.expiresAt };
+  return { tokenId: t.id, expiresAt: t.expiresAt, emailSent };
 }
 
 export async function verifyEmail2fa(params: {
