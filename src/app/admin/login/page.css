@@ -65,7 +65,7 @@
   text-align: center;
   color: #718096;
   margin-bottom: 40px;
-  font-size: 14px;
+  font-size: 18px;
 }
 .form-group {
   margin-bottom: 25px;
@@ -75,14 +75,14 @@
   margin-bottom: 8px;
   color: #4a5568;
   font-weight: 500;
-  font-size: 14px;
+  font-size: 18px;
 }
 .form-group input {
   width: 100%;
-  padding: 14px 16px;
+  padding: 16px 18px;
   border: 2px solid #e2e8f0;
   border-radius: 8px;
-  font-size: 15px;
+  font-size: 18px;
   transition: all 0.3s;
   background: white;
 }
@@ -98,12 +98,12 @@
 }
 .login-button {
   width: 100%;
-  padding: 16px;
+  padding: 18px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
   border-radius: 8px;
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
@@ -140,7 +140,7 @@
   text-align: center;
   color: white;
   margin-top: 30px;
-  font-size: 13px;
+  font-size: 18px;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 @media (max-width: 768px) {

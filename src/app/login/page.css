@@ -44,7 +44,7 @@
 
 .na-login-container {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 2fr 3fr;
   gap: 60px;
   max-width: 1200px;
   width: 100%;
@@ -61,9 +61,9 @@
 
 .na-login-lamp {
   width: 100%;
-  max-width: 400px;
+  max-width: 320px;
   margin-bottom: 20px;
-  min-height: 400px;
+  min-height: 300px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -74,13 +74,19 @@
   height: auto;
 }
 
+.na-login-lottie {
+  width: 100%;
+  max-width: 300px;
+  aspect-ratio: 190 / 161;
+}
+
 .na-login-card {
   background: #fff;
   border: 1px solid rgba(16, 42, 44, 0.08);
   border-radius: 24px;
   padding: 40px;
   box-shadow: 0 18px 45px rgba(16, 42, 44, 0.12);
-  max-width: 480px;
+  max-width: 560px;
   width: 100%;
 }
 
@@ -96,14 +102,14 @@
 }
 
 .na-login-card-title h1 {
-  font-size: 22px;
+  font-size: 29px;
   font-weight: 600;
   margin-bottom: 4px;
   color: #284665;
 }
 
 .na-login-card-title p {
-  font-size: 13px;
+  font-size: 18px;
   color: #284665;
 }
 
@@ -112,7 +118,7 @@
   color: #e07a33;
   padding: 6px 12px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 17px;
   font-weight: 600;
 }
 
@@ -122,7 +128,7 @@
   color: #a53131;
   border-radius: 12px;
   padding: 10px 12px;
-  font-size: 12px;
+  font-size: 17px;
   margin-bottom: 16px;
   display: none;
 }
@@ -140,7 +146,7 @@
 }
 
 .na-login-instructions h2 {
-  font-size: 16px;
+  font-size: 22px;
   margin-bottom: 16px;
   color: #fdaa2d;
   font-weight: 600;
@@ -153,7 +159,7 @@
 
 .na-login-instructions li {
   margin-bottom: 10px;
-  font-size: 13px;
+  font-size: 18px;
   line-height: 1.6;
 }
 
@@ -173,18 +179,18 @@
 .na-login-form-group label {
   display: block;
   margin-bottom: 8px;
-  font-size: 13px;
+  font-size: 18px;
   font-weight: 600;
   color: #284665;
 }
 
 .na-login-form-group input {
   width: 100%;
-  padding: 14px 16px;
+  padding: 18px 18px;
   border: 1px solid rgba(16, 42, 44, 0.08);
   border-radius: 12px;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 19px;
   transition:
     border 0.2s,
     box-shadow 0.2s;
@@ -196,6 +202,12 @@
   box-shadow: 0 0 0 4px rgba(255, 179, 71, 0.2);
 }
 
+.na-login-password-hint {
+  margin: 6px 0 0;
+  font-size: 1.06rem;
+  color: #fdaa2d;
+}
+
 .na-login-captcha-group {
   display: flex;
   justify-content: center;
@@ -203,12 +215,12 @@
 
 .na-login-submit {
   width: 100%;
-  padding: 14px 18px;
+  padding: 18px 20px;
   background: linear-gradient(135deg, #feb13f, #ffd8a5);
   border: 2px solid #fdaa2d;
   border-radius: 14px;
   color: #284665;
-  font-size: 15px;
+  font-size: 20px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -230,7 +242,7 @@
 
 .na-login-otp-hint {
   margin-top: 16px;
-  font-size: 13px;
+  font-size: 18px;
   color: #284665;
   text-align: center;
 }
@@ -239,7 +251,7 @@
   text-align: center;
   margin-top: 28px;
   color: #284665;
-  font-size: 13px;
+  font-size: 18px;
 }
 
 @media (max-width: 980px) {
@@ -268,12 +280,12 @@
   }
 
   .na-login-lamp {
-    max-width: 300px;
-    min-height: 300px;
+    max-width: 240px;
+    min-height: 200px;
   }
 
   .na-login-title {
-    font-size: 28px;
+    font-size: 36px;
     margin-bottom: 30px;
   }
 

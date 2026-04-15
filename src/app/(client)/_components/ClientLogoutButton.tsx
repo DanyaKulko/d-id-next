@@ -21,7 +21,7 @@ export default function ClientLogoutButton() {
         });
       }}
     >
-      {isPending ? "Logging out..." : "Log out"}
+      {isPending ? "Logging out..." : <><span aria-hidden="true">✕</span> Log out</>}
     </button>
   );
 }

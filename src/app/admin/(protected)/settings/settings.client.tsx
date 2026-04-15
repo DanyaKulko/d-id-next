@@ -13,6 +13,7 @@ import {
     saveUserTwoFactorRequirementAction,
     saveUserUpdateAction,
 } from "@/app/admin/(protected)/actions";
+import PasswordInput from "@/components/PasswordInput";
 import type {
     ErrorLogFilters,
     ErrorLogPage,
@@ -1150,9 +1151,8 @@ export default function SettingsClient({
 
                             <div className="input-group">
                                 <label htmlFor="newUserPassword">Password</label>
-                                <input
+                                <PasswordInput
                                     id="newUserPassword"
-                                    type="password"
                                     value={newUserPassword}
                                     onChange={(event) => setNewUserPassword(event.target.value)}
                                     placeholder="At least 6 characters"
@@ -1163,9 +1163,8 @@ export default function SettingsClient({
 
                             <div className="input-group">
                                 <label htmlFor="newUserPasswordConfirm">Confirm Password</label>
-                                <input
+                                <PasswordInput
                                     id="newUserPasswordConfirm"
-                                    type="password"
                                     value={newUserPasswordConfirm}
                                     onChange={(event) =>
                                         setNewUserPasswordConfirm(event.target.value)
@@ -1231,9 +1230,8 @@ export default function SettingsClient({
                             </div>
                             <div className="input-group">
                                 <label htmlFor="editUserPassword">New Password</label>
-                                <input
+                                <PasswordInput
                                     id="editUserPassword"
-                                    type="password"
                                     value={editUserPassword}
                                     onChange={(event) => setEditUserPassword(event.target.value)}
                                     placeholder="Leave blank to keep current password"
@@ -1244,9 +1242,8 @@ export default function SettingsClient({
                                 <label htmlFor="editUserPasswordConfirm">
                                     Confirm New Password
                                 </label>
-                                <input
+                                <PasswordInput
                                     id="editUserPasswordConfirm"
-                                    type="password"
                                     value={editUserPasswordConfirm}
                                     onChange={(event) =>
                                         setEditUserPasswordConfirm(event.target.value)

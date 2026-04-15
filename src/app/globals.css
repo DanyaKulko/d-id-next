@@ -12,7 +12,7 @@
 
   --na-text-on-light: #274663;
   --na-text-on-color: #ffffff;
-  --na-text-muted: rgba(39, 70, 99, 0.65);
+  --na-text-muted: rgba(39, 70, 99, 0.78);
 
   --na-glow-warm: rgba(253, 170, 45, 0.3);
   --na-glow-cold: rgba(50, 144, 202, 0.25);
@@ -58,6 +58,21 @@ body {
   overflow-x: hidden;
 }
 
+/* Global focus-visible for accessibility (elderly audience) */
+:focus-visible {
+  outline: 3px solid var(--na-accent-secondary);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+button:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 3px solid var(--na-accent-secondary);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
 .na-preloader {
   position: fixed;
   inset: 0;
@@ -95,12 +110,12 @@ body {
 }
 
 .na-preloader__anim {
-  width: clamp(140px, 24vw, 260px);
-  height: clamp(120px, 22vw, 240px);
+  width: clamp(210px, 36vw, 390px);
+  height: clamp(180px, 33vw, 360px);
 }
 
 .na-preloader__label {
-  font-size: clamp(14px, 2vw, 18px);
+  font-size: clamp(21px, 3vw, 27px);
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--na-text-on-light);
@@ -139,6 +154,7 @@ body {
   align-items: center;
   gap: var(--na-space-md);
   min-width: 0;
+  width: 100%;
 }
 
 .na-header-side {
@@ -201,6 +217,10 @@ body {
   cursor: pointer;
   transition: color 0.2s ease;
   font-family: inherit;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .na-logout-link:hover {
@@ -208,8 +228,8 @@ body {
 }
 
 .na-logout-link:focus-visible {
-  outline: 2px solid rgba(209, 75, 75, 0.35);
-  outline-offset: 4px;
+  outline: 3px solid #d14b4b;
+  outline-offset: 3px;
   border-radius: 6px;
 }
 
@@ -234,7 +254,7 @@ body {
   background: transparent;
   color: #d14b4b;
   font: inherit;
-  font-size: 12px;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: 0.04em;
   cursor: pointer;
@@ -246,8 +266,8 @@ body {
 }
 
 .na-password-toggle:focus-visible {
-  outline: 2px solid rgba(209, 75, 75, 0.35);
-  outline-offset: 4px;
+  outline: 3px solid #d14b4b;
+  outline-offset: 3px;
   border-radius: 6px;
 }
 
@@ -258,10 +278,10 @@ body {
   justify-content: center;
   gap: 8px;
   padding: 0 24px;
-  height: 46px;
+  height: 56px;
   border-radius: var(--na-radius-md);
   font-weight: 600;
-  font-size: 15px;
+  font-size: 20px;
   letter-spacing: 0.05em;
   border: none;
   cursor: pointer;
@@ -332,7 +352,7 @@ body {
 }
 
 .na-modal-text {
-  font-size: 15px;
+  font-size: 19px;
   line-height: 1.6;
   color: var(--na-text-muted);
   margin-bottom: var(--na-space-lg);
@@ -344,6 +364,8 @@ body {
     justify-content: center;
     align-items: center;
   margin-top: var(--na-space-xl);
+  margin-bottom: var(--na-space-xl);
+  padding-bottom: var(--na-space-xl);
   opacity: 0.7;
 }
 

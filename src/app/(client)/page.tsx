@@ -36,11 +36,8 @@ export default async function Home() {
                 </Link>
               </div>
               <div className="na-header-title na-header-title--centered">
-                <h1 className="na-title-display na-glow">
-                  How to pick NeilAvatar role to talk to?
-                </h1>
                 <p className="na-subtitle">
-                  Click on any image below. Start conversing with Neil Avatar.
+                  Choose a topic to start talking with Neil
                 </p>
               </div>
               <div className="na-header-side na-header-side--end">
@@ -52,12 +49,9 @@ export default async function Home() {
               <Link href="/" className="na-logo-text" aria-label="Neil Avatar">
                 Neil Avatar
               </Link>
-              <div className="na-header-title">
-                <h1 className="na-title-display na-glow">
-                  How to pick NeilAvatar role to talk to?
-                </h1>
+              <div className="na-header-title na-header-title--centered">
                 <p className="na-subtitle">
-                  Click on any image below. Start conversing with Neil Avatar.
+                  Choose a topic to start talking with Neil
                 </p>
               </div>
             </div>
@@ -66,6 +60,9 @@ export default async function Home() {
       </header>
 
       <main className="na-container">
+        <p className="na-subtitle" style={{ textAlign: "center", marginBottom: 16, fontSize: 24 }}>
+          Click on any image of Avatars
+        </p>
         <div className="na-roles-grid">
           {avatars.map((avatar, index) => (
             <Link

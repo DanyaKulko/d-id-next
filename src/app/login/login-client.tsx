@@ -1,12 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import ReCAPTCHA from "react-google-recaptcha";
 import { loginStart } from "@/app/actions/auth/login.actions";
 import { twoFactorVerify } from "@/app/actions/auth/two-factor.actions";
 import PasswordInput from "@/components/PasswordInput";
+import LottieLogo from "@/components/LottieLogo/LottieLogo";
 
 type LoginState =
   | { phase: "login"; error?: string; expiresAt?: string }
@@ -113,12 +113,9 @@ export default function LoginClient({ twoFactorRequired }: LoginClientProps) {
       <div className="na-login-container">
         <div className="na-login-left">
           <div className="na-login-lamp" aria-hidden="true">
-            <Image
-              src="/login-lamp.svg"
-              alt=""
-              width={512}
-              height={512}
-              priority
+            <LottieLogo
+              className="na-login-lottie"
+              loop
             />
           </div>
         </div>
@@ -184,6 +181,9 @@ export default function LoginClient({ twoFactorRequired }: LoginClientProps) {
                     minLength={6}
                     autoComplete="current-password"
                   />
+                  <p className="na-login-password-hint">
+                    Click &quot;Show&quot; to reveal the password
+                  </p>
                 </div>
 
                 {isProd && siteKey ? (

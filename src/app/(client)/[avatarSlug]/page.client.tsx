@@ -942,6 +942,9 @@ export const AvatarPageClient = ({
                                 }
                             }}
                         >
+                            <option disabled value="">
+                                Ask any question in any of these languages
+                            </option>
                             {languages.map((lang) => (
                                 <option key={lang.code} value={lang.code}>
                                     {lang.label}
@@ -949,7 +952,7 @@ export const AvatarPageClient = ({
                             ))}
                         </select>
                         <span className="na-control-hint">
-              Language for communicating with the avatar
+              Click the &quot;English&quot; button to reveal other available languages
             </span>
                     </div>
 
@@ -958,7 +961,11 @@ export const AvatarPageClient = ({
                             className="na-language-select"
                             value={selectedBackgroundId}
                             onChange={(e) => setSelectedBackgroundId(e.target.value)}
+                            disabled={!canSelectBackground || connectionStatus !== "connected"}
                         >
+                            <option disabled value="">
+                                Select a background from the list
+                            </option>
                             <option value="default">🎨 Default Background</option>
                             {canSelectBackground &&
                                 backgroundOptions.map((background) => (
@@ -967,7 +974,13 @@ export const AvatarPageClient = ({
                                     </option>
                                 ))}
                         </select>
-                        <span className="na-control-hint">Avatar background overlay</span>
+                        <span className="na-control-hint">
+                            {!canSelectBackground
+                                ? "The selected role does not support background selection"
+                                : connectionStatus !== "connected"
+                                    ? 'Choose a background after clicking "Start Conversation"'
+                                    : "Choose a background"}
+                        </span>
                     </div>
 
                     {connectionStatus !== "connected" ? (
@@ -981,7 +994,7 @@ export const AvatarPageClient = ({
                                 🎤 Start Conversation
                             </button>
                             <span className="na-control-hint">
-                Click to start a conversation with the avatar
+                Click &quot;Start Conversation&quot; to begin a session
               </span>
                         </div>
                     ) : (

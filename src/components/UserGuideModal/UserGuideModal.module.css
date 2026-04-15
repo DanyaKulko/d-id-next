@@ -119,7 +119,7 @@
   color: white;
   padding: 6px 16px;
   border-radius: 16px;
-  font-size: 12px;
+  font-size: 17px;
   font-weight: 600;
   margin-bottom: var(--na-space-sm);
   text-transform: uppercase;
@@ -127,7 +127,7 @@
 }
 
 .na-slide-title-modal {
-  font-size: 28px;
+  font-size: 34px;
   font-weight: 700;
   color: var(--na-text-on-light);
   margin-bottom: var(--na-space-sm);
@@ -135,7 +135,7 @@
 }
 
 .na-slide-text-modal {
-  font-size: 15px;
+  font-size: 19px;
   color: var(--na-text-on-light);
   line-height: 1.6;
   margin-bottom: var(--na-space-md);
@@ -211,6 +211,7 @@
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.2s;
+  font-family: var(--na-font-family);
 }
 .na-btn:hover {
   opacity: 0.9;
@@ -290,7 +291,7 @@
   }
 
   .na-slide-title-modal {
-    font-size: 24px;
+    font-size: 29px;
   }
 
   .na-slide-logo-modal img {
@@ -334,11 +335,11 @@
   }
 
   .na-slide-title-modal {
-    font-size: 20px;
+    font-size: 24px;
   }
 
   .na-slide-text-modal {
-    font-size: 14px;
+    font-size: 18px;
   }
 
   .na-slide-logo-modal img {
@@ -410,15 +411,15 @@
   }
 
   .na-slide-title-modal {
-    font-size: 18px;
+    font-size: 22px;
   }
 
   .na-slide-text-modal {
-    font-size: 13px;
+    font-size: 17px;
   }
 
   .na-slide-step-modal {
-    font-size: 11px;
+    font-size: 15px;
     padding: 5px 12px;
   }
 
@@ -427,8 +428,8 @@
   }
 
   .na-modal-actions .na-btn {
-    height: 46px;
-    font-size: 14px;
+    height: 56px;
+    font-size: 18px;
   }
 
   .na-slide-images-modal img {

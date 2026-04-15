@@ -19,8 +19,8 @@
 }
 
 .na-subtitle {
-  font-size: 16px;
-  color: var(--na-text-muted);
+  font-size: 32px;
+  color: #284665;
 }
 
 /* Magic glow */
@@ -130,38 +130,43 @@
 }
 
 .na-card-title {
-  font-size: 48px;
+  font-size: 58px;
   font-weight: 600;
   margin-bottom: var(--na-space-xs);
   color: #284664;
 }
 
 .na-card-desc {
-  font-size: 28px;
+  font-size: 34px;
   color: #284664;
   line-height: 1.4;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
-  .na-header-content--with-actions {
-    grid-template-columns: 1fr;
-  }
-
   .na-header-left {
     width: 100%;
     justify-content: space-between;
-  }
-
-  .na-header-side--end {
-    width: 100%;
-    justify-content: flex-start;
   }
 
   .na-header-content {
     flex-direction: column;
     gap: var(--na-space-sm);
     align-items: flex-start;
+  }
+
+  .na-header-content--with-actions {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .na-header-content--with-actions .na-header-title {
+    flex-basis: 100%;
+    order: 3;
+    text-align: left;
   }
 
   .na-header-title {
@@ -174,7 +179,7 @@
   }
 
   .na-subtitle {
-    font-size: 14px;
+    font-size: 28px;
   }
 
   .na-roles-grid {
@@ -193,10 +198,10 @@
   }
 
   .na-card-title {
-    font-size: 18px;
+    font-size: 26px;
   }
 
   .na-card-desc {
-    font-size: 12px;
+    font-size: 20px;
   }
 }

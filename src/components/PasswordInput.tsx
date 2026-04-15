@@ -30,7 +30,7 @@ export default function PasswordInput({
         aria-controls={inputId}
         aria-label={visible ? "Hide password" : "Show password"}
       >
-        {visible ? "Hide pass" : "Show pass"}
+        {visible ? "Hide" : "Show"}
       </button>
     </div>
   );
