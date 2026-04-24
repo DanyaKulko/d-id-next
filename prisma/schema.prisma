@@ -352,3 +352,100 @@ model AppSetting {
 
   @@map("app_settings")
 }
+
+enum BlogPostType {
+  ALBUM
+  POSTCARD
+  TRAVEL_TIP
+  GLOBAL_TIP
+  BLOG
+  VIDEO
+  OTHER
+}
+
+enum BlogCaptionStatus {
+  PENDING
+  READY
+  FAILED
+  SKIPPED
+}
+
+enum BlogMediaKind {
+  PHOTO
+  VIDEO
+}
+
+model BlogPost {
+  id Int @id
+
+  type BlogPostType @default(OTHER)
+
+  title        String
+  link         String?
+  regionName   String?
+  continentName String?
+
+  contentText String @db.Text
+
+  captionText   String?           @db.Text
+  captionStatus BlogCaptionStatus @default(PENDING)
+  captionModel  String?
+  captionError  String?
+  captionedAt   DateTime?
+
+  language String?
+
+  publishedAt      DateTime?
+  remoteUpdatedAt  DateTime?
+
+  searchVector Unsupported("tsvector")?
+
+  mediaAssets BlogMediaAsset[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
+  @@index([captionStatus])
+  @@index([remoteUpdatedAt])
+  @@map("blog_posts")
+}
+
+model BlogMediaAsset {
+  id String @id @default(cuid())
+
+  postId Int
+  post   BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  kind BlogMediaKind
+
+  url          String
+  thumbnailUrl String?
+  embedUrl     String?
+  mimeType     String?
+  title        String?
+
+  imageCaption String?        @db.Text
+  imageCaptionModel String?
+
+  orderIndex Int @default(0)
+
+  sourceId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([postId, sourceId])
+  @@index([kind])
+  @@index([postId, orderIndex])
+  @@map("blog_media_assets")
+}
+
+model BlogIngestState {
+  key   String @id
+  value String @db.Text
+
+  updatedAt DateTime @updatedAt
+
+  @@map("blog_ingest_state")
+}

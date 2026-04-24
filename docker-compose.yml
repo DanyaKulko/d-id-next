@@ -6,6 +6,8 @@ services:
       - ./.env
     environment:
       NODE_ENV: production
+      DATABASE_URL: "postgresql://${DB_USER}:${DB_PASSWORD}@d-id_postgres:5432/${DB_NAME}?schema=public"
+      REDIS_URL: "redis://d-id_redis:6379"
     volumes:
       - ./public/uploads:/app/public/uploads
     ports:
@@ -21,9 +23,26 @@ services:
     container_name: d-id_cron_worker
     restart: always
     env_file: .env
+    environment:
+      DATABASE_URL: "postgresql://${DB_USER}:${DB_PASSWORD}@d-id_postgres:5432/${DB_NAME}?schema=public"
+      REDIS_URL: "redis://d-id_redis:6379"
     command: ["npx", "tsx", "scripts/cron/knowledge-cron-worker.ts"]
     volumes:
       - ./public/uploads:/app/public/uploads
+    depends_on:
+      - app
+      - redis
+      - postgres
+
+  blog_media_worker:
+    build: .
+    container_name: d-id_blog_media_worker
+    restart: always
+    env_file: .env
+    environment:
+      DATABASE_URL: "postgresql://${DB_USER}:${DB_PASSWORD}@d-id_postgres:5432/${DB_NAME}?schema=public"
+      REDIS_URL: "redis://d-id_redis:6379"
+    command: ["npx", "tsx", "scripts/cron/blog-media-worker.ts"]
     depends_on:
       - app
       - redis

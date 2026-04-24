@@ -287,6 +287,11 @@ export const useAgent = (
     cleanup();
   }, [agentId, cleanup]);
 
+  const getIds = useCallback(
+    () => (idsRef.current ? { ...idsRef.current } : null),
+    [],
+  );
+
   return {
     connect,
     disconnect,
@@ -295,5 +300,6 @@ export const useAgent = (
     interrupt,
     status,
     isAgentSpeaking,
+    getIds,
   };
 };

@@ -41,3 +41,11 @@ export const closeSessionSchema = z.object({
   streamId: z.string().min(1),
   chatId: z.string().optional(),
 });
+
+export const resolveMediaIntentSchema = z.object({
+  chatId: z.string().min(1),
+  streamId: z.string().min(1),
+  sessionId: z.string().min(1),
+  text: z.string().min(1),
+  language: z.string().optional(),
+});
