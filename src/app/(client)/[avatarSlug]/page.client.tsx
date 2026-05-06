@@ -147,6 +147,13 @@ export const AvatarPageClient = ({
     return () => observer.disconnect();
   }, [langTip.trigger]);
 
+  const interruptBtnRef = useRef<HTMLButtonElement | null>(null);
+  const interruptTip = useShowOncePerSession("na.tip.interrupt");
+
+  useEffect(() => {
+    if (agentStatus === "speaking") interruptTip.trigger();
+  }, [agentStatus, interruptTip.trigger]);
+
   const [selectedBackgroundId, setSelectedBackgroundId] = useState("default");
   const [mediaResult, setMediaResult] = useState<MediaResolveResult | null>(
     null,
@@ -1163,6 +1170,7 @@ export const AvatarPageClient = ({
 
           <div className="na-control-group">
             <button
+              ref={interruptBtnRef}
               type={"button"}
               className="na-btn na-btn--interrupt"
               id="interruptBtn"
@@ -1174,6 +1182,15 @@ export const AvatarPageClient = ({
             <span className="na-control-hint">
               Click Interrupt if you want to move to another topic.
             </span>
+            <EducationalTooltip
+              anchorRef={interruptBtnRef}
+              open={interruptTip.show}
+              onClose={interruptTip.close}
+              position="top"
+            >
+              Ask another question — the Avatar will start replying. The
+              Interrupt button keeps Avatar on line.
+            </EducationalTooltip>
           </div>
         </div>
       </div>
