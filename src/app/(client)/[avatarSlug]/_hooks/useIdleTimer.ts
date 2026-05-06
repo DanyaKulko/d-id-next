@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 
-const IDLE_TIMEOUT_MS = 30000;
+const IDLE_TIMEOUT_MS = 120000;
 
 interface UseIdleTimerProps {
   isActive: boolean;
