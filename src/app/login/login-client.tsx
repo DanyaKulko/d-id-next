@@ -108,18 +108,14 @@ export default function LoginClient({ twoFactorRequired }: LoginClientProps) {
 
   return (
     <div className="na-login-shell">
-      <h1 className="na-login-title">Neil Avatar</h1>
+      <div className="na-login-brand">
+        <h1 className="na-login-title">Neil Avatar</h1>
+        <span className="na-login-tagline">
+          Space. Travel. Sports. Politics.
+        </span>
+      </div>
 
-      <div className="na-login-container">
-        <div className="na-login-left">
-          <div className="na-login-lamp" aria-hidden="true">
-            <LottieLogo
-              className="na-login-lottie"
-              loop
-            />
-          </div>
-        </div>
-
+      <div className="na-login-content">
         <div className="na-login-card">
           <div className="na-login-card-header">
             <div className="na-login-card-title">
@@ -254,6 +250,10 @@ export default function LoginClient({ twoFactorRequired }: LoginClientProps) {
           <div className="na-login-footer-text">
             Contact Neil with Login issues.
           </div>
+        </div>
+
+        <div className="na-login-lamp" aria-hidden="true">
+          <LottieLogo className="na-login-lottie" loop />
         </div>
       </div>
     </div>
