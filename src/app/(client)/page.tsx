@@ -31,9 +31,18 @@ export default async function Home() {
           {authRequired ? (
             <div className="na-header-content na-header-content--with-actions">
               <div className="na-header-side">
-                <Link href="/" className="na-logo-text" aria-label="Neil Avatar">
-                  Neil Avatar
-                </Link>
+                <div className="na-logo-block">
+                  <Link
+                    href="/"
+                    className="na-logo-text"
+                    aria-label="Neil Avatar"
+                  >
+                    Neil Avatar
+                  </Link>
+                  <span className="na-logo-tagline">
+                    Space. Travel. Sports. Politics.
+                  </span>
+                </div>
               </div>
               <div className="na-header-title na-header-title--centered">
                 <p className="na-subtitle">
@@ -46,9 +55,18 @@ export default async function Home() {
             </div>
           ) : (
             <div className="na-header-content">
-              <Link href="/" className="na-logo-text" aria-label="Neil Avatar">
-                Neil Avatar
-              </Link>
+              <div className="na-logo-block">
+                <Link
+                  href="/"
+                  className="na-logo-text"
+                  aria-label="Neil Avatar"
+                >
+                  Neil Avatar
+                </Link>
+                <span className="na-logo-tagline">
+                  Space. Travel. Sports. Politics.
+                </span>
+              </div>
               <div className="na-header-title na-header-title--centered">
                 <p className="na-subtitle">
                   Choose a topic to start talking with Neil

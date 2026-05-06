@@ -23,6 +23,24 @@
   color: #284665;
 }
 
+/* Home logo block: wordmark + tagline stacked */
+.na-logo-block {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  line-height: 1.05;
+}
+
+.na-logo-tagline {
+  font-size: 17px;
+  font-style: italic;
+  font-weight: 500;
+  color: #284665;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 /* Magic glow */
 .na-glow {
   position: relative;
