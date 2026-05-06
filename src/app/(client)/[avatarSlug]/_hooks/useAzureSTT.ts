@@ -188,7 +188,7 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
 
         speechConfig.setProperty(
           SpeechSDK.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs,
-          isAppleMobile ? "5000" : "3000",
+          isAppleMobile ? "6000" : "4000",
         );
         speechConfig.setProperty(
           SpeechSDK.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs,
