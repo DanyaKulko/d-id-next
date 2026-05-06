@@ -133,18 +133,45 @@ export const AvatarPageClient = ({
   useEffect(() => {
     const el = languageSelectRef.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        if (entry?.isIntersecting && entry.intersectionRatio >= 0.5) {
-          langTip.trigger();
-          observer.disconnect();
+
+    let intersectionObserver: IntersectionObserver | null = null;
+    let mutationObserver: MutationObserver | null = null;
+
+    const startWatching = () => {
+      intersectionObserver = new IntersectionObserver(
+        (entries) => {
+          const entry = entries[0];
+          if (entry?.isIntersecting && entry.intersectionRatio >= 0.5) {
+            langTip.trigger();
+            intersectionObserver?.disconnect();
+          }
+        },
+        { threshold: 0.5 },
+      );
+      intersectionObserver.observe(el);
+    };
+
+    if (!document.querySelector(".na-preloader")) {
+      startWatching();
+    } else if (typeof MutationObserver !== "undefined") {
+      mutationObserver = new MutationObserver(() => {
+        if (!document.querySelector(".na-preloader")) {
+          mutationObserver?.disconnect();
+          startWatching();
         }
-      },
-      { threshold: 0.5 },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
+      });
+      mutationObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
+    } else {
+      startWatching();
+    }
+
+    return () => {
+      intersectionObserver?.disconnect();
+      mutationObserver?.disconnect();
+    };
   }, [langTip.trigger]);
 
   const interruptBtnRef = useRef<HTMLButtonElement | null>(null);
