@@ -1091,10 +1091,10 @@ export const AvatarPageClient = ({
             </select>
             <span className="na-control-hint">
               {!canSelectBackground
-                ? "The selected role does not support background selection"
+                ? "Background selection is not available for this role."
                 : connectionStatus !== "connected"
-                  ? 'Choose a background after clicking "Start Conversation"'
-                  : "Choose a background"}
+                  ? "Background selection becomes available only after you start the conversation."
+                  : "Choose a background."}
             </span>
           </div>
 
@@ -1123,7 +1123,7 @@ export const AvatarPageClient = ({
                 Stop
               </button>
               <span className="na-control-hint">
-                Click to stop a conversation with the avatar
+                Click Stop to exit in case you want to take an extended break.
               </span>
             </div>
           )}
@@ -1139,7 +1139,7 @@ export const AvatarPageClient = ({
               ⏸️ Interrupt Neil Avatar
             </button>
             <span className="na-control-hint">
-              Click if you want to interrupt the avatar
+              Click Interrupt if you want to move to another topic.
             </span>
           </div>
         </div>
