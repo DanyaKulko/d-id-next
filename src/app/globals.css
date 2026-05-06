@@ -171,7 +171,7 @@ a:focus-visible {
   font-size: 32px;
   font-weight: 700;
   letter-spacing: 0.1em;
-  color: var(--na-accent-primary);
+  color: #284665;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
