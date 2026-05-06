@@ -12,6 +12,8 @@ import { useIdleTimer } from "@/app/(client)/[avatarSlug]/_hooks/useIdleTimer";
 import { resolveMediaIntentAction } from "@/app/actions/media.actions";
 import watermark from "@/assets/img/neil_avatar_watermark.png";
 import type { MediaResolveResult } from "@/lib/media/types";
+import EducationalTooltip from "@/components/EducationalTooltip/EducationalTooltip";
+import { useShowOncePerSession } from "@/components/EducationalTooltip/useShowOncePerSession";
 
 type DidAgentPayload = {
   id: string;
@@ -125,6 +127,26 @@ export const AvatarPageClient = ({
     "idle" | "preparing" | "listening" | "thinking" | "speaking" | "timed_out"
   >("idle");
   const [language, setLanguage] = useState(languages[0].code);
+  const languageSelectRef = useRef<HTMLSelectElement | null>(null);
+  const langTip = useShowOncePerSession("na.tip.lang");
+
+  useEffect(() => {
+    const el = languageSelectRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry?.isIntersecting && entry.intersectionRatio >= 0.5) {
+          langTip.trigger();
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.5 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [langTip.trigger]);
+
   const [selectedBackgroundId, setSelectedBackgroundId] = useState("default");
   const [mediaResult, setMediaResult] = useState<MediaResolveResult | null>(
     null,
@@ -1035,6 +1057,7 @@ export const AvatarPageClient = ({
         <div className="na-controls">
           <div className="na-control-group">
             <select
+              ref={languageSelectRef}
               className="na-language-select"
               value={language}
               onChange={(e) => {
@@ -1067,6 +1090,16 @@ export const AvatarPageClient = ({
               Click the &quot;English&quot; button to reveal other available
               languages
             </span>
+            <EducationalTooltip
+              anchorRef={languageSelectRef}
+              open={langTip.show}
+              onClose={langTip.close}
+              position="bottom"
+            >
+              After you select a language, questions below remain in English.
+              You must ask questions in the language you selected for the Avatar
+              to speak in the same language.
+            </EducationalTooltip>
           </div>
 
           <div className="na-control-group">
