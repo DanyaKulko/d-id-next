@@ -20,7 +20,27 @@
 
 .na-subtitle {
   font-size: 32px;
+  color: #FCC272;
+}
+
+/* Home logo block: wordmark + tagline stacked, equal width */
+.na-logo-block {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  line-height: 1.05;
+}
+
+.na-logo-tagline {
+  display: block;
+  font-size: 13px;
+  font-style: italic;
+  font-weight: 500;
   color: #284665;
+  text-align: justify;
+  text-align-last: justify;
+  text-justify: inter-character;
 }
 
 /* Magic glow */

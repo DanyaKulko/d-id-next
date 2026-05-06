@@ -1,0 +1,86 @@
+.na-edu-tooltip {
+  position: fixed;
+  z-index: 10000;
+  max-width: clamp(260px, 80vw, 360px);
+  padding: 12px 36px 12px 14px;
+  background: var(--na-bg-surface);
+  color: var(--na-text-on-light);
+  border: 2px solid var(--na-accent-secondary-soft);
+  border-radius: var(--na-radius-md);
+  box-shadow: var(--na-shadow-soft);
+  font-family: var(--na-font-family);
+  font-size: 18px;
+  line-height: 1.35;
+  animation: naEduTooltipFadeIn 200ms ease-out both;
+}
+
+.na-edu-tooltip__body {
+  white-space: normal;
+}
+
+.na-edu-tooltip__close {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--na-text-on-light);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.na-edu-tooltip__close:hover {
+  background: rgba(40, 70, 101, 0.08);
+}
+
+.na-edu-tooltip__close:focus-visible {
+  outline: 2px solid var(--na-accent-secondary);
+  outline-offset: 2px;
+}
+
+.na-edu-tooltip__arrow {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: var(--na-bg-surface);
+  border-left: 2px solid var(--na-accent-secondary-soft);
+  border-top: 2px solid var(--na-accent-secondary-soft);
+  transform: rotate(45deg);
+  left: 50%;
+  margin-left: -7px;
+}
+
+.na-edu-tooltip[data-position="bottom"] .na-edu-tooltip__arrow {
+  top: -8px;
+}
+
+.na-edu-tooltip[data-position="top"] .na-edu-tooltip__arrow {
+  bottom: -8px;
+  transform: rotate(225deg);
+}
+
+@keyframes naEduTooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 480px) {
+  .na-edu-tooltip {
+    font-size: 16px;
+    padding: 10px 32px 10px 12px;
+  }
+}

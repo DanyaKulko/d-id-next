@@ -12,6 +12,8 @@ import { useIdleTimer } from "@/app/(client)/[avatarSlug]/_hooks/useIdleTimer";
 import { resolveMediaIntentAction } from "@/app/actions/media.actions";
 import watermark from "@/assets/img/neil_avatar_watermark.png";
 import type { MediaResolveResult } from "@/lib/media/types";
+import EducationalTooltip from "@/components/EducationalTooltip/EducationalTooltip";
+import { useShowOncePerSession } from "@/components/EducationalTooltip/useShowOncePerSession";
 
 type DidAgentPayload = {
   id: string;
@@ -125,6 +127,63 @@ export const AvatarPageClient = ({
     "idle" | "preparing" | "listening" | "thinking" | "speaking" | "timed_out"
   >("idle");
   const [language, setLanguage] = useState(languages[0].code);
+  const languageSelectRef = useRef<HTMLSelectElement | null>(null);
+  const langTip = useShowOncePerSession("na.tip.lang");
+
+  useEffect(() => {
+    const el = languageSelectRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+
+    let intersectionObserver: IntersectionObserver | null = null;
+    let mutationObserver: MutationObserver | null = null;
+
+    const startWatching = () => {
+      intersectionObserver = new IntersectionObserver(
+        (entries) => {
+          const entry = entries[0];
+          if (entry?.isIntersecting && entry.intersectionRatio >= 0.5) {
+            langTip.trigger();
+            intersectionObserver?.disconnect();
+          }
+        },
+        { threshold: 0.5 },
+      );
+      intersectionObserver.observe(el);
+    };
+
+    if (!document.querySelector(".na-preloader")) {
+      startWatching();
+    } else if (typeof MutationObserver !== "undefined") {
+      mutationObserver = new MutationObserver(() => {
+        if (!document.querySelector(".na-preloader")) {
+          mutationObserver?.disconnect();
+          startWatching();
+        }
+      });
+      mutationObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
+    } else {
+      startWatching();
+    }
+
+    return () => {
+      intersectionObserver?.disconnect();
+      mutationObserver?.disconnect();
+    };
+  }, [langTip.trigger]);
+
+  const interruptBtnRef = useRef<HTMLButtonElement | null>(null);
+  const interruptTip = useShowOncePerSession("na.tip.interrupt");
+
+  useEffect(() => {
+    if (agentStatus === "speaking") interruptTip.trigger();
+  }, [agentStatus, interruptTip.trigger]);
+
+  const startBtnRef = useRef<HTMLButtonElement | null>(null);
+  const startTip = useShowOncePerSession("na.tip.start");
+
   const [selectedBackgroundId, setSelectedBackgroundId] = useState("default");
   const [mediaResult, setMediaResult] = useState<MediaResolveResult | null>(
     null,
@@ -291,6 +350,10 @@ export const AvatarPageClient = ({
   useEffect(() => {
     connectionStatusRef.current = connectionStatus;
   }, [connectionStatus]);
+
+  useEffect(() => {
+    if (connectionStatus === "connected") startTip.close();
+  }, [connectionStatus, startTip.close]);
 
   useEffect(() => {
     isAgentSpeakingRef.current = isAgentSpeaking;
@@ -1035,6 +1098,7 @@ export const AvatarPageClient = ({
         <div className="na-controls">
           <div className="na-control-group">
             <select
+              ref={languageSelectRef}
               className="na-language-select"
               value={language}
               onChange={(e) => {
@@ -1067,6 +1131,16 @@ export const AvatarPageClient = ({
               Click the &quot;English&quot; button to reveal other available
               languages
             </span>
+            <EducationalTooltip
+              anchorRef={languageSelectRef}
+              open={langTip.show}
+              onClose={langTip.close}
+              position="bottom"
+            >
+              After you select a language, questions below remain in English.
+              You must ask questions in the language you selected for the Avatar
+              to speak in the same language.
+            </EducationalTooltip>
           </div>
 
           <div className="na-control-group">
@@ -1091,26 +1165,39 @@ export const AvatarPageClient = ({
             </select>
             <span className="na-control-hint">
               {!canSelectBackground
-                ? "The selected role does not support background selection"
+                ? "Background selection is not available for this role."
                 : connectionStatus !== "connected"
-                  ? 'Choose a background after clicking "Start Conversation"'
-                  : "Choose a background"}
+                  ? "Background selection becomes available only after you start the conversation."
+                  : "Choose a background."}
             </span>
           </div>
 
           {connectionStatus !== "connected" ? (
             <div className="na-control-group">
               <button
+                ref={startBtnRef}
                 type={"button"}
                 className="na-btn na-btn--primary"
                 id="startBtn"
-                onClick={handleRestart}
+                onClick={() => {
+                  startTip.trigger();
+                  handleRestart();
+                }}
               >
                 🎤 Start Conversation
               </button>
               <span className="na-control-hint">
                 Click &quot;Start Conversation&quot; to begin a session
               </span>
+              <EducationalTooltip
+                anchorRef={startBtnRef}
+                open={startTip.show}
+                onClose={startTip.close}
+                position="top"
+              >
+                When you click Start Conversation, it takes about 20 seconds for
+                the Avatar to come alive. Be patient.
+              </EducationalTooltip>
             </div>
           ) : (
             <div className="na-control-group">
@@ -1123,13 +1210,14 @@ export const AvatarPageClient = ({
                 Stop
               </button>
               <span className="na-control-hint">
-                Click to stop a conversation with the avatar
+                Click Stop to exit in case you want to take an extended break.
               </span>
             </div>
           )}
 
           <div className="na-control-group">
             <button
+              ref={interruptBtnRef}
               type={"button"}
               className="na-btn na-btn--interrupt"
               id="interruptBtn"
@@ -1139,8 +1227,17 @@ export const AvatarPageClient = ({
               ⏸️ Interrupt Neil Avatar
             </button>
             <span className="na-control-hint">
-              Click if you want to interrupt the avatar
+              Click Interrupt if you want to move to another topic.
             </span>
+            <EducationalTooltip
+              anchorRef={interruptBtnRef}
+              open={interruptTip.show}
+              onClose={interruptTip.close}
+              position="top"
+            >
+              Ask another question — the Avatar will start replying. The
+              Interrupt button keeps Avatar on line.
+            </EducationalTooltip>
           </div>
         </div>
       </div>

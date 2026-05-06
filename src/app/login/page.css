@@ -33,40 +33,51 @@
   width: 100%;
 }
 
+.na-login-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: max-content;
+  margin: 0 auto 36px;
+  gap: 8px;
+}
+
 .na-login-title {
   font-family: var(--font-nasalization-sans), "Nasalization", Arial, sans-serif;
   font-size: 48px;
   font-weight: 700;
-  color: #fdaa2d;
-  margin-bottom: 40px;
+  color: #284665;
   text-align: center;
 }
 
-.na-login-container {
-  display: grid;
-  grid-template-columns: 2fr 3fr;
-  gap: 60px;
-  max-width: 1200px;
-  width: 100%;
-  align-items: center;
-  margin: 0 auto;
+.na-login-tagline {
+  display: block;
+  font-size: 18px;
+  font-style: italic;
+  font-weight: 500;
+  color: #284665;
+  text-align: justify;
+  text-align-last: justify;
+  text-justify: inter-character;
 }
 
-.na-login-left {
+.na-login-content {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  gap: 36px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
 }
 
 .na-login-lamp {
   width: 100%;
-  max-width: 320px;
-  margin-bottom: 20px;
-  min-height: 300px;
+  max-width: 280px;
   display: flex;
   align-items: center;
   justify-content: center;
+  margin: 0 auto;
 }
 
 .na-login-lamp img {
@@ -255,22 +266,12 @@
 }
 
 @media (max-width: 980px) {
-  .na-login-container {
-    grid-template-columns: 1fr;
-    gap: 40px;
-  }
-
-  .na-login-left {
-    order: 1;
-  }
-
-  .na-login-card {
-    order: 2;
-    margin: 0 auto;
-  }
-
   .na-login-title {
     font-size: 36px;
+  }
+
+  .na-login-tagline {
+    font-size: 14px;
   }
 }
 
@@ -280,13 +281,19 @@
   }
 
   .na-login-lamp {
-    max-width: 240px;
-    min-height: 200px;
+    max-width: 220px;
+  }
+
+  .na-login-brand {
+    margin-bottom: 28px;
   }
 
   .na-login-title {
     font-size: 36px;
-    margin-bottom: 30px;
+  }
+
+  .na-login-tagline {
+    font-size: 13px;
   }
 
   .na-login-instructions {
