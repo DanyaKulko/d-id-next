@@ -157,10 +157,6 @@ export const AvatarPageClient = ({
   const startBtnRef = useRef<HTMLButtonElement | null>(null);
   const startTip = useShowOncePerSession("na.tip.start");
 
-  useEffect(() => {
-    if (connectionStatus === "connected") startTip.close();
-  }, [connectionStatus, startTip.close]);
-
   const [selectedBackgroundId, setSelectedBackgroundId] = useState("default");
   const [mediaResult, setMediaResult] = useState<MediaResolveResult | null>(
     null,
@@ -327,6 +323,10 @@ export const AvatarPageClient = ({
   useEffect(() => {
     connectionStatusRef.current = connectionStatus;
   }, [connectionStatus]);
+
+  useEffect(() => {
+    if (connectionStatus === "connected") startTip.close();
+  }, [connectionStatus, startTip.close]);
 
   useEffect(() => {
     isAgentSpeakingRef.current = isAgentSpeaking;
