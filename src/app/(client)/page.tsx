@@ -78,7 +78,15 @@ export default async function Home() {
       </header>
 
       <main className="na-container">
-        <p className="na-subtitle" style={{ textAlign: "center", marginBottom: 16, fontSize: 24 }}>
+        <p
+          className="na-subtitle"
+          style={{
+            textAlign: "center",
+            marginBottom: 16,
+            fontSize: 24,
+            color: "#284665",
+          }}
+        >
           Click on any image of Avatars
         </p>
         <div className="na-roles-grid">

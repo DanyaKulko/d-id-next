@@ -52,7 +52,7 @@
 
 .na-login-tagline {
   display: block;
-  font-size: 22px;
+  font-size: 18px;
   font-style: italic;
   font-weight: 500;
   color: #284665;
@@ -271,7 +271,7 @@
   }
 
   .na-login-tagline {
-    font-size: 19px;
+    font-size: 14px;
   }
 }
 
@@ -293,7 +293,7 @@
   }
 
   .na-login-tagline {
-    font-size: 18px;
+    font-size: 13px;
   }
 
   .na-login-instructions {
