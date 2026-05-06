@@ -38,7 +38,6 @@ export default function EducationalTooltip({
   const [coords, setCoords] = useState<{
     top: number;
     left: number;
-    width: number;
     actualPosition: Position;
   } | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
@@ -59,12 +58,25 @@ export default function EducationalTooltip({
 
     const spaceBelow = vh - a.bottom;
     const spaceAbove = a.top;
+    const requiredSpace = tipH + TOOLTIP_GAP_PX + VIEWPORT_MARGIN_PX;
     const wantBottom = position === "bottom";
-    const flipsToTop =
-      wantBottom && spaceBelow < tipH + TOOLTIP_GAP_PX + VIEWPORT_MARGIN_PX
-        ? spaceAbove > spaceBelow
-        : !wantBottom;
-    const actualPosition: Position = flipsToTop ? "top" : "bottom";
+
+    let actualPosition: Position;
+    if (wantBottom) {
+      actualPosition =
+        spaceBelow >= requiredSpace
+          ? "bottom"
+          : spaceAbove > spaceBelow
+            ? "top"
+            : "bottom";
+    } else {
+      actualPosition =
+        spaceAbove >= requiredSpace
+          ? "top"
+          : spaceBelow > spaceAbove
+            ? "bottom"
+            : "top";
+    }
 
     const top =
       actualPosition === "bottom"
@@ -75,7 +87,7 @@ export default function EducationalTooltip({
     left = Math.max(VIEWPORT_MARGIN_PX, left);
     left = Math.min(vw - tipW - VIEWPORT_MARGIN_PX, left);
 
-    setCoords({ top, left, width: tipW, actualPosition });
+    setCoords({ top, left, actualPosition });
   }, [anchorRef, position]);
 
   useLayoutEffect(() => {
