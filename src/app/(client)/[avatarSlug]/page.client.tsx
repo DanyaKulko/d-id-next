@@ -154,6 +154,13 @@ export const AvatarPageClient = ({
     if (agentStatus === "speaking") interruptTip.trigger();
   }, [agentStatus, interruptTip.trigger]);
 
+  const startBtnRef = useRef<HTMLButtonElement | null>(null);
+  const startTip = useShowOncePerSession("na.tip.start");
+
+  useEffect(() => {
+    if (connectionStatus === "connected") startTip.close();
+  }, [connectionStatus, startTip.close]);
+
   const [selectedBackgroundId, setSelectedBackgroundId] = useState("default");
   const [mediaResult, setMediaResult] = useState<MediaResolveResult | null>(
     null,
@@ -1141,16 +1148,29 @@ export const AvatarPageClient = ({
           {connectionStatus !== "connected" ? (
             <div className="na-control-group">
               <button
+                ref={startBtnRef}
                 type={"button"}
                 className="na-btn na-btn--primary"
                 id="startBtn"
-                onClick={handleRestart}
+                onClick={() => {
+                  startTip.trigger();
+                  handleRestart();
+                }}
               >
                 🎤 Start Conversation
               </button>
               <span className="na-control-hint">
                 Click &quot;Start Conversation&quot; to begin a session
               </span>
+              <EducationalTooltip
+                anchorRef={startBtnRef}
+                open={startTip.show}
+                onClose={startTip.close}
+                position="top"
+              >
+                When you click Start Conversation, it takes about 20 seconds for
+                the Avatar to come alive. Be patient.
+              </EducationalTooltip>
             </div>
           ) : (
             <div className="na-control-group">
