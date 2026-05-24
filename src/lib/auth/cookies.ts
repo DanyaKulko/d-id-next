@@ -1,8 +1,12 @@
+import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 
 export const SESSION_COOKIE = "session";
 export const PENDING_2FA_COOKIE = "pending_2fa";
 export const WEB_SESSION_COOKIE = "web_session";
+export const VISITOR_COOKIE = "na_visitor";
+
+const VISITOR_COOKIE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 
 const base = {
   httpOnly: true,
@@ -62,4 +66,22 @@ export async function clearWebSessionCookie() {
     ...base,
     expires: new Date(0),
   });
+}
+
+export async function getVisitorCookie() {
+  return (await cookies()).get(VISITOR_COOKIE)?.value ?? null;
+}
+
+// Reads the long-lived anonymous visitor id, creating it if absent.
+// Used to anchor cross-session memory for users who are not logged in.
+export async function ensureVisitorCookie(): Promise<string> {
+  const store = await cookies();
+  const existing = store.get(VISITOR_COOKIE)?.value;
+  if (existing && existing.trim()) return existing;
+  const id = randomUUID();
+  store.set(VISITOR_COOKIE, id, {
+    ...base,
+    expires: new Date(Date.now() + VISITOR_COOKIE_TTL_MS),
+  });
+  return id;
 }

@@ -18,7 +18,9 @@ import { verifyRecaptcha } from "@/lib/security/recaptcha";
 const userTwoFactorRequiredKey = "requireUserTwoFactorAuthentication";
 
 const Schema = z.object({
-  email: z.email().toLowerCase(),
+  // email OR username; older callers may still send `email`.
+  identifier: z.string().trim().min(1).max(200).optional(),
+  email: z.string().trim().min(1).max(200).optional(),
   password: z.string().min(6).max(200),
   recaptchaToken: z.string().optional(),
   scope: z.enum(["user", "admin"]).optional(),
@@ -29,7 +31,11 @@ export async function loginStart(input: unknown) {
   if (!parsed.success) {
     return { ok: false as const, step: "login" as const };
   }
-  const { email, password, recaptchaToken, scope } = parsed.data;
+  const { password, recaptchaToken, scope } = parsed.data;
+  const identifier = (parsed.data.identifier ?? parsed.data.email ?? "").trim();
+  if (!identifier) {
+    return { ok: false as const, step: "login" as const };
+  }
 
   try {
     const rawHeaders = await headers();
@@ -43,7 +49,7 @@ export async function loginStart(input: unknown) {
           type: "LOGIN_PASSWORD",
           success: false,
           reason: "captcha_failed",
-          email,
+          email: identifier,
           ip,
           userAgent: ua,
         });
@@ -51,8 +57,14 @@ export async function loginStart(input: unknown) {
       }
     }
 
+    // Accept either an email or a username as the login identifier.
     const user = await prisma.user.findFirst({
-      where: { email: { equals: email, mode: "insensitive" } },
+      where: {
+        OR: [
+          { email: { equals: identifier, mode: "insensitive" } },
+          { username: { equals: identifier, mode: "insensitive" } },
+        ],
+      },
       select: {
         id: true,
         email: true,
@@ -66,7 +78,7 @@ export async function loginStart(input: unknown) {
         type: "LOGIN_PASSWORD",
         success: false,
         reason: "user_not_found",
-        email,
+        email: identifier,
         ip,
         userAgent: ua,
       });
@@ -105,8 +117,11 @@ export async function loginStart(input: unknown) {
       ? userTwoFactorSetting.value === "true"
       : true;
 
+    // Email OTP is the only 2FA channel; users without an email (username-
+    // only accounts) sign in directly with their password.
     const requiresTwoFactor =
-      scope === "admin" ? true : isUserTwoFactorRequired;
+      (scope === "admin" ? true : isUserTwoFactorRequired) &&
+      Boolean(user.email);
     if (!requiresTwoFactor) {
       const session = await createSession({
         userId: user.id,

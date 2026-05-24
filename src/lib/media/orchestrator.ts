@@ -5,6 +5,11 @@ import {
 } from "@/lib/media/intent-classifier";
 import { phraseForIntent, phraseForNoResults } from "@/lib/media/phrases";
 import {
+  composeMediaReply,
+  type MediaReplyKind,
+  type MediaReplyOutcome,
+} from "@/lib/media/reply";
+import {
   searchBlogPhotos,
   searchBlogVideos,
 } from "@/lib/media/search/blog-search";
@@ -257,11 +262,28 @@ export const resolveMediaIntent = async (
       firstItemTitle: items[0]?.title,
     });
 
-    const phrase =
-      items.length > 0
-        ? phraseForIntent(classification.intent, language, { blogFallback })
-        : phraseForNoResults(language);
-    log("phrase_chosen", { phrase, hasResults: items.length > 0 });
+    const hasResults = items.length > 0;
+    const kind: MediaReplyKind = classification.intent.startsWith("video")
+      ? "video"
+      : "photo";
+    const outcome: MediaReplyOutcome = !hasResults
+      ? "none"
+      : blogFallback
+        ? "external_fallback"
+        : classification.intent.endsWith("_from_blog")
+          ? "blog"
+          : "external";
+    const fallbackPhrase = hasResults
+      ? phraseForIntent(classification.intent, language, { blogFallback })
+      : phraseForNoResults(language);
+    const phrase = await composeMediaReply({
+      userMessage: trimmed,
+      language,
+      kind,
+      outcome,
+      fallbackPhrase,
+    });
+    log("phrase_chosen", { phrase, outcome, hasResults });
 
     const spoke = await speakScript(agentId, streamId, sessionId, phrase);
     if (!spoke) {

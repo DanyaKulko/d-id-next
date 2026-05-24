@@ -5,8 +5,8 @@ import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import ReCAPTCHA from "react-google-recaptcha";
 import { loginStart } from "@/app/actions/auth/login.actions";
 import { twoFactorVerify } from "@/app/actions/auth/two-factor.actions";
-import PasswordInput from "@/components/PasswordInput";
 import LottieLogo from "@/components/LottieLogo/LottieLogo";
+import PasswordInput from "@/components/PasswordInput";
 
 type LoginState =
   | { phase: "login"; error?: string; expiresAt?: string }
@@ -35,19 +35,20 @@ export default function LoginClient({ twoFactorRequired }: LoginClientProps) {
 
   const [state, loginAction, loginPending] = useActionState(
     async (_prev: LoginState, formData: FormData): Promise<LoginState> => {
-      const email = String(formData.get("email") ?? "")
-        .trim()
-        .toLowerCase();
+      const identifier = String(formData.get("identifier") ?? "").trim();
       const password = String(formData.get("password") ?? "");
 
-      if (!email || !password) {
-        return { phase: "login", error: "Email and password are required" };
+      if (!identifier || !password) {
+        return {
+          phase: "login",
+          error: "Email/username and password are required",
+        };
       }
 
       let result: Awaited<ReturnType<typeof loginStart>>;
       try {
         result = await loginStart({
-          email,
+          identifier,
           password,
           recaptchaToken: isProd ? recaptchaToken : undefined,
           scope: "user",
@@ -57,7 +58,10 @@ export default function LoginClient({ twoFactorRequired }: LoginClientProps) {
       }
 
       if (!result.ok) {
-        return { phase: "login", error: "Invalid email/password or captcha" };
+        return {
+          phase: "login",
+          error: "Invalid email/username, password or captcha",
+        };
       }
 
       if (result.step === "2fa") {
@@ -154,16 +158,15 @@ export default function LoginClient({ twoFactorRequired }: LoginClientProps) {
 
               <form action={loginAction} id="loginForm">
                 <div className="na-login-form-group">
-                  <label htmlFor="email">Email</label>
+                  <label htmlFor="identifier">Email or username</label>
                   <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    placeholder="you@company.com"
+                    type="text"
+                    id="identifier"
+                    name="identifier"
+                    placeholder="you@company.com or username"
                     required
                     autoComplete="username"
-                    pattern="^[^@\s]+@[^@\s]+\.[^@\s]+$"
-                    title="Enter a valid email address"
+                    title="Enter your email or username"
                   />
                 </div>
 

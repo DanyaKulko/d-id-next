@@ -14,7 +14,8 @@ export const normalizeDidChatText = (raw: string) => {
   }
 
   let decoded = value;
-  for (let pass = 0; pass < 2; pass += 1) {
+  for (let pass = 0; pass < 5; pass += 1) {
+    if (!/%[0-9A-Fa-f]{2}/.test(decoded)) break;
     try {
       const next = decodeURIComponent(decoded.replace(/\+/g, "%20"));
       if (next === decoded) break;

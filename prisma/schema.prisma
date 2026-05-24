@@ -29,8 +29,9 @@ enum AuthEventType {
 }
 
 model User {
-  id           String @id @default(cuid())
-  email        String @unique
+  id           String  @id @default(cuid())
+  email        String  @unique
+  username     String? @unique
   passwordHash String
 
   isActive       Boolean @default(true)
@@ -44,6 +45,7 @@ model User {
   roles           UserRole[]
   LoginEvent      LoginEvent[]
   chatSessions    ChatSession[]
+  memory          VisitorMemory?
 }
 
 model UserWebSession {
@@ -230,12 +232,15 @@ model ChatSession {
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
+  visitorId String?
+
   language  String?
   device    String?
   userAgent String?
   ip        String?
 
-  endedAt DateTime?
+  endedAt     DateTime?
+  summarizedAt DateTime?
 
   messages ChatMessage[]
 
@@ -244,7 +249,32 @@ model ChatSession {
 
   @@index([agentId, createdAt])
   @@index([userId, createdAt])
+  @@index([visitorId, createdAt])
+  @@index([summarizedAt])
   @@map("chat_sessions")
+}
+
+// Compact, rolling cross-session memory about a visitor. Keyed by userId
+// (logged-in) and/or visitorId (anonymous cookie). On login the anonymous
+// row is adopted by setting userId. The summary is intentionally short so
+// it fits the LLM context window alongside the full current conversation.
+model VisitorMemory {
+  id String @id @default(cuid())
+
+  userId    String? @unique
+  user      User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  visitorId String? @unique
+
+  summary      String  @default("") @db.Text
+  displayName  String?
+
+  sessionCount  Int       @default(0)
+  lastSessionAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("visitor_memories")
 }
 
 model ChatMessage {

@@ -80,12 +80,14 @@ export default function SettingsClient({
     const [isCheckingAzure, startCheckingAzure] = useTransition();
     const [showAddUser, setShowAddUser] = useState(false);
     const [newUserEmail, setNewUserEmail] = useState("");
+    const [newUserUsername, setNewUserUsername] = useState("");
     const [newUserPassword, setNewUserPassword] = useState("");
     const [newUserPasswordConfirm, setNewUserPasswordConfirm] = useState("");
     const [editUserCandidate, setEditUserCandidate] = useState<UserRow | null>(
         null,
     );
     const [editUserEmail, setEditUserEmail] = useState("");
+    const [editUserUsername, setEditUserUsername] = useState("");
     const [deleteUserCandidate, setDeleteUserCandidate] =
         useState<UserRow | null>(null);
     const [editUserPassword, setEditUserPassword] = useState("");
@@ -248,6 +250,7 @@ export default function SettingsClient({
         formData.set("action", "create");
         formData.set("email", email);
         formData.set("password", password);
+        formData.set("username", newUserUsername.trim());
 
         startSaving(async () => {
             await saveUserUpdateAction(formData)
@@ -258,6 +261,7 @@ export default function SettingsClient({
                     setUsers((prev) => [...prev, result.user]);
                     setShowAddUser(false);
                     setNewUserEmail("");
+                    setNewUserUsername("");
                     setNewUserPassword("");
                     setNewUserPasswordConfirm("");
                     toast.success(`User "${email}" created`);
@@ -272,6 +276,7 @@ export default function SettingsClient({
 
         setEditUserCandidate(user);
         setEditUserEmail(user.email);
+        setEditUserUsername(user.username ?? "");
         setEditUserPassword("");
         setEditUserPasswordConfirm("");
     };
@@ -303,6 +308,7 @@ export default function SettingsClient({
         formData.set("action", "update");
         formData.set("userId", editUserCandidate.id);
         formData.set("email", newEmail);
+        formData.set("username", editUserUsername.trim());
         if (editUserPassword) {
             formData.set("password", editUserPassword);
         }
@@ -1150,6 +1156,22 @@ export default function SettingsClient({
                             </div>
 
                             <div className="input-group">
+                                <label htmlFor="newUserUsername">
+                                    Username (optional)
+                                </label>
+                                <input
+                                    id="newUserUsername"
+                                    type="text"
+                                    value={newUserUsername}
+                                    onChange={(event) =>
+                                        setNewUserUsername(event.target.value)
+                                    }
+                                    placeholder="username for login (optional)"
+                                    autoComplete="off"
+                                />
+                            </div>
+
+                            <div className="input-group">
                                 <label htmlFor="newUserPassword">Password</label>
                                 <PasswordInput
                                     id="newUserPassword"
@@ -1226,6 +1248,21 @@ export default function SettingsClient({
                                     onChange={(event) => setEditUserEmail(event.target.value)}
                                     placeholder="user@example.com"
                                     required
+                                />
+                            </div>
+                            <div className="input-group">
+                                <label htmlFor="editUserUsername">
+                                    Username (optional)
+                                </label>
+                                <input
+                                    id="editUserUsername"
+                                    type="text"
+                                    value={editUserUsername}
+                                    onChange={(event) =>
+                                        setEditUserUsername(event.target.value)
+                                    }
+                                    placeholder="username for login (optional)"
+                                    autoComplete="off"
                                 />
                             </div>
                             <div className="input-group">

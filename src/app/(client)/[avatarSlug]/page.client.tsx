@@ -9,11 +9,15 @@ import { MediaOverlay } from "@/app/(client)/[avatarSlug]/_components/MediaOverl
 import { useAgent } from "@/app/(client)/[avatarSlug]/_hooks/useAgent";
 import { useAzureSTT } from "@/app/(client)/[avatarSlug]/_hooks/useAzureSTT";
 import { useIdleTimer } from "@/app/(client)/[avatarSlug]/_hooks/useIdleTimer";
+import {
+  pickTriggerPhrase,
+  type TriggerType,
+} from "@/app/(client)/[avatarSlug]/_lib/trigger-phrases";
 import { resolveMediaIntentAction } from "@/app/actions/media.actions";
 import watermark from "@/assets/img/neil_avatar_watermark.png";
-import type { MediaResolveResult } from "@/lib/media/types";
 import EducationalTooltip from "@/components/EducationalTooltip/EducationalTooltip";
 import { useShowOncePerSession } from "@/components/EducationalTooltip/useShowOncePerSession";
+import type { MediaResolveResult } from "@/lib/media/types";
 
 type DidAgentPayload = {
   id: string;
@@ -105,6 +109,7 @@ export const AvatarPageClient = ({
   const stopListeningRef = useRef<((dispose?: boolean) => void) | null>(null);
   const responsePendingRef = useRef(false);
   const responseStartedRef = useRef(false);
+  const silenceNudgedRef = useRef(false);
   const preconnectListeningRef = useRef(false);
   const reconnectingRef = useRef(false);
 
@@ -397,6 +402,23 @@ export const AvatarPageClient = ({
     return text.trim().replace(/\s+/g, " ");
   }, []);
 
+  const speakTrigger = useCallback(
+    async (
+      type: TriggerType,
+      options?: { skipSpeakingGuard?: boolean },
+    ): Promise<boolean> => {
+      if (connectionStatusRef.current !== "connected") return false;
+      if (!options?.skipSpeakingGuard && isAgentSpeakingRef.current) {
+        return false;
+      }
+      const phrase = pickTriggerPhrase(type, language);
+      if (!phrase) return false;
+      const res = await sendStreamScript(phrase);
+      return Boolean(res?.success);
+    },
+    [sendStreamScript, language],
+  );
+
   const sendTranscript = useCallback(
     async (text: string) => {
       const normalized = normalizeTranscript(text);
@@ -421,6 +443,7 @@ export const AvatarPageClient = ({
       lastSentRef.current = { text: normalized, time: Date.now() };
       responsePendingRef.current = true;
       responseStartedRef.current = false;
+      silenceNudgedRef.current = false;
       stopListeningRef.current?.();
       setAgentStatus("thinking");
       setMediaResult(null);
@@ -463,10 +486,20 @@ export const AvatarPageClient = ({
           await ensureConnection();
           return;
         }
-        setShowError(true);
-        setAgentStatus("idle");
         responsePendingRef.current = false;
         responseStartedRef.current = false;
+        // System error trigger: if the WebRTC stream is still alive we can
+        // voice a short apology and keep the session going. Only fall back
+        // to the hard error screen if even that fails (stream truly dead).
+        const spokeApology = await speakTrigger("error", {
+          skipSpeakingGuard: true,
+        });
+        if (spokeApology) {
+          setAgentStatus("listening");
+        } else {
+          setShowError(true);
+          setAgentStatus("idle");
+        }
       }
 
       sendInFlightRef.current = false;
@@ -488,6 +521,7 @@ export const AvatarPageClient = ({
       ensureConnection,
       agent.agentId,
       getIds,
+      speakTrigger,
     ],
   );
 
@@ -708,7 +742,48 @@ export const AvatarPageClient = ({
     interrupt();
     resetTimer();
     setAgentStatus("listening");
-  }, [interrupt, resetTimer]);
+    silenceNudgedRef.current = false;
+    // Acknowledge the interruption out loud ~1 of 3 times.
+    if (Math.random() < 0.33) {
+      void speakTrigger("interrupt", { skipSpeakingGuard: true });
+    }
+  }, [interrupt, resetTimer, speakTrigger]);
+
+  // Silence nudge: if the user stays quiet for 15s while we're listening
+  // (and no photos/videos are on screen), the avatar gently prompts once.
+  // `interimTranscript` is a dependency on purpose: every partial word the
+  // user utters (even before it's finalized / sent to D-ID) re-runs this
+  // effect and restarts the 15s window, so we never interrupt mid-sentence.
+  useEffect(() => {
+    const mediaShown = Boolean(
+      activeMediaResult && activeMediaResult.items.length > 0,
+    );
+    const userIsSpeaking = interimTranscript.trim().length > 0;
+    const canNudge =
+      connectionStatus === "connected" &&
+      agentStatus === "listening" &&
+      micPermission === "granted" &&
+      !isAgentSpeaking &&
+      !userIsSpeaking &&
+      !showError &&
+      !mediaShown &&
+      !silenceNudgedRef.current;
+    if (!canNudge) return;
+    const timer = setTimeout(() => {
+      silenceNudgedRef.current = true;
+      void speakTrigger("silence");
+    }, 15000);
+    return () => clearTimeout(timer);
+  }, [
+    connectionStatus,
+    agentStatus,
+    micPermission,
+    isAgentSpeaking,
+    interimTranscript,
+    showError,
+    activeMediaResult,
+    speakTrigger,
+  ]);
 
   useEffect(() => {
     if (!greetingPendingRef.current) return;

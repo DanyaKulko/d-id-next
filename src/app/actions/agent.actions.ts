@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import type { z } from "zod";
 import { ensureClientAuth } from "@/lib/auth/client-access";
+import { ensureVisitorCookie } from "@/lib/auth/cookies";
 import { getCurrentUser } from "@/lib/auth/require";
 import { prisma } from "@/lib/db/prisma";
 import {
@@ -10,6 +11,13 @@ import {
   logExternalServiceError,
   resolveExternalErrorDetails,
 } from "@/lib/logging/external-errors";
+import {
+  adoptVisitorMemory,
+  backfillUnsummarizedSessions,
+  buildMemorySystemMessage,
+  getMemoryForInjection,
+  summarizeAndPersistSession,
+} from "@/lib/memory/visitor-memory";
 import { didService } from "@/lib/services/did.service";
 import { normalizeDidChatText } from "@/lib/text/did-chat";
 import {
@@ -27,6 +35,33 @@ const resolveDeviceLabel = (userAgent?: string | null) => {
   if (ua.includes("mobile")) return "Mobile";
   if (ua.includes("tablet") || ua.includes("ipad")) return "Tablet";
   return "Desktop";
+};
+
+const LANGUAGE_NAMES: Record<string, string> = {
+  "en-US": "English",
+  "hi-IN": "Hindi",
+  "mr-IN": "Marathi",
+  "es-ES": "Spanish",
+  "fr-FR": "French",
+  "ru-RU": "Russian",
+  "id-ID": "Indonesian",
+};
+
+const resolveLanguageName = (code?: string | null): string | null => {
+  if (!code) return null;
+  return LANGUAGE_NAMES[code] ?? LANGUAGE_NAMES[code.slice(0, 2)] ?? null;
+};
+
+const buildLanguageDirective = (code?: string | null): string | null => {
+  const name = resolveLanguageName(code);
+  if (!name) return null;
+  return `The user has selected ${name} (${code}) as the conversation language. Respond ONLY in ${name}, regardless of the language used in any earlier message of this conversation. Do not switch languages unless the user explicitly asks.`;
+};
+
+const buildInlineLanguageDirective = (code?: string | null): string | null => {
+  const name = resolveLanguageName(code);
+  if (!name) return null;
+  return `(Reply in ${name} only.)`;
 };
 
 const resolveAssistantMessage = (data: unknown) => {
@@ -129,6 +164,8 @@ export async function createSessionAction(
     await ensureClientAuth();
     const data = await didService.createSession(agentId);
     const session = await getCurrentUser();
+    const visitorId = await ensureVisitorCookie();
+    const userId = session?.user.id ?? null;
     const rawHeaders = await headers();
     const userAgent = rawHeaders.get("user-agent");
     const ip = rawHeaders.get("x-forwarded-for")?.split(",")[0]?.trim();
@@ -151,7 +188,8 @@ export async function createSessionAction(
             didSessionId: sessionId || null,
             didChatId: chatId,
             agentId: agent?.id ?? null,
-            userId: session?.user.id ?? null,
+            userId,
+            visitorId,
             userAgent: userAgent ?? null,
             ip: ip ?? null,
             device: resolveDeviceLabel(userAgent),
@@ -160,6 +198,22 @@ export async function createSessionAction(
         })
         .catch(() => undefined);
     }
+
+    // If a logged-in user previously chatted anonymously, attach that memory.
+    if (userId) {
+      await adoptVisitorMemory(userId, visitorId);
+    }
+    // Safety net: fold any sessions that ended abruptly (tab closed → no
+    // closeSession) into memory BEFORE the first turn, so the avatar already
+    // remembers the visitor on the very first message of this new session.
+    // Normally a no-op (closeSession already summarized prior sessions), so
+    // it adds latency only for returning visitors with an unsummarized
+    // session. Failures are swallowed inside the helper.
+    await backfillUnsummarizedSessions(
+      { userId, visitorId },
+      { excludeChatId: chatId, limit: 3 },
+    );
+
     return { success: true, data };
   } catch (error) {
     return handleError(error, "Create Session");
@@ -223,6 +277,9 @@ export async function chatAction(
   try {
     await ensureClientAuth();
     const { chatId, streamId, sessionId, text, language } = result.data;
+    // Guarantee an anonymous identity even if the session was created
+    // outside the normal createSession flow, so memory still anchors.
+    const visitorId = await ensureVisitorCookie();
 
     const session = await prisma.chatSession.findUnique({
       where: { didChatId: chatId },
@@ -248,6 +305,7 @@ export async function chatAction(
             didChatId: chatId,
             agentId: agentRecord?.id ?? null,
             userId: sessionUser?.user.id ?? null,
+            visitorId: visitorId ?? null,
             userAgent: userAgent ?? null,
             ip: ip ?? null,
             device: resolveDeviceLabel(userAgent),
@@ -309,12 +367,61 @@ export async function chatAction(
             },
           ];
 
+    const languageDirective = buildLanguageDirective(language);
+    const inlineDirective = buildInlineLanguageDirective(language);
+
+    const withInline = messagesPayload.map((m) => ({ ...m }));
+    if (inlineDirective) {
+      for (let i = withInline.length - 1; i >= 0; i -= 1) {
+        if (withInline[i].role === "user") {
+          withInline[i].content =
+            `${withInline[i].content}\n\n${inlineDirective}`;
+          break;
+        }
+      }
+    }
+
+    // Cross-session memory: prepend a compact profile of this visitor so the
+    // avatar "remembers" them across sessions.
+    const memory = activeSession
+      ? await getMemoryForInjection({
+          userId: activeSession.userId,
+          visitorId: activeSession.visitorId,
+        })
+      : null;
+    const memoryDirective = memory ? buildMemorySystemMessage(memory) : null;
+
+    const systemMessages: Array<{
+      role: "system";
+      content: string;
+      created_at: string;
+    }> = [];
+    if (memoryDirective) {
+      systemMessages.push({
+        role: "system",
+        content: memoryDirective,
+        created_at: new Date(0).toISOString(),
+      });
+    }
+    if (languageDirective) {
+      systemMessages.push({
+        role: "system",
+        content: languageDirective,
+        created_at: new Date(0).toISOString(),
+      });
+    }
+
+    const finalPayload =
+      systemMessages.length > 0
+        ? [...systemMessages, ...withInline]
+        : withInline;
+
     const data = await didService.chat(
       agentId,
       chatId,
       streamId,
       sessionId,
-      messagesPayload,
+      finalPayload,
     );
 
     if (activeSession) {
@@ -450,6 +557,16 @@ export async function closeSessionAction(
       where: { didStreamId: result.data.streamId },
       data: { endedAt: new Date() },
     });
+
+    // Update rolling cross-session memory from this conversation.
+    const ended = await prisma.chatSession.findUnique({
+      where: { didStreamId: result.data.streamId },
+      select: { id: true },
+    });
+    if (ended) {
+      await summarizeAndPersistSession(ended.id);
+    }
+
     return { success: true, status: "closed" };
   } catch (error) {
     return handleError(error, "Close Session");

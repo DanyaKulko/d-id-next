@@ -4,13 +4,6 @@ import { useEffect, useState } from "react";
 import type { MediaItem } from "@/lib/media/types";
 import "./MediaOverlay.css";
 
-const SLOT_CLASSES = [
-  "na-media-overlay__slot--tl",
-  "na-media-overlay__slot--tr",
-  "na-media-overlay__slot--bl",
-  "na-media-overlay__slot--br",
-] as const;
-
 interface MediaOverlayProps {
   items: MediaItem[];
   visible: boolean;
@@ -41,7 +34,7 @@ export const MediaOverlay = ({
       {items.slice(0, 4).map((item, index) => (
         <div
           key={`${mountedKey}-${item.id}`}
-          className={`na-media-overlay__slot ${SLOT_CLASSES[index]} na-media-overlay__slot--visible`}
+          className="na-media-overlay__slot na-media-overlay__slot--visible"
           style={{ transitionDelay: `${index * 80}ms` }}
         >
           <button
@@ -75,9 +68,6 @@ export const MediaOverlay = ({
                   <path d="M8 5v14l11-7z" />
                 </svg>
               </span>
-            )}
-            {item.title && (
-              <span className="na-media-card__title">{item.title}</span>
             )}
           </button>
         </div>

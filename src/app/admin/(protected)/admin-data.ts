@@ -10,6 +10,7 @@ export type UserRow = {
   id: string;
   login: string;
   email: string;
+  username: string | null;
   createdDate: string;
   lastLogin: string;
   status: "active" | "inactive";
@@ -175,6 +176,7 @@ export async function fetchUsers(): Promise<UserRow[]> {
     select: {
       id: true,
       email: true,
+      username: true,
       isActive: true,
       createdAt: true,
     },
@@ -201,8 +203,9 @@ export async function fetchUsers(): Promise<UserRow[]> {
 
   return users.map((user) => ({
     id: user.id,
-    login: user.email.split("@")[0] ?? user.email,
+    login: user.username ?? user.email.split("@")[0] ?? user.email,
     email: user.email,
+    username: user.username ?? null,
     createdDate: user.createdAt.toISOString().split("T")[0],
     lastLogin: lastLoginMap.get(user.id) ?? "Never",
     status: user.isActive ? "active" : "inactive",

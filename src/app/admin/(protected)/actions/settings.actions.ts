@@ -1,7 +1,7 @@
 "use server";
 
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { getAzureSpeechToken } from "@/app/actions/azure.actions";
 import { setSessionCookie } from "@/lib/auth/cookies";
 import { hashPassword, verifyPassword } from "@/lib/auth/passwords";
@@ -21,12 +21,20 @@ import {
 
 const formatDateOnly = (date: Date) => date.toISOString().split("T")[0];
 
+const normalizeUsername = (raw: string): string => raw.trim();
+
+// Usernames: 3-30 chars, letters/digits/._- and no "@" (to avoid colliding
+// with the email format used by the same login field).
+const isValidUsername = (value: string): boolean =>
+  /^[a-zA-Z0-9._-]{3,30}$/.test(value);
+
 const buildUserRow = async (userId: string) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
       id: true,
       email: true,
+      username: true,
       isActive: true,
       createdAt: true,
     },
@@ -48,8 +56,9 @@ const buildUserRow = async (userId: string) => {
 
   return {
     id: user.id,
-    login: user.email.split("@")[0] ?? user.email,
+    login: user.username ?? user.email.split("@")[0] ?? user.email,
     email: user.email,
+    username: user.username ?? null,
     createdDate: formatDateOnly(user.createdAt),
     lastLogin: lastLogin ? formatDateOnly(lastLogin.createdAt) : "Never",
     status: user.isActive ? ("active" as const) : ("inactive" as const),
@@ -115,13 +124,35 @@ export async function saveUserUpdateAction(formData: FormData) {
   if (action === "create") {
     const email = getString(formData.get("email")).trim().toLowerCase();
     const password = getString(formData.get("password"));
+    const usernameRaw = getOptionalString(formData.get("username"));
     if (!email || !password) {
       throw new Error("Email and password are required");
     }
 
-    const user = await prisma.user.findFirst({ where: { email } });
-    if (user) {
-      throw new Error("User with this email already exists");
+    const username = usernameRaw ? normalizeUsername(usernameRaw) : null;
+    if (username && !isValidUsername(username)) {
+      throw new Error(
+        "Username must be 3-30 chars: letters, digits, dot, dash or underscore",
+      );
+    }
+
+    const existing = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email },
+          ...(username
+            ? [{ username: { equals: username, mode: "insensitive" as const } }]
+            : []),
+        ],
+      },
+      select: { email: true, username: true },
+    });
+    if (existing) {
+      throw new Error(
+        existing.email === email
+          ? "User with this email already exists"
+          : "User with this username already exists",
+      );
     }
 
     const hash = await hashPassword(password);
@@ -129,6 +160,7 @@ export async function saveUserUpdateAction(formData: FormData) {
     const created = await prisma.user.create({
       data: {
         email,
+        username,
         passwordHash: hash,
         roles: { create: [{ role: "USER" }] },
       },
@@ -152,6 +184,11 @@ export async function saveUserUpdateAction(formData: FormData) {
     const userId = getString(formData.get("userId")).trim();
     const email = getString(formData.get("email")).trim().toLowerCase();
     const password = getOptionalString(formData.get("password"));
+    const usernameRaw = getOptionalString(formData.get("username"));
+    // Distinguish "field absent" from "explicitly cleared": when the form
+    // sends the username field at all, we honor it (empty string → clear).
+    const usernameProvided = formData.has("username");
+    const username = usernameRaw ? normalizeUsername(usernameRaw) : null;
 
     if (!userId || !email) {
       throw new Error("User id and email are required");
@@ -159,6 +196,12 @@ export async function saveUserUpdateAction(formData: FormData) {
 
     if (password && password.length < 6) {
       throw new Error("Password must be at least 6 characters");
+    }
+
+    if (username && !isValidUsername(username)) {
+      throw new Error(
+        "Username must be 3-30 chars: letters, digits, dot, dash or underscore",
+      );
     }
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -171,7 +214,27 @@ export async function saveUserUpdateAction(formData: FormData) {
       throw new Error("Cannot edit admin users here");
     }
 
-    const updateData: { email: string; passwordHash?: string } = { email };
+    if (username) {
+      const clash = await prisma.user.findFirst({
+        where: {
+          id: { not: userId },
+          username: { equals: username, mode: "insensitive" },
+        },
+        select: { id: true },
+      });
+      if (clash) {
+        throw new Error("User with this username already exists");
+      }
+    }
+
+    const updateData: {
+      email: string;
+      passwordHash?: string;
+      username?: string | null;
+    } = { email };
+    if (usernameProvided) {
+      updateData.username = username;
+    }
     const hasPasswordChange = Boolean(password);
     if (hasPasswordChange) {
       updateData.passwordHash = await hashPassword(password as string);
