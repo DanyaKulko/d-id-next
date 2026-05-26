@@ -8,6 +8,20 @@ export const POST_CAPTION_MODEL =
 export const IMAGE_CAPTION_MODEL =
   process.env.BLOG_IMAGE_CAPTION_MODEL || "gpt-4o";
 
+// gpt-5 / o-series reject `max_tokens` (require `max_completion_tokens`) and a
+// custom `temperature`, but accept `reasoning_effort`. gpt-4o* use the classic
+// params. This keeps both paths valid since the model is env-swappable.
+const isReasoningModel = (model: string): boolean =>
+  /^(gpt-5|o[0-9])/i.test(model);
+
+const modelTuning = (model: string, maxOutputTokens: number) =>
+  isReasoningModel(model)
+    ? {
+        max_completion_tokens: maxOutputTokens,
+        reasoning_effort: "minimal" as const,
+      }
+    : { max_completion_tokens: maxOutputTokens, temperature: 0.2 };
+
 const POST_CAPTION_SYSTEM = `You are a caption writer preparing an English search index for Neil's travel blog.
 
 Rules:
@@ -50,8 +64,7 @@ export const generatePostCaption = async (
     const completion = await openai.chat.completions.create(
       {
         model: POST_CAPTION_MODEL,
-        temperature: 0.2,
-        max_tokens: 220,
+        ...modelTuning(POST_CAPTION_MODEL, 600),
         messages: [
           { role: "system", content: POST_CAPTION_SYSTEM },
           { role: "user", content: buildUserPrompt(input) },
@@ -119,8 +132,7 @@ export const generateImageCaption = async (
     const completion = await openai.chat.completions.create(
       {
         model: IMAGE_CAPTION_MODEL,
-        temperature: 0.2,
-        max_tokens: 80,
+        ...modelTuning(IMAGE_CAPTION_MODEL, 300),
         messages: [
           { role: "system", content: IMAGE_CAPTION_SYSTEM },
           {
@@ -209,8 +221,7 @@ export const generateVideoCaption = async (
     const completion = await openai.chat.completions.create(
       {
         model: VIDEO_CAPTION_MODEL,
-        temperature: 0.2,
-        max_tokens: 120,
+        ...modelTuning(VIDEO_CAPTION_MODEL, 300),
         messages: [
           { role: "system", content: VIDEO_CAPTION_SYSTEM },
           { role: "user", content: buildVideoContext(input) },
