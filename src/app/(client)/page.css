@@ -23,6 +23,26 @@
   color: #FCC272;
 }
 
+/* Header lockup: lamp animation + stacked wordmark/tagline */
+.na-logo-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.na-logo-lamp {
+  flex: 0 0 auto;
+  display: block;
+  line-height: 0;
+}
+
+.na-logo-lamp-anim {
+  display: block;
+  width: 56px;
+  height: 56px;
+  aspect-ratio: 1 / 1;
+}
+
 /* Home logo block: wordmark + tagline stacked, equal width */
 .na-logo-block {
   display: inline-flex;
