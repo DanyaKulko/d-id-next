@@ -458,6 +458,8 @@ model BlogMediaAsset {
   imageCaption String?        @db.Text
   imageCaptionModel String?
 
+  searchVector Unsupported("tsvector")?
+
   orderIndex Int @default(0)
 
   sourceId String
