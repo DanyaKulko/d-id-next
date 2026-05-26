@@ -18,7 +18,7 @@ const modelTuning = (model: string, maxOutputTokens: number) =>
   isReasoningModel(model)
     ? {
         max_completion_tokens: maxOutputTokens,
-        reasoning_effort: "minimal" as const,
+        reasoning_effort: "low" as const,
       }
     : { max_completion_tokens: maxOutputTokens, temperature: 0.2 };
 
