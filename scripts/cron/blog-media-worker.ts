@@ -2,10 +2,18 @@ import { Worker } from "bullmq";
 import IORedis from "ioredis";
 import { BlogApiClient } from "@/lib/blog/api-client";
 import {
+  captionImageBatch,
+  countPendingImageAssets,
+} from "@/lib/blog/image-caption";
+import {
   captionPost,
   ingestPage,
   listPendingCaptionIds,
 } from "@/lib/blog/ingest";
+import {
+  captionVideoBatch,
+  countPendingVideoAssets,
+} from "@/lib/blog/video-caption";
 import { prisma } from "@/lib/db/prisma";
 
 const REDIS_URL = process.env.REDIS_URL || "redis://redis:6379";
@@ -150,10 +158,60 @@ async function drainCaptions(): Promise<{
   return totals;
 }
 
+const IMAGE_CAPTION_LOOP_BATCH = 50;
+const MAX_IMAGE_CAPTION_LOOPS = 400;
+
+async function drainImageCaptions(
+  hardLimit?: number,
+): Promise<{ processed: number; done: number; failed: number; loops: number }> {
+  const totals = { processed: 0, done: 0, failed: 0, loops: 0 };
+  for (let i = 0; i < MAX_IMAGE_CAPTION_LOOPS; i++) {
+    const remaining = hardLimit ? hardLimit - totals.processed : undefined;
+    if (remaining !== undefined && remaining <= 0) break;
+    const batchSize = remaining
+      ? Math.min(IMAGE_CAPTION_LOOP_BATCH, remaining)
+      : IMAGE_CAPTION_LOOP_BATCH;
+    const res = await captionImageBatch(batchSize);
+    totals.processed += res.processed;
+    totals.done += res.done;
+    totals.failed += res.failed;
+    totals.loops += 1;
+    if (res.processed === 0) break;
+    // All failed → likely systemic (OpenAI down / bad URLs). Stop, retry later.
+    if (res.done === 0 && res.failed === res.processed) break;
+  }
+  return totals;
+}
+
+const VIDEO_CAPTION_LOOP_BATCH = 50;
+const MAX_VIDEO_CAPTION_LOOPS = 400;
+
+async function drainVideoCaptions(
+  hardLimit?: number,
+): Promise<{ processed: number; done: number; failed: number; loops: number }> {
+  const totals = { processed: 0, done: 0, failed: 0, loops: 0 };
+  for (let i = 0; i < MAX_VIDEO_CAPTION_LOOPS; i++) {
+    const remaining = hardLimit ? hardLimit - totals.processed : undefined;
+    if (remaining !== undefined && remaining <= 0) break;
+    const batchSize = remaining
+      ? Math.min(VIDEO_CAPTION_LOOP_BATCH, remaining)
+      : VIDEO_CAPTION_LOOP_BATCH;
+    const res = await captionVideoBatch(batchSize);
+    totals.processed += res.processed;
+    totals.done += res.done;
+    totals.failed += res.failed;
+    totals.loops += 1;
+    if (res.processed === 0) break;
+    // All failed → likely systemic (OpenAI down). Stop, retry later.
+    if (res.done === 0 && res.failed === res.processed) break;
+  }
+  return totals;
+}
+
 const worker = new Worker(
   "blog-media-sync",
   async (job) => {
-    const name = job.name as "sync-delta";
+    const name = job.name as "sync-delta" | "caption-images" | "caption-videos";
     const startedAt = Date.now();
     log("INFO", "Job started", { id: job.id, name, data: job.data });
 
@@ -167,6 +225,32 @@ const worker = new Worker(
     }, LOCK_EXTEND_INTERVAL_MS);
 
     try {
+      if (name === "caption-images") {
+        const pending = await countPendingImageAssets();
+        const result = await drainImageCaptions(
+          (job.data as { limit?: number })?.limit,
+        );
+        log("INFO", "Image captioning done", {
+          pendingAtStart: pending,
+          ...result,
+          elapsedMs: Date.now() - startedAt,
+        });
+        return result;
+      }
+
+      if (name === "caption-videos") {
+        const pending = await countPendingVideoAssets();
+        const result = await drainVideoCaptions(
+          (job.data as { limit?: number })?.limit,
+        );
+        log("INFO", "Video captioning done", {
+          pendingAtStart: pending,
+          ...result,
+          elapsedMs: Date.now() - startedAt,
+        });
+        return result;
+      }
+
       if (name !== "sync-delta") {
         throw new Error(`Unknown job name: ${name}`);
       }

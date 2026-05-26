@@ -70,6 +70,9 @@ const toMediaItemVideo = (row: VideoRow): MediaItem => ({
 
 const MAX_PHOTOS_PER_POST = 2;
 
+// Two-tier ranking: tier 1 = photo's own Vision caption matches; tier 2 =
+// parent post text matches (photo inherits post rank). Capped per post for
+// variety, then extra photos backfill remaining slots up to `limit`.
 export const searchBlogPhotos = async (
   keywords: string,
   limit = 4,
@@ -78,77 +81,76 @@ export const searchBlogPhotos = async (
   if (!query) return [];
 
   try {
-    const capped = await prisma.$queryRaw<PhotoRow[]>`
-      WITH matched_posts AS (
-        SELECT
-          bp.id,
-          bp."regionName" AS region_name,
-          bp.link AS link,
-          ts_rank_cd(bp."searchVector", websearch_to_tsquery('english', ${query})) AS rank
-        FROM blog_posts bp
-        WHERE bp."searchVector" @@ websearch_to_tsquery('english', ${query})
-        ORDER BY rank DESC
-        LIMIT 8
+    const rows = await prisma.$queryRaw<PhotoRow[]>`
+      WITH q AS (
+        SELECT websearch_to_tsquery('english', ${query}) AS tsq
       ),
-      ranked_assets AS (
+      candidates AS (
         SELECT
-          bma.id AS id,
-          bma."postId" AS post_id,
-          bma.url AS url,
+          bma.id             AS id,
+          bma."postId"       AS post_id,
+          bma.url            AS url,
           bma."thumbnailUrl" AS thumbnail_url,
-          bma.title AS title,
-          mp.region_name AS region_name,
-          mp.link AS link,
-          mp.rank AS rank,
-          ROW_NUMBER() OVER (
-            PARTITION BY bma."postId"
-            ORDER BY bma."orderIndex" ASC
-          ) AS asset_rn
-        FROM matched_posts mp
-        JOIN blog_media_assets bma ON bma."postId" = mp.id
-        WHERE bma.kind = 'PHOTO' AND mp.rank >= ${MIN_RANK}
-      )
-      SELECT id, post_id, url, thumbnail_url, title, region_name, link
-      FROM ranked_assets
-      WHERE asset_rn <= ${MAX_PHOTOS_PER_POST}
-      ORDER BY rank DESC, asset_rn ASC
-      LIMIT ${limit};
-    `;
+          bma.title          AS title,
+          bma."orderIndex"   AS order_index,
+          1                  AS tier,
+          ts_rank_cd(bma."searchVector", q.tsq) AS rank
+        FROM blog_media_assets bma
+        CROSS JOIN q
+        WHERE bma.kind = 'PHOTO'
+          AND bma."searchVector" @@ q.tsq
 
-    if (capped.length >= limit) return capped.map(toMediaItemPhoto);
-    if (capped.length === 0) return [];
+        UNION ALL
 
-    const takenIds = capped.map((r) => r.id);
-    const remaining = limit - capped.length;
-    const filler = await prisma.$queryRaw<PhotoRow[]>`
-      WITH matched_posts AS (
         SELECT
-          bp.id,
-          bp."regionName" AS region_name,
-          bp.link AS link,
-          ts_rank_cd(bp."searchVector", websearch_to_tsquery('english', ${query})) AS rank
+          bma.id             AS id,
+          bma."postId"       AS post_id,
+          bma.url            AS url,
+          bma."thumbnailUrl" AS thumbnail_url,
+          bma.title          AS title,
+          bma."orderIndex"   AS order_index,
+          2                  AS tier,
+          ts_rank_cd(bp."searchVector", q.tsq) AS rank
         FROM blog_posts bp
-        WHERE bp."searchVector" @@ websearch_to_tsquery('english', ${query})
-        ORDER BY rank DESC
-        LIMIT 4
+        JOIN blog_media_assets bma ON bma."postId" = bp.id
+        CROSS JOIN q
+        WHERE bp."searchVector" @@ q.tsq
+          AND bma.kind = 'PHOTO'
+      ),
+      deduped AS (
+        SELECT DISTINCT ON (id)
+          id, post_id, url, thumbnail_url, title, order_index, tier, rank
+        FROM candidates
+        ORDER BY id, tier ASC, rank DESC
+      ),
+      ranked AS (
+        SELECT
+          d.*,
+          ROW_NUMBER() OVER (
+            PARTITION BY post_id
+            ORDER BY tier ASC, rank DESC, order_index ASC
+          ) AS post_rn
+        FROM deduped d
       )
       SELECT
-        bma.id AS id,
-        bma."postId" AS post_id,
-        bma.url AS url,
-        bma."thumbnailUrl" AS thumbnail_url,
-        bma.title AS title,
-        mp.region_name AS region_name,
-        mp.link AS link
-      FROM matched_posts mp
-      JOIN blog_media_assets bma ON bma."postId" = mp.id
-      WHERE bma.kind = 'PHOTO'
-        AND mp.rank >= ${MIN_RANK}
-        AND NOT (bma.id = ANY(${takenIds}::text[]))
-      ORDER BY mp.rank DESC, bma."orderIndex" ASC
-      LIMIT ${remaining};
+        r.id,
+        r.post_id,
+        r.url,
+        r.thumbnail_url,
+        r.title,
+        bp."regionName" AS region_name,
+        bp.link         AS link
+      FROM ranked r
+      JOIN blog_posts bp ON bp.id = r.post_id
+      WHERE r.rank >= ${MIN_RANK}
+      ORDER BY
+        (r.post_rn <= ${MAX_PHOTOS_PER_POST}) DESC,
+        r.tier ASC,
+        r.rank DESC,
+        r.post_rn ASC
+      LIMIT ${limit};
     `;
-    return [...capped, ...filler].map(toMediaItemPhoto);
+    return rows.map(toMediaItemPhoto);
   } catch (error) {
     await logExternalServiceError({
       source: "BlogSearch",
@@ -168,33 +170,65 @@ export const searchBlogVideos = async (
   if (!query) return [];
 
   try {
+    // Same two-tier rule as photos: tier 1 = the video's own caption
+    // (transcript-derived) matches; tier 2 = the parent post text matches.
     const rows = await prisma.$queryRaw<VideoRow[]>`
-      WITH matched_posts AS (
+      WITH q AS (
+        SELECT websearch_to_tsquery('english', ${query}) AS tsq
+      ),
+      candidates AS (
         SELECT
-          bp.id,
-          bp."regionName"   AS region_name,
-          bp.link           AS link,
-          ts_rank_cd(bp."searchVector", websearch_to_tsquery('english', ${query})) AS rank
+          bma.id             AS id,
+          bma."postId"       AS post_id,
+          bma.url            AS url,
+          bma."thumbnailUrl" AS thumbnail_url,
+          bma."embedUrl"     AS embed_url,
+          bma.title          AS title,
+          bma."orderIndex"   AS order_index,
+          1                  AS tier,
+          ts_rank_cd(bma."searchVector", q.tsq) AS rank
+        FROM blog_media_assets bma
+        CROSS JOIN q
+        WHERE bma.kind = 'VIDEO'
+          AND bma."searchVector" @@ q.tsq
+
+        UNION ALL
+
+        SELECT
+          bma.id             AS id,
+          bma."postId"       AS post_id,
+          bma.url            AS url,
+          bma."thumbnailUrl" AS thumbnail_url,
+          bma."embedUrl"     AS embed_url,
+          bma.title          AS title,
+          bma."orderIndex"   AS order_index,
+          2                  AS tier,
+          ts_rank_cd(bp."searchVector", q.tsq) AS rank
         FROM blog_posts bp
-        WHERE bp."searchVector" @@ websearch_to_tsquery('english', ${query})
-          AND bp.type = 'VIDEO'
-        ORDER BY rank DESC
-        LIMIT 4
+        JOIN blog_media_assets bma ON bma."postId" = bp.id
+        CROSS JOIN q
+        WHERE bp."searchVector" @@ q.tsq
+          AND bma.kind = 'VIDEO'
+      ),
+      deduped AS (
+        SELECT DISTINCT ON (id)
+          id, post_id, url, thumbnail_url, embed_url, title, order_index, tier, rank
+        FROM candidates
+        ORDER BY id, tier ASC, rank DESC
       )
       SELECT
-        bma.id             AS id,
-        bma."postId"       AS post_id,
-        bma.url            AS url,
-        bma."thumbnailUrl" AS thumbnail_url,
-        bma."embedUrl"     AS embed_url,
-        bma.title          AS title,
-        mp.region_name     AS region_name,
-        mp.link            AS link
-      FROM matched_posts mp
-      JOIN blog_media_assets bma ON bma."postId" = mp.id
-      WHERE bma.kind = 'VIDEO'
-        AND mp.rank >= ${MIN_RANK}
-      ORDER BY mp.rank DESC, bma."orderIndex" ASC
+        d.id,
+        d.post_id,
+        d.url,
+        d.thumbnail_url,
+        d.embed_url,
+        d.title,
+        bp."regionName" AS region_name,
+        bp.link         AS link
+      FROM deduped d
+      JOIN blog_posts bp ON bp.id = d.post_id
+      WHERE d.rank >= ${MIN_RANK}
+      ORDER BY d.tier ASC, d.rank DESC, d.order_index ASC
       LIMIT ${limit};
     `;
     return rows.map(toMediaItemVideo);
