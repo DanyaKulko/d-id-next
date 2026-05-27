@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import LottieLogo from "@/components/LottieLogo/LottieLogo";
+import BrandLockup from "@/components/BrandLockup/BrandLockup";
 
 type ClientPreloaderProps = {
   minDurationMs?: number;
 };
 
 export default function ClientPreloader({
-  minDurationMs = 2100,
+  // Long enough for the ~3.3s lamp-drawing video to play through once.
+  minDurationMs = 3400,
 }: ClientPreloaderProps) {
   const [phase, setPhase] = useState<"visible" | "hiding" | "hidden">(
     "visible",
@@ -32,12 +33,7 @@ export default function ClientPreloader({
       }}
     >
       <div className="na-preloader__content">
-        <LottieLogo
-          className="na-preloader__anim"
-          path="/lottie/preload.json"
-          // loop
-          autoplay
-        />
+        <BrandLockup lampVideoSrc="/video/lamp-draw.mp4" />
         <div className="na-preloader__label">Loading</div>
       </div>
     </div>

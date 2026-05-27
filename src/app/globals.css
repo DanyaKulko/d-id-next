@@ -103,11 +103,6 @@ a:focus-visible {
   gap: 12px;
 }
 
-.na-preloader__anim {
-  width: clamp(210px, 36vw, 390px);
-  height: clamp(180px, 33vw, 360px);
-}
-
 .na-preloader__label {
   font-size: clamp(21px, 3vw, 27px);
   letter-spacing: 0.18em;
