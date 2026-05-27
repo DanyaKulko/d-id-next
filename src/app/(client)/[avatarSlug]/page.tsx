@@ -75,7 +75,7 @@ export default async function AvatarPage({ params }: AvatarPageProps) {
         />
 
         <div className="na-brand-logo" aria-hidden="true">
-          <BrandLockup />
+          <BrandLockup size="lg" />
         </div>
       </main>
     </>

@@ -109,7 +109,7 @@ export default async function Home() {
         </div>
 
         <div className="na-brand-logo" aria-hidden="true">
-          <BrandLockup />
+          <BrandLockup size="lg" />
         </div>
       </main>
     </>

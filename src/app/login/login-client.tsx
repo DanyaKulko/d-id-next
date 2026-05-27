@@ -113,7 +113,7 @@ export default function LoginClient({ twoFactorRequired }: LoginClientProps) {
   return (
     <div className="na-login-shell">
       <div className="na-login-brand">
-        <BrandLockup />
+        <BrandLockup size="lg" />
       </div>
 
       <div className="na-login-content">

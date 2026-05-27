@@ -552,6 +552,8 @@ export const AvatarPageClient = ({
     startListening,
     stopListening,
     interimTranscript,
+    muted,
+    toggleMute,
     warmupAudio,
     isAppleMobile,
   } = useAzureSTT(handleUserSpeech);
@@ -1016,18 +1018,21 @@ export const AvatarPageClient = ({
             <span>{getStatusText()}</span>
           </div>
 
-          {canFullscreen && (
+          <div className="na-stage-actions">
             <button
               type="button"
-              className="na-fullscreen-btn"
-              onClick={toggleFullscreen}
-              aria-label={
-                isFullscreen ? "Exit full screen" : "Enter full screen"
+              className={`na-stage-btn ${muted ? "na-stage-btn--active" : ""}`}
+              onClick={toggleMute}
+              aria-label={muted ? "Unmute microphone" : "Mute microphone"}
+              aria-pressed={muted}
+              title={
+                muted
+                  ? "Microphone muted — click to unmute"
+                  : "Mute microphone (Neil won't hear you)"
               }
-              title={isFullscreen ? "Exit full screen" : "Enter full screen"}
             >
-              {isFullscreen ? (
-                // biome-ignore lint/a11y/noSvgWithoutTitle: 1
+              {muted ? (
+                // biome-ignore lint/a11y/noSvgWithoutTitle: labelled via aria-label
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="20"
@@ -1039,10 +1044,12 @@ export const AvatarPageClient = ({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
-                  <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7" />
+                  <line x1="2" y1="2" x2="22" y2="22" />
+                  <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V5a3 3 0 0 0-5.94-.6" />
+                  <path d="M17 16.95A7 7 0 0 1 5 12v-1M12 18v4M8 22h8" />
                 </svg>
               ) : (
-                // biome-ignore lint/a11y/noSvgWithoutTitle: 1
+                // biome-ignore lint/a11y/noSvgWithoutTitle: labelled via aria-label
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="20"
@@ -1054,11 +1061,56 @@ export const AvatarPageClient = ({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
-                  <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                  <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+                  <path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8" />
                 </svg>
               )}
             </button>
-          )}
+
+            {canFullscreen && (
+              <button
+                type="button"
+                className="na-stage-btn"
+                onClick={toggleFullscreen}
+                aria-label={
+                  isFullscreen ? "Exit full screen" : "Enter full screen"
+                }
+                title={isFullscreen ? "Exit full screen" : "Enter full screen"}
+              >
+                {isFullscreen ? (
+                  // biome-ignore lint/a11y/noSvgWithoutTitle: 1
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7" />
+                  </svg>
+                ) : (
+                  // biome-ignore lint/a11y/noSvgWithoutTitle: 1
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                  </svg>
+                )}
+              </button>
+            )}
+          </div>
 
           <AvatarStage
             videoRef={videoRef}

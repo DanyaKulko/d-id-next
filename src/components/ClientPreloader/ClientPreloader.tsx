@@ -33,7 +33,7 @@ export default function ClientPreloader({
       }}
     >
       <div className="na-preloader__content">
-        <BrandLockup lampPath="/lottie/lamp-draw.json" lampLoop={false} />
+        <BrandLockup size="lg" lampPath="/lottie/lamp-draw.json" lampLoop={false} />
       </div>
     </div>
   );
