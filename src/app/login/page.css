@@ -33,12 +33,36 @@
   width: 100%;
 }
 
+/* Brand lockup: lamp + stacked wordmark/tagline (same concept as the header,
+   ~50% larger here). */
 .na-login-brand {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 auto 36px;
+  gap: 18px;
+}
+
+.na-login-brand-lamp {
+  flex: 0 0 auto;
+  display: block;
+  line-height: 0;
+}
+
+.na-login-brand-lamp-anim {
+  display: block;
+  width: 135px;
+  height: 135px;
+  aspect-ratio: 1 / 1;
+}
+
+.na-login-brand-text {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  width: max-content;
-  margin: 0 auto 36px;
   gap: 8px;
 }
 
@@ -47,12 +71,12 @@
   font-size: 48px;
   font-weight: 700;
   color: #284665;
-  text-align: center;
+  text-align: left;
 }
 
 .na-login-tagline {
   display: block;
-  font-size: 18px;
+  font-size: 20px;
   font-style: italic;
   font-weight: 500;
   color: #284665;
@@ -61,34 +85,28 @@
   text-justify: inter-character;
 }
 
+/* Two columns: photo on the left, login form on the right. */
 .na-login-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+  align-items: stretch;
   gap: 36px;
   width: 100%;
-  max-width: 560px;
+  max-width: 1000px;
   margin: 0 auto;
 }
 
-.na-login-lamp {
-  width: 100%;
-  max-width: 280px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto;
+.na-login-image-col {
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 18px 45px rgba(16, 42, 44, 0.12);
 }
 
-.na-login-lamp img {
+.na-login-photo {
+  display: block;
   width: 100%;
-  height: auto;
-}
-
-.na-login-lottie {
-  width: 100%;
-  max-width: 300px;
-  aspect-ratio: 190 / 161;
+  height: 100%;
+  object-fit: cover;
 }
 
 .na-login-card {
@@ -97,7 +115,6 @@
   border-radius: 24px;
   padding: 40px;
   box-shadow: 0 18px 45px rgba(16, 42, 44, 0.12);
-  max-width: 560px;
   width: 100%;
 }
 
@@ -265,13 +282,27 @@
   font-size: 18px;
 }
 
-@media (max-width: 980px) {
+@media (max-width: 900px) {
+  .na-login-content {
+    grid-template-columns: 1fr;
+    max-width: 560px;
+  }
+
+  .na-login-image-col {
+    max-height: 240px;
+  }
+
+  .na-login-brand-lamp-anim {
+    width: 110px;
+    height: 110px;
+  }
+
   .na-login-title {
-    font-size: 36px;
+    font-size: 40px;
   }
 
   .na-login-tagline {
-    font-size: 14px;
+    font-size: 17px;
   }
 }
 
@@ -280,20 +311,26 @@
     padding: 28px 24px;
   }
 
-  .na-login-lamp {
-    max-width: 220px;
-  }
-
   .na-login-brand {
+    gap: 12px;
     margin-bottom: 28px;
   }
 
+  .na-login-brand-lamp-anim {
+    width: 88px;
+    height: 88px;
+  }
+
   .na-login-title {
-    font-size: 36px;
+    font-size: 30px;
   }
 
   .na-login-tagline {
-    font-size: 13px;
+    font-size: 14px;
+  }
+
+  .na-login-image-col {
+    max-height: 200px;
   }
 
   .na-login-instructions {
