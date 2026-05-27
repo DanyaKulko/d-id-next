@@ -7,45 +7,33 @@ type BrandLockupProps = {
   className?: string;
   /** Render the wordmark as a link to the home page (used in the header). */
   asLink?: boolean;
-  /**
-   * Render the lamp as a one-shot video (plays once, holds the last frame)
-   * instead of the looping Lottie. Used on the preloader splash.
-   */
-  lampVideoSrc?: string;
+  /** Override the lamp Lottie animation path (default: the looping lamp). */
+  lampPath?: string;
+  /** Whether the lamp animation loops (default: true). */
+  lampLoop?: boolean;
 };
 
 /**
  * Brand lockup: lamp animation on the left, stacked "Neil Avatar"
  * wordmark + tagline on the right. Shared across the header, the login
  * page, the page footers and the preloader so the logo stays consistent
- * everywhere. By default the lamp loops (Lottie); pass `lampVideoSrc` for
- * the one-shot drawing video.
+ * everywhere. The lamp loops by default; the preloader passes the one-shot
+ * "drawing" lamp via `lampPath` + `lampLoop={false}`.
  */
 export default function BrandLockup({
   className,
   asLink = false,
-  lampVideoSrc,
+  lampPath = "/lottie/lamp.json",
+  lampLoop = true,
 }: BrandLockupProps) {
   return (
     <div className={`na-brand-lockup${className ? ` ${className}` : ""}`}>
       <span className="na-brand-lockup-lamp" aria-hidden="true">
-        {lampVideoSrc ? (
-          // biome-ignore lint/a11y/useMediaCaption: decorative logo animation, no audio
-          <video
-            className="na-brand-lockup-lamp-anim"
-            src={lampVideoSrc}
-            autoPlay
-            muted
-            playsInline
-            preload="auto"
-          />
-        ) : (
-          <LottieLogo
-            className="na-brand-lockup-lamp-anim"
-            path="/lottie/lamp.json"
-            loop
-          />
-        )}
+        <LottieLogo
+          className="na-brand-lockup-lamp-anim"
+          path={lampPath}
+          loop={lampLoop}
+        />
       </span>
       <div className="na-brand-lockup-text">
         {asLink ? (

@@ -103,14 +103,6 @@ a:focus-visible {
   gap: 12px;
 }
 
-.na-preloader__label {
-  font-size: clamp(21px, 3vw, 27px);
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--na-text-on-light);
-  opacity: 0.7;
-}
-
 .na-container {
   max-width: 1400px;
   margin: 0 auto;
