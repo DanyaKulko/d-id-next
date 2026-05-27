@@ -5,7 +5,7 @@ import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import ReCAPTCHA from "react-google-recaptcha";
 import { loginStart } from "@/app/actions/auth/login.actions";
 import { twoFactorVerify } from "@/app/actions/auth/two-factor.actions";
-import LottieLogo from "@/components/LottieLogo/LottieLogo";
+import BrandLockup from "@/components/BrandLockup/BrandLockup";
 import PasswordInput from "@/components/PasswordInput";
 
 type LoginState =
@@ -113,19 +113,7 @@ export default function LoginClient({ twoFactorRequired }: LoginClientProps) {
   return (
     <div className="na-login-shell">
       <div className="na-login-brand">
-        <span className="na-login-brand-lamp" aria-hidden="true">
-          <LottieLogo
-            className="na-login-brand-lamp-anim"
-            path="/lottie/lamp.json"
-            loop
-          />
-        </span>
-        <div className="na-login-brand-text">
-          <span className="na-login-title">Neil Avatar</span>
-          <span className="na-login-tagline">
-            Space. Travel. Sports. Politics.
-          </span>
-        </div>
+        <BrandLockup />
       </div>
 
       <div className="na-login-content">
@@ -141,7 +129,6 @@ export default function LoginClient({ twoFactorRequired }: LoginClientProps) {
           <div className="na-login-card-header">
             <div className="na-login-card-title">
               <h1>User Login</h1>
-              <p>Neil Avatar Access Portal</p>
             </div>
             <span className="na-login-secure-badge">Secure</span>
           </div>

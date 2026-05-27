@@ -33,63 +33,22 @@
   width: 100%;
 }
 
-/* Brand lockup: lamp + stacked wordmark/tagline (same concept as the header,
-   ~50% larger here). */
+/* Brand lockup wrapper — centered above the two columns
+   (lockup itself is styled in BrandLockup.css). */
 .na-login-brand {
   display: flex;
-  flex-direction: row;
-  align-items: center;
   justify-content: center;
-  width: max-content;
   max-width: 100%;
   margin: 0 auto 36px;
-  gap: 18px;
 }
 
-.na-login-brand-lamp {
-  flex: 0 0 auto;
-  display: block;
-  line-height: 0;
-}
-
-.na-login-brand-lamp-anim {
-  display: block;
-  width: 135px;
-  height: 135px;
-  aspect-ratio: 1 / 1;
-}
-
-.na-login-brand-text {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-}
-
-.na-login-title {
-  font-family: var(--font-nasalization-sans), "Nasalization", Arial, sans-serif;
-  font-size: 48px;
-  font-weight: 700;
-  color: #284665;
-  text-align: left;
-}
-
-.na-login-tagline {
-  display: block;
-  font-size: 20px;
-  font-style: italic;
-  font-weight: 500;
-  color: #284665;
-  text-align: justify;
-  text-align-last: justify;
-  text-justify: inter-character;
-}
-
-/* Two columns: photo on the left, login form on the right. */
+/* Two columns: photo on the left, login form on the right.
+   Columns share a common middle line; the photo keeps its original
+   aspect ratio and is never cropped. */
 .na-login-content {
   display: grid;
   grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
-  align-items: stretch;
+  align-items: center;
   gap: 36px;
   width: 100%;
   max-width: 1000px;
@@ -100,13 +59,13 @@
   border-radius: 24px;
   overflow: hidden;
   box-shadow: 0 18px 45px rgba(16, 42, 44, 0.12);
+  line-height: 0;
 }
 
 .na-login-photo {
   display: block;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
 }
 
 .na-login-card {
@@ -166,6 +125,7 @@
 }
 
 .na-login-instructions {
+  margin-top: 20px;
   margin-bottom: 30px;
   background: rgba(253, 170, 45, 0.05);
   padding: 20px;
@@ -288,21 +248,11 @@
     max-width: 560px;
   }
 
+  /* Stacked: keep the photo uncropped but at a sensible width, centered. */
   .na-login-image-col {
-    max-height: 240px;
-  }
-
-  .na-login-brand-lamp-anim {
-    width: 110px;
-    height: 110px;
-  }
-
-  .na-login-title {
-    font-size: 40px;
-  }
-
-  .na-login-tagline {
-    font-size: 17px;
+    width: 100%;
+    max-width: 340px;
+    margin: 0 auto;
   }
 }
 
@@ -312,25 +262,11 @@
   }
 
   .na-login-brand {
-    gap: 12px;
     margin-bottom: 28px;
   }
 
-  .na-login-brand-lamp-anim {
-    width: 88px;
-    height: 88px;
-  }
-
-  .na-login-title {
-    font-size: 30px;
-  }
-
-  .na-login-tagline {
-    font-size: 14px;
-  }
-
   .na-login-image-col {
-    max-height: 200px;
+    max-width: 280px;
   }
 
   .na-login-instructions {

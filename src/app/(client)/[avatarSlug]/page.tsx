@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { AvatarPageClient } from "@/app/(client)/[avatarSlug]/page.client";
 import { findAgentByKey } from "@/lib/agents/agents.db";
 import { enforceClientAuth } from "@/lib/auth/client-access";
-import LottieLogo from "@/components/LottieLogo/LottieLogo";
+import BrandLockup from "@/components/BrandLockup/BrandLockup";
 import ClientPreloader from "@/components/ClientPreloader/ClientPreloader";
 import { AgentHintsScript } from "./_components/AgentHintsScript";
 import ClientLogoutButton from "../_components/ClientLogoutButton";
@@ -75,11 +75,7 @@ export default async function AvatarPage({ params }: AvatarPageProps) {
         />
 
         <div className="na-brand-logo" aria-hidden="true">
-          <LottieLogo
-            className="na-logo-anim na-logo-anim--footer"
-            loop
-            // playOnView
-          />
+          <BrandLockup />
         </div>
       </main>
     </>

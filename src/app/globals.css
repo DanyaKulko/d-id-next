@@ -33,12 +33,6 @@
   --na-font-family:
     "Nasalization", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --na-font-size-base: 16px;
-
-  /* Logo sizing */
-  --na-logo-width: 100px;
-  --na-logo-height: 101px;
-  --na-logo-width-footer: 360px;
-  --na-logo-height-footer: 282px;
 }
 
 /* Common Styles - Shared across all pages */
@@ -175,22 +169,6 @@ a:focus-visible {
   text-decoration: none;
   display: inline-flex;
   align-items: center;
-}
-
-.na-logo-anim {
-  width: var(--na-logo-width);
-  height: var(--na-logo-height);
-  max-width: 90vw;
-  max-height: 60vw;
-  aspect-ratio: 190 / 161;
-}
-
-.na-logo-anim--footer {
-  width: var(--na-logo-width-footer);
-  height: var(--na-logo-height-footer);
-  max-width: 95vw;
-  max-height: 70vw;
-  aspect-ratio: 190 / 161;
 }
 
 .na-back-link {
