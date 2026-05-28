@@ -1,11 +1,8 @@
 .na-brand-lockup {
   --na-lockup-lamp: 135px;
   --na-lockup-word: 56px;
-  --na-lockup-tag: 18px;
+  --na-lockup-tag: 20px;
   --na-lockup-gap: 18px;
-  /* Letter-spacing on the tagline approximates the wordmark width without
-     touching word spacing (no huge inter-word gaps on mobile). */
-  --na-lockup-tag-tracking: 0.06em;
 
   display: inline-flex;
   flex-direction: row;
@@ -17,9 +14,8 @@
 .na-brand-lockup--lg {
   --na-lockup-lamp: 176px;
   --na-lockup-word: 74px;
-  --na-lockup-tag: 24px;
+  --na-lockup-tag: 26px;
   --na-lockup-gap: 22px;
-  --na-lockup-tag-tracking: 0.05em;
 }
 
 .na-brand-lockup-lamp {
@@ -43,7 +39,7 @@
   min-width: 0;
 }
 
-/* Wordmark anchors the lockup width and must never wrap to a second line. */
+/* Wordmark anchors the lockup width and must never wrap. */
 .na-brand-lockup-title {
   font-family: var(--font-nasalization-sans), "Nasalization", Arial, sans-serif;
   font-size: var(--na-lockup-word);
@@ -55,46 +51,43 @@
   white-space: nowrap;
 }
 
+/* Tagline: letter-spacing is set in JS to match the wordmark width exactly. */
 .na-brand-lockup-tagline {
   display: block;
   font-size: var(--na-lockup-tag);
   font-style: italic;
   font-weight: 500;
   color: #284665;
-  letter-spacing: var(--na-lockup-tag-tracking);
   white-space: nowrap;
+  letter-spacing: 0;
 }
 
 @media (max-width: 900px) {
   .na-brand-lockup {
     --na-lockup-lamp: 110px;
     --na-lockup-word: 44px;
-    --na-lockup-tag: 15px;
-    --na-lockup-tag-tracking: 0.04em;
+    --na-lockup-tag: 16px;
   }
 
   .na-brand-lockup--lg {
     --na-lockup-lamp: 138px;
     --na-lockup-word: 56px;
-    --na-lockup-tag: 19px;
-    --na-lockup-tag-tracking: 0.04em;
+    --na-lockup-tag: 20px;
   }
 }
 
 @media (max-width: 640px) {
   .na-brand-lockup {
-    --na-lockup-lamp: 80px;
-    --na-lockup-word: 28px;
-    --na-lockup-tag: 9px;
-    --na-lockup-gap: 10px;
-    --na-lockup-tag-tracking: 0.06em;
+    --na-lockup-lamp: 76px;
+    --na-lockup-word: 30px;
+    --na-lockup-tag: 11px;
+    --na-lockup-gap: 8px;
   }
 
   .na-brand-lockup--lg {
-    --na-lockup-lamp: 92px;
-    --na-lockup-word: 32px;
-    --na-lockup-tag: 10px;
-    --na-lockup-gap: 12px;
-    --na-lockup-tag-tracking: 0.06em;
+    --na-lockup-lamp: 84px;
+    --na-lockup-word: 36px;
+    --na-lockup-tag: 13px;
+    --na-lockup-gap: 10px;
   }
 }
