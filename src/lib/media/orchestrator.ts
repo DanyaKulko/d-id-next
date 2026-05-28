@@ -224,7 +224,7 @@ export const resolveMediaIntent = async (
 
   try {
     if (classification.intent === "search_information") {
-      const webResults = await searchWeb(classification.keywords, 5);
+      const webResults = await searchWeb(classification.keywords, 6);
       log("search_information.web_results", {
         resultsCount: webResults.length,
       });

@@ -70,12 +70,18 @@ export const searchWeb = async (
       : [];
 
     return results.slice(0, limit).map((r) => {
-      const description = r.description ? decodeHtml(r.description) : "";
-      const snippet =
-        description ||
-        (Array.isArray(r.extra_snippets) && r.extra_snippets[0]
-          ? decodeHtml(r.extra_snippets[0])
-          : "");
+      // Combine the description with ALL of Brave's extra snippets. The actual
+      // figure asked for (temperature, exchange rate, score) frequently lives
+      // in a secondary snippet rather than the main description, so feeding the
+      // summarizer only the first one is why "current/now" answers were thin.
+      // Capped to keep the summarizer prompt lean.
+      const parts = [
+        r.description ? decodeHtml(r.description) : "",
+        ...(Array.isArray(r.extra_snippets)
+          ? r.extra_snippets.map((s) => decodeHtml(s))
+          : []),
+      ].filter((s) => s.trim().length > 0);
+      const snippet = parts.join(" — ").slice(0, 600);
       return {
         title: r.title?.trim() ?? "",
         snippet,
