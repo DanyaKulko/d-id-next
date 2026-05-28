@@ -5,7 +5,7 @@ import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import ReCAPTCHA from "react-google-recaptcha";
 import { loginStart } from "@/app/actions/auth/login.actions";
 import { twoFactorVerify } from "@/app/actions/auth/two-factor.actions";
-import LottieLogo from "@/components/LottieLogo/LottieLogo";
+import BrandLockup from "@/components/BrandLockup/BrandLockup";
 import PasswordInput from "@/components/PasswordInput";
 
 type LoginState =
@@ -113,18 +113,22 @@ export default function LoginClient({ twoFactorRequired }: LoginClientProps) {
   return (
     <div className="na-login-shell">
       <div className="na-login-brand">
-        <h1 className="na-login-title">Neil Avatar</h1>
-        <span className="na-login-tagline">
-          Space. Travel. Sports. Politics.
-        </span>
+        <BrandLockup size="lg" />
       </div>
 
       <div className="na-login-content">
+        <div className="na-login-image-col">
+          {/* biome-ignore lint/performance/noImgElement: static hero, intentionally unoptimized */}
+          <img
+            className="na-login-photo"
+            src="/images/neil-login.jpg"
+            alt="Neil's Travels"
+          />
+        </div>
         <div className="na-login-card">
           <div className="na-login-card-header">
             <div className="na-login-card-title">
               <h1>User Login</h1>
-              <p>Neil Avatar Access Portal</p>
             </div>
             <span className="na-login-secure-badge">Secure</span>
           </div>
@@ -135,27 +139,6 @@ export default function LoginClient({ twoFactorRequired }: LoginClientProps) {
 
           {!isOtp ? (
             <>
-              <div className="na-login-instructions">
-                <h2>How to Get Access to NeilAvatar</h2>
-                <ol>
-                  <li>
-                    Type in your email address. Use the same email address that
-                    you typically correspond with Neil.
-                  </li>
-                  <li>
-                    Type in the password which Neil has sent you via email. Keep
-                    password safe.
-                  </li>
-                  <li>Check the Captcha box to confirm you are human.</li>
-                  <li>Click Login.</li>
-                  <li>
-                    {twoFactorRequired
-                      ? "Enter the 6-digit code from your email."
-                      : "Enjoy NeilAvatar."}
-                  </li>
-                </ol>
-              </div>
-
               <form action={loginAction} id="loginForm">
                 <div className="na-login-form-group">
                   <label htmlFor="identifier">Email or username</label>
@@ -207,6 +190,27 @@ export default function LoginClient({ twoFactorRequired }: LoginClientProps) {
                   {loginPending ? "Signing in..." : "Login"}
                 </button>
               </form>
+
+              <div className="na-login-instructions">
+                <h2>How to Get Access to NeilAvatar</h2>
+                <ol>
+                  <li>
+                    Type in your email address. Use the same email address that
+                    you typically correspond with Neil.
+                  </li>
+                  <li>
+                    Type in the password which Neil has sent you via email. Keep
+                    password safe.
+                  </li>
+                  <li>Check the Captcha box to confirm you are human.</li>
+                  <li>Click Login.</li>
+                  <li>
+                    {twoFactorRequired
+                      ? "Enter the 6-digit code from your email."
+                      : "Enjoy NeilAvatar."}
+                  </li>
+                </ol>
+              </div>
             </>
           ) : (
             <>
@@ -253,10 +257,6 @@ export default function LoginClient({ twoFactorRequired }: LoginClientProps) {
           <div className="na-login-footer-text">
             Contact Neil with Login issues.
           </div>
-        </div>
-
-        <div className="na-login-lamp" aria-hidden="true">
-          <LottieLogo className="na-login-lottie" loop />
         </div>
       </div>
     </div>

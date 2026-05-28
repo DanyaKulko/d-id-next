@@ -82,6 +82,11 @@ const normalizeHintsScriptUrl = (value: string) => {
   const trimmed = value.trim();
   if (!trimmed) return null;
 
+  // Allow root-relative paths to locally-hosted scripts (e.g. /hints/neil-hints-sports.js).
+  if (trimmed.startsWith("/")) {
+    return trimmed;
+  }
+
   let url: URL;
   try {
     url = new URL(trimmed);

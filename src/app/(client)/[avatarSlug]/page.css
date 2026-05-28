@@ -193,10 +193,17 @@ body.na-body-pseudo-fullscreen .na-brand-logo {
   background: #f44336;
 }
 
-.na-fullscreen-btn {
+.na-stage-actions {
   position: absolute;
   top: var(--na-space-sm);
   right: var(--na-space-sm);
+  z-index: 32;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.na-stage-btn {
   width: 44px;
   height: 44px;
   border-radius: 10px;
@@ -208,15 +215,21 @@ body.na-body-pseudo-fullscreen .na-brand-logo {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  z-index: 32;
   transition:
     transform 0.15s ease,
-    box-shadow 0.15s ease;
+    box-shadow 0.15s ease,
+    background 0.15s ease;
 }
 
-.na-fullscreen-btn:hover {
+.na-stage-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 6px 16px rgba(39, 70, 99, 0.2);
+}
+
+/* Muted state — highlighted like the site's primary accent. */
+.na-stage-btn--active {
+  background: #feb13f;
+  border-color: #fdaa2d;
 }
 
 .na-avatar-container:fullscreen {
@@ -514,7 +527,7 @@ body.na-body-pseudo-fullscreen .na-brand-logo {
     min-height: 100vh;
   }
 
-  .na-fullscreen-btn {
+  .na-stage-btn {
     width: 44px;
     height: 44px;
     font-size: 20px;

@@ -14,8 +14,10 @@ interface CachedToken {
 export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
   const [listening, setListening] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState("");
+  const [muted, setMuted] = useState(false);
 
   const recognizerRef = useRef<SpeechSDK.SpeechRecognizer | null>(null);
+  const mutedRef = useRef(false);
   const tokenCacheRef = useRef<CachedToken | null>(null);
   const activeLangRef = useRef<string | null>(null);
   const isStoppedRef = useRef(false);
@@ -82,6 +84,27 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
   useEffect(() => {
     listeningRef.current = listening;
   }, [listening]);
+
+  useEffect(() => {
+    mutedRef.current = muted;
+  }, [muted]);
+
+  // Mute = the avatar stops "hearing" the user. The recognizer keeps running
+  // but recognition results are dropped while muted. Defaults to unmuted.
+  const toggleMute = useCallback(() => {
+    setMuted((prev) => {
+      const next = !prev;
+      if (next) {
+        if (partialTimerRef.current) {
+          clearTimeout(partialTimerRef.current);
+          partialTimerRef.current = null;
+        }
+        partialBufferRef.current = "";
+        setInterimTranscript("");
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (typeof navigator === "undefined") return;
@@ -228,7 +251,8 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
         );
 
         recognizer.recognizing = (_s, e) => {
-          if (!listeningRef.current || isStoppedRef.current) return;
+          if (!listeningRef.current || isStoppedRef.current || mutedRef.current)
+            return;
           if (e.result.text) {
             setInterimTranscript(e.result.text);
             partialBufferRef.current = e.result.text;
@@ -246,7 +270,8 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
         };
 
         recognizer.recognized = (_s, e) => {
-          if (!listeningRef.current || isStoppedRef.current) return;
+          if (!listeningRef.current || isStoppedRef.current || mutedRef.current)
+            return;
 
           if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
             const text = e.result.text;
@@ -402,6 +427,8 @@ export const useAzureSTT = (onFinalTranscript: (text: string) => void) => {
     startListening,
     stopListening,
     interimTranscript,
+    muted,
+    toggleMute,
     warmupAudio: resumeAudioContext,
     isAppleMobile: isAppleMobileRef.current,
     mediaStreamActive: Boolean(mediaStreamRef.current),

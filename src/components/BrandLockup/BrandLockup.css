@@ -1,0 +1,93 @@
+.na-brand-lockup {
+  --na-lockup-lamp: 135px;
+  --na-lockup-word: 56px;
+  --na-lockup-tag: 20px;
+  --na-lockup-gap: 18px;
+
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--na-lockup-gap);
+}
+
+/* Enlarged variant — preloader, page footers, login. */
+.na-brand-lockup--lg {
+  --na-lockup-lamp: 176px;
+  --na-lockup-word: 74px;
+  --na-lockup-tag: 26px;
+  --na-lockup-gap: 22px;
+}
+
+.na-brand-lockup-lamp {
+  flex: 0 0 auto;
+  display: block;
+  line-height: 0;
+}
+
+.na-brand-lockup-lamp-anim {
+  display: block;
+  width: var(--na-lockup-lamp);
+  height: var(--na-lockup-lamp);
+  aspect-ratio: 1 / 1;
+}
+
+.na-brand-lockup-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Wordmark anchors the lockup width and must never wrap. */
+.na-brand-lockup-title {
+  font-family: var(--font-nasalization-sans), "Nasalization", Arial, sans-serif;
+  font-size: var(--na-lockup-word);
+  font-weight: 700;
+  color: #284665;
+  text-decoration: none;
+  line-height: 1.05;
+  display: block;
+  white-space: nowrap;
+}
+
+/* Tagline: letter-spacing is set in JS to match the wordmark width exactly. */
+.na-brand-lockup-tagline {
+  display: block;
+  font-size: var(--na-lockup-tag);
+  font-style: italic;
+  font-weight: 500;
+  color: #284665;
+  white-space: nowrap;
+  letter-spacing: 0;
+}
+
+@media (max-width: 900px) {
+  .na-brand-lockup {
+    --na-lockup-lamp: 110px;
+    --na-lockup-word: 44px;
+    --na-lockup-tag: 16px;
+  }
+
+  .na-brand-lockup--lg {
+    --na-lockup-lamp: 138px;
+    --na-lockup-word: 56px;
+    --na-lockup-tag: 20px;
+  }
+}
+
+@media (max-width: 640px) {
+  .na-brand-lockup {
+    --na-lockup-lamp: 76px;
+    --na-lockup-word: 30px;
+    --na-lockup-tag: 11px;
+    --na-lockup-gap: 8px;
+  }
+
+  .na-brand-lockup--lg {
+    --na-lockup-lamp: 84px;
+    --na-lockup-word: 36px;
+    --na-lockup-tag: 13px;
+    --na-lockup-gap: 10px;
+  }
+}
