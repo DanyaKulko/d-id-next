@@ -446,7 +446,9 @@ export const AvatarPageClient = ({
       silenceNudgedRef.current = false;
       stopListeningRef.current?.();
       setAgentStatus("thinking");
-      setMediaResult(null);
+      // Media intentionally NOT cleared here — it stays visible across
+      // follow-up questions. It is replaced when a new media intent returns
+      // results, or cleared by the × button on the overlay.
       setCarouselOpen(false);
       resetTimer();
 
@@ -745,11 +747,7 @@ export const AvatarPageClient = ({
     resetTimer();
     setAgentStatus("listening");
     silenceNudgedRef.current = false;
-    // Acknowledge the interruption out loud ~1 of 3 times.
-    if (Math.random() < 0.33) {
-      void speakTrigger("interrupt", { skipSpeakingGuard: true });
-    }
-  }, [interrupt, resetTimer, speakTrigger]);
+  }, [interrupt, resetTimer]);
 
   // Silence nudge: if the user stays quiet for 15s while we're listening
   // (and no photos/videos are on screen), the avatar gently prompts once.
@@ -1140,6 +1138,11 @@ export const AvatarPageClient = ({
             onItemClick={(index) => {
               setCarouselIndex(index);
               setCarouselOpen(true);
+            }}
+            onClose={() => {
+              setMediaResult(null);
+              setDebugMediaResult(null);
+              setCarouselOpen(false);
             }}
           />
 

@@ -58,6 +58,11 @@ export const searchWeb = async (
         q: query,
         count: Math.max(1, Math.min(20, limit)),
         safesearch: "moderate",
+        // Real-time queries dominate this surface (weather, scores, rates,
+        // news). Past-week freshness biases Brave toward current snippets
+        // instead of years-old pages.
+        freshness: "pw",
+        text_decorations: false,
       },
     });
     const results: BraveWebResult[] = Array.isArray(response.data?.web?.results)

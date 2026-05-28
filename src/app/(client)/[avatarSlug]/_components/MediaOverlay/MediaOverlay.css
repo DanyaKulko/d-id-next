@@ -3,11 +3,19 @@
   inset: 0;
   pointer-events: none;
   z-index: 22;
+  /* Top padding clears the "Speaking..." status pill so the top card
+     never overlaps it. */
+  padding: 80px 16px 16px;
+}
+
+.na-media-overlay__grid {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: space-evenly;
-  padding: 12px 16px;
+  width: 100%;
+  height: 100%;
+  gap: 12px;
 }
 
 .na-media-overlay__slot {
@@ -64,6 +72,8 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  /* Crop from the top so portraits keep heads in frame. */
+  object-position: 50% 0;
   display: block;
 }
 
@@ -89,15 +99,52 @@
   margin-left: 3px;
 }
 
+/* Round close button (×) — kills all media. */
+.na-media-overlay__close {
+  pointer-events: auto;
+  position: absolute;
+  top: 16px;
+  left: clamp(120px, 17%, 220px);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  transition:
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+
+.na-media-overlay__close:hover {
+  background: rgba(0, 0, 0, 0.85);
+  transform: scale(1.06);
+}
+
+.na-media-overlay__close:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
 @media (max-width: 720px) {
   .na-media-overlay {
+    padding: 12px;
+  }
+
+  .na-media-overlay__grid {
     display: grid;
     grid-template-columns: repeat(2, clamp(84px, 26%, 150px));
     grid-auto-rows: min-content;
     gap: 8px;
     align-content: end;
     justify-content: start;
-    padding: 12px;
+    height: 100%;
   }
 
   .na-media-overlay__slot {
@@ -121,5 +168,15 @@
   .na-media-card__play svg {
     width: 13px;
     height: 13px;
+  }
+
+  /* On mobile pin the close button to the top-right of the viewport
+     so it never sits under the photo grid. */
+  .na-media-overlay__close {
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
+    right: calc(env(safe-area-inset-right, 0px) + 12px);
+    left: auto;
+    width: 44px;
+    height: 44px;
   }
 }
