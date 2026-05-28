@@ -1,8 +1,11 @@
 .na-brand-lockup {
   --na-lockup-lamp: 135px;
   --na-lockup-word: 56px;
-  --na-lockup-tag: 17px;
+  --na-lockup-tag: 18px;
   --na-lockup-gap: 18px;
+  /* Letter-spacing on the tagline approximates the wordmark width without
+     touching word spacing (no huge inter-word gaps on mobile). */
+  --na-lockup-tag-tracking: 0.06em;
 
   display: inline-flex;
   flex-direction: row;
@@ -14,8 +17,9 @@
 .na-brand-lockup--lg {
   --na-lockup-lamp: 176px;
   --na-lockup-word: 74px;
-  --na-lockup-tag: 23px;
+  --na-lockup-tag: 24px;
   --na-lockup-gap: 22px;
+  --na-lockup-tag-tracking: 0.05em;
 }
 
 .na-brand-lockup-lamp {
@@ -34,12 +38,12 @@
 .na-brand-lockup-text {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  align-items: flex-start;
   gap: 8px;
+  min-width: 0;
 }
 
-/* Wordmark anchors the lockup width. Both lines are justified so the
-   tagline ends up exactly as wide as "Neil Avatar". */
+/* Wordmark anchors the lockup width and must never wrap to a second line. */
 .na-brand-lockup-title {
   font-family: var(--font-nasalization-sans), "Nasalization", Arial, sans-serif;
   font-size: var(--na-lockup-word);
@@ -48,9 +52,7 @@
   text-decoration: none;
   line-height: 1.05;
   display: block;
-  text-align: justify;
-  text-align-last: justify;
-  text-justify: inter-character;
+  white-space: nowrap;
 }
 
 .na-brand-lockup-tagline {
@@ -59,37 +61,40 @@
   font-style: italic;
   font-weight: 500;
   color: #284665;
-  text-align: justify;
-  text-align-last: justify;
-  text-justify: inter-character;
+  letter-spacing: var(--na-lockup-tag-tracking);
+  white-space: nowrap;
 }
 
 @media (max-width: 900px) {
   .na-brand-lockup {
     --na-lockup-lamp: 110px;
     --na-lockup-word: 44px;
-    --na-lockup-tag: 14px;
+    --na-lockup-tag: 15px;
+    --na-lockup-tag-tracking: 0.04em;
   }
 
   .na-brand-lockup--lg {
     --na-lockup-lamp: 138px;
     --na-lockup-word: 56px;
-    --na-lockup-tag: 18px;
+    --na-lockup-tag: 19px;
+    --na-lockup-tag-tracking: 0.04em;
   }
 }
 
 @media (max-width: 640px) {
   .na-brand-lockup {
-    --na-lockup-lamp: 88px;
-    --na-lockup-word: 36px;
-    --na-lockup-tag: 11px;
-    --na-lockup-gap: 12px;
+    --na-lockup-lamp: 80px;
+    --na-lockup-word: 28px;
+    --na-lockup-tag: 9px;
+    --na-lockup-gap: 10px;
+    --na-lockup-tag-tracking: 0.06em;
   }
 
   .na-brand-lockup--lg {
-    --na-lockup-lamp: 104px;
-    --na-lockup-word: 44px;
-    --na-lockup-tag: 14px;
-    --na-lockup-gap: 14px;
+    --na-lockup-lamp: 92px;
+    --na-lockup-word: 32px;
+    --na-lockup-tag: 10px;
+    --na-lockup-gap: 12px;
+    --na-lockup-tag-tracking: 0.06em;
   }
 }

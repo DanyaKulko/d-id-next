@@ -155,18 +155,38 @@
     align-items: flex-start;
   }
 
+  /* Mobile auth header: brand on its own row; second row is [Logout][Subtitle].
+     Subtitle wraps to two lines next to the Logout button. */
   .na-header-content--with-actions {
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
-    justify-content: space-between;
     align-items: center;
+    gap: var(--na-space-sm);
+  }
+
+  .na-header-content--with-actions > .na-header-side:first-child {
+    flex-basis: 100%;
+    order: 1;
+  }
+
+  .na-header-content--with-actions .na-header-side--end {
+    order: 2;
+    flex: 0 0 auto;
   }
 
   .na-header-content--with-actions .na-header-title {
-    flex-basis: 100%;
     order: 3;
+    flex: 1 1 0;
+    flex-basis: 0;
+    min-width: 0;
     text-align: left;
+  }
+
+  /* Subtitle ~30% smaller than its previous mobile size, fits 2 lines. */
+  .na-header-content--with-actions .na-subtitle {
+    font-size: 20px;
+    line-height: 1.2;
   }
 
   .na-header-title {
