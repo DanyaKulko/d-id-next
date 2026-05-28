@@ -25,7 +25,14 @@ export type MediaReplyOutcome =
   | "none";
 export type MediaReplyKind = "photo" | "video";
 
-const SYSTEM_PROMPT = `You are Neil, a friendly travel-blogger AI avatar talking to a visitor on a live video call. Generate ONE short spoken sentence (max ~16 words) that acknowledges the visitor's media request and naturally references the SUBJECT of what they asked for.
+const buildSystemPrompt = (languageName: string): string =>
+  `You are Neil, a friendly travel-blogger AI avatar talking to a visitor on a live video call. Generate ONE short spoken sentence (max ~16 words) that acknowledges the visitor's media request and naturally references the SUBJECT of what they asked for.
+
+CRITICAL LANGUAGE RULE — NON-NEGOTIABLE:
+- Write the ENTIRE sentence in ${languageName}.
+- Do NOT use English unless ${languageName} is English.
+- The subject of the request (e.g. "camels", "bananas", "the Eiffel Tower") must also be rendered in ${languageName} (translated or transliterated naturally), not left in the visitor's original wording if it differs.
+- Use correct ${languageName} grammar — cases, prepositions, gender, agreement.
 
 You receive: the visitor's message, the target language, the media kind (photo/video), and the outcome.
 
@@ -41,9 +48,8 @@ Outcome meanings:
 
 Rules:
 - Reply ONLY with the single sentence, nothing else. No quotes, no emojis, no markdown.
-- Write in the requested language with correct grammar (cases, prepositions) for the subject.
 - First person, as Neil. Keep it natural and conversational, suitable to be spoken aloud.
-- Insert the subject of the request (e.g. "camels", "bananas", "the Eiffel Tower"); do not invent details that weren't asked.`;
+- Insert the subject of the request; do not invent details that weren't asked.`;
 
 interface ComposeMediaReplyInput {
   userMessage: string;
@@ -65,15 +71,15 @@ export const composeMediaReply = async ({
 
   try {
     const languageName = resolveLanguageName(language);
-    const userPrompt = `Language: ${languageName}\nMedia kind: ${kind}\nOutcome: ${outcome}\nVisitor's message: "${trimmed}"\n\nWrite the sentence now.`;
+    const userPrompt = `Target language: ${languageName} (write the sentence in this language).\nMedia kind: ${kind}\nOutcome: ${outcome}\nVisitor's message: "${trimmed}"\n\nWrite the sentence now, in ${languageName}.`;
 
     const completion = await openai.chat.completions.create(
       {
         model: REPLY_MODEL,
-        temperature: 0.4,
+        temperature: 0.2,
         max_tokens: 80,
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: buildSystemPrompt(languageName) },
           { role: "user", content: userPrompt },
         ],
       },

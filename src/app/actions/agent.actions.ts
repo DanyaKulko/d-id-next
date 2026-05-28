@@ -55,13 +55,13 @@ const resolveLanguageName = (code?: string | null): string | null => {
 const buildLanguageDirective = (code?: string | null): string | null => {
   const name = resolveLanguageName(code);
   if (!name) return null;
-  return `The user has selected ${name} (${code}) as the conversation language. Respond ONLY in ${name}, regardless of the language used in any earlier message of this conversation. Do not switch languages unless the user explicitly asks.`;
+  return `LANGUAGE LOCK — STRICT: The user has selected ${name} (${code}) as the conversation language. Every reply you produce MUST be entirely in ${name}. This applies even if earlier turns, search results, knowledge-base snippets, or the user's transcript contain other languages. Never switch to English (or any other language) unless ${name} is English, or the user explicitly asks to switch. Proper names (places, people, brands) stay as-is, but the surrounding sentence is in ${name}.`;
 };
 
 const buildInlineLanguageDirective = (code?: string | null): string | null => {
   const name = resolveLanguageName(code);
   if (!name) return null;
-  return `(Reply in ${name} only.)`;
+  return `[Reply in ${name}.]`;
 };
 
 const resolveAssistantMessage = (data: unknown) => {
@@ -372,11 +372,14 @@ export async function chatAction(
 
     const withInline = messagesPayload.map((m) => ({ ...m }));
     if (inlineDirective) {
-      for (let i = withInline.length - 1; i >= 0; i -= 1) {
+      // Language pin: prefix EVERY user message (not just the last) with the
+      // language tag. This saturates the conversation context with a single
+      // consistent directive so the model cannot drift when history contains
+      // older messages in a different language. We mutate only the in-flight
+      // payload — persisted history in the DB is left untouched.
+      for (let i = 0; i < withInline.length; i += 1) {
         if (withInline[i].role === "user") {
-          withInline[i].content =
-            `${withInline[i].content}\n\n${inlineDirective}`;
-          break;
+          withInline[i].content = `${inlineDirective} ${withInline[i].content}`;
         }
       }
     }

@@ -45,21 +45,24 @@ export const summarizeSearch = async (
   }
   try {
     const languageName = resolveLanguageName(language);
+    const today = new Date().toISOString().slice(0, 10);
     const systemPrompt = `You are Neil's travel-blogger AI avatar. Summarize web search results into a spoken answer.
 
 Rules:
 - Respond in ${languageName}.
 - 1-3 short natural sentences, conversational and friendly (spoken by an avatar, not written).
-- Mention concrete numbers/dates when present (weather, scores, currency rates, etc.).
+- GROUNDING: use ONLY facts, numbers and dates that appear verbatim in the search snippets below. Do NOT use prior knowledge.
+- If the user asked for a specific current value (weather, price, exchange rate, score, etc.) and that value is NOT explicitly stated in the snippets, say in ${languageName} that you could not find the current value right now. Never invent or estimate a number.
+- When a number is in the snippet, prefer the most recent one (today is ${today}).
 - Do NOT list sources, URLs, "(1)", "(2)", etc. No bullet points.
 - Do NOT add greetings or sign-offs.`;
 
-    const userPrompt = `User asked: "${userQuestion}"\n\nSearch results:\n${joinResults(results)}\n\nAnswer now.`;
+    const userPrompt = `Today is ${today}.\nUser asked: "${userQuestion}"\n\nSearch results (treat as the only source of truth):\n${joinResults(results)}\n\nAnswer now in ${languageName}. If the snippets don't contain the specific current value asked for, say so honestly.`;
 
     const completion = await openai.chat.completions.create(
       {
         model: SUMMARIZER_MODEL,
-        temperature: 0.3,
+        temperature: 0,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
