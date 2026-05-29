@@ -132,6 +132,16 @@ export const AvatarPageClient = ({
     "idle" | "preparing" | "listening" | "thinking" | "speaking" | "timed_out"
   >("idle");
   const [language, setLanguage] = useState(languages[0].code);
+  // Always-current mirror of `language`. The Azure STT recognizer captures the
+  // transcript callback when it is CREATED, so after a language switch it can
+  // keep dispatching through a closure that still holds the previous language.
+  // Reading this ref at send time guarantees the server gets the live language,
+  // which is what fixes the "first reply after switching is in the old
+  // language" bug.
+  const languageRef = useRef(language);
+  useEffect(() => {
+    languageRef.current = language;
+  }, [language]);
   const languageSelectRef = useRef<HTMLSelectElement | null>(null);
   const langTip = useShowOncePerSession("na.tip.lang");
 
@@ -411,12 +421,12 @@ export const AvatarPageClient = ({
       if (!options?.skipSpeakingGuard && isAgentSpeakingRef.current) {
         return false;
       }
-      const phrase = pickTriggerPhrase(type, language);
+      const phrase = pickTriggerPhrase(type, languageRef.current);
       if (!phrase) return false;
       const res = await sendStreamScript(phrase);
       return Boolean(res?.success);
     },
-    [sendStreamScript, language],
+    [sendStreamScript],
   );
 
   const sendTranscript = useCallback(
@@ -452,6 +462,11 @@ export const AvatarPageClient = ({
       setCarouselOpen(false);
       resetTimer();
 
+      // Read the live language from the ref (not the closed-over value) so a
+      // transcript that arrives right after a language switch is sent with the
+      // current language, even if the STT callback closure is stale.
+      const currentLanguage = languageRef.current;
+
       let res: { success: boolean; error?: string } = { success: true };
       let handledByMedia = false;
       const ids = getIds();
@@ -463,7 +478,7 @@ export const AvatarPageClient = ({
             streamId: ids.streamId,
             sessionId: ids.sessionId,
             text: normalized,
-            language,
+            language: currentLanguage,
           });
           if (intentRes.success && intentRes.data.intent !== "none") {
             setMediaResult(intentRes.data);
@@ -475,7 +490,7 @@ export const AvatarPageClient = ({
       }
 
       if (!handledByMedia) {
-        res = await speak(normalized, language);
+        res = await speak(normalized, currentLanguage);
       }
 
       if (!res?.success) {
@@ -519,7 +534,6 @@ export const AvatarPageClient = ({
       normalizeTranscript,
       resetTimer,
       speak,
-      language,
       ensureConnection,
       agent.agentId,
       getIds,
@@ -1233,6 +1247,9 @@ export const AvatarPageClient = ({
               value={language}
               onChange={(e) => {
                 const nextLang = e.target.value;
+                // Update the ref synchronously so any transcript fired in this
+                // same tick is already sent with the new language.
+                languageRef.current = nextLang;
                 setLanguage(nextLang);
                 setMediaResult(null);
                 setCarouselOpen(false);
