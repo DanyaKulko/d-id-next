@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./theme-space.css";
 import Local from "next/font/local";
+import ZoomLock from "@/components/ZoomLock/ZoomLock";
 
 const nasalization = Local({
   src: "../assets/fonts/Nasalization_regular.otf",
@@ -22,6 +24,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -31,7 +35,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${nasalization.variable}`}>{children}</body>
+      <body className={`${nasalization.variable}`}>
+        <ZoomLock />
+        {children}
+      </body>
     </html>
   );
 }

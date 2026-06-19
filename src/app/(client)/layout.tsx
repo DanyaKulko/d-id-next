@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/auth/require";
 import { isClientAuthRequired } from "@/lib/auth/client-access";
+import SpaceBackground from "@/components/SpaceBackground/SpaceBackground";
 import UserSessionTracker from "./_components/UserSessionTracker";
 
 const isRegularUserRoles = (roles: string[]) =>
@@ -18,7 +19,8 @@ export default async function ClientLayout({
   return (
     <>
       {shouldTrack ? <UserSessionTracker /> : null}
-      {children}
+      <SpaceBackground />
+      <div className="na-theme-space">{children}</div>
     </>
   );
 }

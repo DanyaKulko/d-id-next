@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import HomeMediaPrefetch from "@/components/HomeMediaPrefetch";
 import BrandLockup from "@/components/BrandLockup/BrandLockup";
+import Marquee from "@/components/Marquee/Marquee";
 import UserGuideModal from "@/components/UserGuideModal/UserGuideModal";
 import ClientPreloader from "@/components/ClientPreloader/ClientPreloader";
 import { fetchHomeAgents } from "@/lib/agents/agents.db";
@@ -57,12 +58,11 @@ export default async function Home() {
 
       <main className="na-container">
         <p
-          className="na-subtitle"
+          className="na-subtitle na-avatars-hint"
           style={{
             textAlign: "center",
             marginBottom: 16,
-            fontSize: 24,
-            color: "#284665",
+            color: "#EBF2FC",
           }}
         >
           Click on any image of Avatars
@@ -102,11 +102,17 @@ export default async function Home() {
               <div className="na-card-overlay"></div>
               <div className="na-card-content">
                 <h3 className="na-card-title">{avatar.name}</h3>
-                <p className="na-card-desc">{avatar.description}</p>
+                <Marquee className="na-card-desc" text={avatar.description} />
               </div>
             </Link>
           ))}
         </div>
+
+        {authRequired ? (
+          <div className="na-home-logout">
+            <ClientLogoutButton />
+          </div>
+        ) : null}
 
         <div className="na-brand-logo" aria-hidden="true">
           <BrandLockup size="lg" />

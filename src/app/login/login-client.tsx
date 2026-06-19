@@ -7,6 +7,7 @@ import { loginStart } from "@/app/actions/auth/login.actions";
 import { twoFactorVerify } from "@/app/actions/auth/two-factor.actions";
 import BrandLockup from "@/components/BrandLockup/BrandLockup";
 import PasswordInput from "@/components/PasswordInput";
+import SpaceBackground from "@/components/SpaceBackground/SpaceBackground";
 
 type LoginState =
   | { phase: "login"; error?: string; expiresAt?: string }
@@ -109,20 +110,27 @@ export default function LoginClient({ twoFactorRequired }: LoginClientProps) {
 
   const currentState = state.phase === "otp" ? otpState : state;
   const isOtp = state.phase === "otp";
+  const [photoZoom, setPhotoZoom] = useState(false);
 
   return (
-    <div className="na-login-shell">
-      <div className="na-login-brand">
+    <>
+      <SpaceBackground />
+      <div className="na-login-shell na-theme-space">
+        <div className="na-login-brand">
         <BrandLockup size="lg" />
       </div>
 
       <div className="na-login-content">
-        <div className="na-login-image-col">
+        <div
+          className={`na-login-image-col ${photoZoom ? "na-login-image-col--zoom" : ""}`}
+        >
           {/* biome-ignore lint/performance/noImgElement: static hero, intentionally unoptimized */}
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: decorative photo zoom toggle */}
           <img
             className="na-login-photo"
             src="/images/neil-login.jpg"
             alt="Neil's Travels"
+            onClick={() => setPhotoZoom((v) => !v)}
           />
         </div>
         <div className="na-login-card">
@@ -260,5 +268,6 @@ export default function LoginClient({ twoFactorRequired }: LoginClientProps) {
         </div>
       </div>
     </div>
+    </>
   );
 }
