@@ -1,0 +1,29 @@
+/* ============================================================
+   DEMO GLUE — НЕ часть рабочего проекта.
+   Только то, что в реальном приложении делают next/font и React-обёртки:
+   - регистрирует шрифт Nasalization (в проде грузит next/font/local);
+   - задаёт CSS-переменную, которую ждёт BrandLockup;
+   - базовый фон body, как в реальном layout (.na-theme-space wrapper).
+   Вся остальная вёрстка — реальные CSS-файлы из src/, скопированные как есть.
+   ============================================================ */
+
+@font-face {
+  font-family: "Nasalization";
+  src: url("./fonts/Nasalization_regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* В приложении эту переменную ставит next/font/local на <body>. */
+  --font-nasalization-sans: "Nasalization";
+}
+
+html,
+body {
+  background: #0b1726;
+}
+
+/* В реальном приложении звёздный canvas рисуется компонентом Starfield
+   внутри .na-space-bg__stars; здесь — порт того же canvas. */

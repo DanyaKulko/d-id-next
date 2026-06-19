@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Neil Avatar 3.0 — demo: desktop layout on mobile (no responsive)</title>
+  <link rel="stylesheet" href="assets/demo.css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background:
+        radial-gradient(1100px 680px at 78% -8%, rgba(77,177,221,.12), transparent 60%),
+        radial-gradient(900px 620px at 6% 108%, rgba(252,169,44,.09), transparent 60%),
+        linear-gradient(180deg, #0d1a2c 0%, #0b1726 60%, #091320 100%);
+      color: #d8e3f2;
+      min-height: 100vh;
+      padding: 32px 20px 64px;
+    }
+    .wrap { max-width: 1180px; margin: 0 auto; }
+    .brand { font-family: "Nasalization", sans-serif; font-size: 30px; color: #eaf2fb; letter-spacing: .04em; }
+    .tag { color: rgba(216,227,242,.66); font-size: 14px; margin-top: 4px; font-style: italic; }
+    h1 { font-size: 26px; margin: 22px 0 10px; color: #fff; font-weight: 700; }
+    .lead { max-width: 760px; line-height: 1.6; color: rgba(216,227,242,.85); font-size: 16px; }
+    .lead b { color: #fca92c; }
+    .note {
+      margin: 20px 0 10px; padding: 14px 18px; font-size: 14px; line-height: 1.55;
+      background: rgba(252,169,44,.08); border: 1px solid rgba(252,169,44,.28);
+      border-radius: 10px; color: #ffd9a8; max-width: 860px;
+    }
+    .grid { display: flex; flex-wrap: wrap; gap: 40px; margin-top: 36px; justify-content: center; }
+    .col { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+    .col h2 { font-size: 17px; color: #7fcdec; font-weight: 600; }
+    /* Рамка телефона: десктопная страница 1280px, вписанная в ширину экрана —
+       ровно то, что делает мобильный браузер с НЕадаптивным сайтом. */
+    .phone {
+      position: relative; width: 360px; height: 760px;
+      border: 10px solid #11203400; border-radius: 38px;
+      background: #000;
+      box-shadow: 0 0 0 12px #0e1d30, 0 30px 70px rgba(0,0,0,.55), 0 0 0 13px rgba(77,177,221,.25);
+      overflow: hidden;
+    }
+    .phone::after {
+      content: ""; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+      width: 130px; height: 22px; background: #0e1d30; border-radius: 0 0 14px 14px; z-index: 5;
+    }
+    .phone iframe {
+      width: 1280px; height: 2702px; border: 0;
+      transform: scale(0.28125); transform-origin: top left;
+    }
+    .links { display: flex; gap: 10px; }
+    .btn {
+      display: inline-block; text-decoration: none; font-size: 13px; font-weight: 600;
+      padding: 9px 16px; border-radius: 9px; transition: .15s;
+    }
+    .btn-primary { background: linear-gradient(135deg, #fca92c, #ffc57a); color: #1a1102; }
+    .btn-primary:hover { filter: brightness(1.05); }
+    .btn-ghost { border: 1px solid rgba(77,177,221,.4); color: #7fcdec; }
+    .btn-ghost:hover { background: rgba(77,177,221,.12); }
+    footer { margin-top: 48px; font-size: 13px; color: rgba(216,227,242,.5); line-height: 1.6; max-width: 860px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">Neil Avatar 3.0</div>
+    <div class="tag">Space. Travel. Sports. Politics.</div>
+
+    <h1>How the site looks on mobile WITHOUT responsive layout</h1>
+    <p class="lead">
+      This is an isolated demo (the live site is untouched). It shows how the pages look on a phone
+      if the responsive mobile layout is removed and the <b>desktop version is simply squeezed to the
+      screen width</b> — exactly what was requested. Each &ldquo;phone frame&rdquo; below is the real
+      1280px-wide desktop page fitted into a phone screen. You can see that the text and controls become
+      <b>too small</b> — reading and tapping is barely possible without zooming.
+    </p>
+
+    <div class="note">
+      💡 Best viewed on a real phone: tap &ldquo;Open on phone&rdquo; under any page — the browser will
+      fit the desktop into the screen and shrink everything, just like in these frames.
+    </div>
+
+    <div class="grid">
+      <div class="col">
+        <h2>1. Home (roles)</h2>
+        <div class="phone"><iframe src="home.html" title="Home" scrolling="no" loading="lazy"></iframe></div>
+        <div class="links">
+          <a class="btn btn-primary" href="home.html" target="_blank">Open on phone</a>
+        </div>
+      </div>
+
+      <div class="col">
+        <h2>2. Role page (Space)</h2>
+        <div class="phone"><iframe src="role.html" title="Role" scrolling="no" loading="lazy"></iframe></div>
+        <div class="links">
+          <a class="btn btn-primary" href="role.html" target="_blank">Open on phone</a>
+        </div>
+      </div>
+
+      <div class="col">
+        <h2>3. Login</h2>
+        <div class="phone"><iframe src="login.html" title="Login" scrolling="no" loading="lazy"></iframe></div>
+        <div class="links">
+          <a class="btn btn-primary" href="login.html" target="_blank">Open on phone</a>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      Markup and media are taken from the current project (branch redesign/3.0-space) and copied into this
+      folder unchanged. The only difference from the live site is a fixed desktop viewport
+      (<code>width=1280</code>) instead of the responsive one, to demonstrate the &ldquo;squeezed desktop&rdquo;
+      effect. This demo folder is not part of the build and is not deployed.
+    </footer>
+  </div>
+</body>
+</html>

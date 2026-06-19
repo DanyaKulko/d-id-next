@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import BrandLockup from "@/components/BrandLockup/BrandLockup";
+import SpaceBackground from "@/components/SpaceBackground/SpaceBackground";
 
 type ClientPreloaderProps = {
   minDurationMs?: number;
@@ -32,6 +33,7 @@ export default function ClientPreloader({
         if (phase === "hiding") setPhase("hidden");
       }}
     >
+      <SpaceBackground />
       <div className="na-preloader__content">
         <BrandLockup
           className="na-preloader__lockup"

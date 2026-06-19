@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <!-- ДЕМО: фиксированный десктопный viewport (НЕ адаптив) — на телефоне ужмётся. -->
+  <meta name="viewport" content="width=1280" />
+  <title>Neil Avatar 3.0 — Login (non-responsive demo)</title>
+  <link rel="stylesheet" href="assets/css/globals.css" />
+  <link rel="stylesheet" href="assets/css/theme-space.css" />
+  <link rel="stylesheet" href="assets/css/brand-lockup.css" />
+  <link rel="stylesheet" href="assets/css/space-background.css" />
+  <link rel="stylesheet" href="assets/css/login.css" />
+  <link rel="stylesheet" href="assets/demo.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
+</head>
+<body>
+  <!-- SpaceBackground (фон + звёзды) — монтируется в login-client.tsx -->
+  <div class="na-space-bg" aria-hidden="true">
+    <div class="na-space-bg__nebula"></div>
+    <div class="na-space-bg__grid"></div>
+    <canvas class="na-space-bg__stars"></canvas>
+  </div>
+
+  <div class="na-login-shell na-theme-space">
+    <div class="na-login-brand">
+      <div class="na-brand-lockup na-brand-lockup--lg">
+        <span class="na-brand-lockup-lamp" aria-hidden="true">
+          <div class="na-brand-lockup-lamp-anim"></div>
+        </span>
+        <div class="na-brand-lockup-text">
+          <span class="na-brand-lockup-title">Neil Avatar 3.0</span>
+          <span class="na-brand-lockup-tagline">Space. Travel. Sports. Politics.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="na-login-content">
+      <div class="na-login-image-col">
+        <img class="na-login-photo" src="assets/neil-login.jpg" alt="Neil's Travels" />
+      </div>
+
+      <div class="na-login-card">
+        <div class="na-login-card-header">
+          <div class="na-login-card-title">
+            <h1>User Login</h1>
+          </div>
+          <span class="na-login-secure-badge">Secure</span>
+        </div>
+
+        <div class="na-login-error"></div>
+
+        <form id="loginForm" onsubmit="return false">
+          <div class="na-login-form-group">
+            <label for="identifier">Email or username</label>
+            <input type="text" id="identifier" name="identifier"
+              placeholder="you@company.com or username" autocomplete="username" />
+          </div>
+
+          <div class="na-login-form-group">
+            <label for="password">Password</label>
+            <div class="na-password-input">
+              <input type="password" id="password" name="password" placeholder="Enter your password" />
+              <button type="button" class="na-password-toggle" onclick="
+                var i=document.getElementById('password');
+                if(i.type==='password'){i.type='text';this.textContent='Hide';}
+                else{i.type='password';this.textContent='Show';}">Show</button>
+            </div>
+            <p class="na-login-password-hint">Click &quot;Show&quot; to reveal the password</p>
+          </div>
+
+          <!-- reCAPTCHA (в проде — Google reCAPTCHA; здесь статичная копия виджета) -->
+          <div class="na-login-form-group na-login-captcha-group">
+            <div style="width:304px;max-width:100%;height:78px;background:#f9f9f9;border:1px solid #d3d3d3;border-radius:3px;display:flex;align-items:center;padding:0 12px;gap:12px;box-shadow:0 0 4px rgba(0,0,0,.08)">
+              <span style="width:28px;height:28px;border:2px solid #c1c1c1;border-radius:2px;background:#fff;flex:0 0 auto"></span>
+              <span style="color:#000;font-family:Roboto,Arial,sans-serif;font-size:14px">I'm not a robot</span>
+              <span style="margin-left:auto;text-align:center;color:#555;font-family:Roboto,Arial,sans-serif">
+                <span style="display:block;width:32px;height:32px;margin:0 auto;background:radial-gradient(circle at 50% 38%,#4a90d9 0 38%,transparent 39%);border-radius:50%"></span>
+                <span style="font-size:10px">reCAPTCHA</span>
+              </span>
+            </div>
+          </div>
+
+          <button type="submit" class="na-login-submit">Login</button>
+        </form>
+
+        <div class="na-login-instructions">
+          <h2>How to Get Access to NeilAvatar</h2>
+          <ol>
+            <li>Type in your email address. Use the same email address that you typically correspond with Neil.</li>
+            <li>Type in the password which Neil has sent you via email. Keep password safe.</li>
+            <li>Check the Captcha box to confirm you are human.</li>
+            <li>Click Login.</li>
+            <li>Enjoy NeilAvatar.</li>
+          </ol>
+        </div>
+
+        <div class="na-login-footer-text">
+          Contact Neil with Login issues.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/demo.js"></script>
+</body>
+</html>

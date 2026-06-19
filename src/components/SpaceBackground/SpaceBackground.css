@@ -1,0 +1,91 @@
+/* Fixed space backdrop — see SpaceBackground.tsx */
+
+.na-space-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  /* Deep brand navy wash + ambient amber/blue glow blooms.
+     "Dark but not black" — derived from brand #284666. */
+  background:
+    radial-gradient(
+      1100px 680px at 78% -8%,
+      rgba(77, 177, 221, 0.12),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 620px at 6% 108%,
+      rgba(252, 169, 44, 0.09),
+      transparent 60%
+    ),
+    linear-gradient(180deg, #0d1a2c 0%, #0b1726 60%, #091320 100%);
+}
+
+/* Galaxy nebula: soft brand-tinted clouds slowly turning like a galaxy.
+   Only `transform` animates → composited, cheap on mobile. */
+.na-space-bg__nebula {
+  position: absolute;
+  inset: -30%;
+  transform-origin: 50% 50%;
+  background:
+    radial-gradient(
+      38% 30% at 33% 38%,
+      rgba(77, 177, 221, 0.18),
+      transparent 70%
+    ),
+    radial-gradient(
+      34% 26% at 67% 60%,
+      rgba(252, 169, 44, 0.13),
+      transparent 70%
+    ),
+    radial-gradient(
+      52% 42% at 50% 50%,
+      rgba(86, 64, 150, 0.16),
+      transparent 72%
+    );
+  filter: blur(34px);
+  animation: na-galaxy-rot 140s linear infinite;
+  will-change: transform;
+}
+
+@keyframes na-galaxy-rot {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Faint HUD grid, faded out toward the edges with a radial mask. */
+.na-space-bg__grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(77, 177, 221, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(77, 177, 221, 0.06) 1px, transparent 1px);
+  background-size: 48px 48px;
+  -webkit-mask-image: radial-gradient(
+    ellipse 100% 80% at 50% 32%,
+    #000 38%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    ellipse 100% 80% at 50% 32%,
+    #000 38%,
+    transparent 100%
+  );
+  opacity: 0.7;
+}
+
+.na-space-bg__stars {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Starfield already paints a single static frame; freeze the nebula too. */
+  .na-space-bg__stars {
+    opacity: 0.85;
+  }
+  .na-space-bg__nebula {
+    animation: none;
+  }
+}

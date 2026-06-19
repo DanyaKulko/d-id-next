@@ -101,16 +101,16 @@ export default function BrandLockup({
             ref={titleRef as React.RefObject<HTMLAnchorElement>}
             href="/"
             className="na-brand-lockup-title"
-            aria-label="Neil Avatar"
+            aria-label="Neil Avatar 3.0"
           >
-            Neil Avatar
+            Neil Avatar 3.0
           </Link>
         ) : (
           <span
             ref={titleRef as React.RefObject<HTMLSpanElement>}
             className="na-brand-lockup-title"
           >
-            Neil Avatar
+            Neil Avatar 3.0
           </span>
         )}
         <span ref={tagRef} className="na-brand-lockup-tagline">

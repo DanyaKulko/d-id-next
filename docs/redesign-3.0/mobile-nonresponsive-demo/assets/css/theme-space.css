@@ -1,0 +1,179 @@
+/* ============================================================
+   Neil Avatar 3.0 — "Space" dark reskin
+   Scoped to the public client surfaces via `.na-theme-space`.
+   Overrides the existing --na-* tokens so token-driven components
+   flip automatically; targeted fixes follow for hardcoded spots.
+   Admin is NOT wrapped and is unaffected.
+   ============================================================ */
+
+.na-theme-space {
+  /* Surfaces — deep brand navy, "dark but not black" (from #284666) */
+  --na-bg-base: #0b1726;
+  --na-bg-surface: #122339;
+  --na-bg-surface-raised: #18304b;
+  --na-bg-accent-warm: rgba(252, 169, 44, 0.1);
+  --na-bg-accent-cold: rgba(77, 177, 221, 0.1);
+
+  /* Accents — strictly brand (amber + blue, no green) */
+  --na-accent-primary: #fca92c;
+  --na-accent-primary-soft: #ffc57a;
+  --na-accent-secondary: #4db1dd;
+  --na-accent-secondary-soft: #7fcdec;
+
+  /* Text — cool near-white on dark */
+  --na-text-on-light: #d8e3f2; /* repurposed: primary readable text */
+  --na-text-on-color: #ffffff;
+  --na-text-muted: rgba(216, 227, 242, 0.66);
+  --na-ink-dim: #93a6c2;
+  --na-ink-faint: #6f87a8;
+
+  /* Lines & glow */
+  --na-line: rgba(77, 177, 221, 0.16);
+  --na-line-strong: rgba(77, 177, 221, 0.34);
+  --na-glow-warm: rgba(252, 169, 44, 0.35);
+  --na-glow-cold: rgba(77, 177, 221, 0.3);
+
+  /* Radii & shadows */
+  --na-radius-sm: 9px;
+  --na-shadow-soft: 0 18px 45px rgba(0, 0, 0, 0.45);
+  --na-shadow-cta: 0 18px 40px rgba(252, 169, 44, 0.3);
+
+  /* Brand corner accent color (HUD brackets) */
+  --na-hud: var(--na-accent-primary);
+
+  position: relative;
+  z-index: 1;
+  min-height: 100dvh;
+  color: var(--na-text-on-light);
+}
+
+/* Paint the document background dark too, so iOS overscroll never flashes
+   the light body bg. Scoped to client pages; admin sets its own body bg.
+   Graceful fallback for engines without :has() — the fixed backdrop still
+   covers the viewport; only the rubber-band edge differs. */
+body:has(.na-theme-space) {
+  background: #0b1726;
+}
+
+/* ---- Base element styling within the theme ---- */
+.na-theme-space ::selection {
+  background: rgba(252, 169, 44, 0.32);
+  color: #fff;
+}
+
+.na-theme-space a {
+  color: var(--na-accent-secondary);
+}
+
+/* Slim cosmic scrollbar (WebKit/Blink; Firefox uses default) */
+.na-theme-space * {
+  scrollbar-color: rgba(77, 177, 221, 0.4) transparent;
+}
+.na-theme-space *::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.na-theme-space *::-webkit-scrollbar-thumb {
+  background: rgba(77, 177, 221, 0.28);
+  border-radius: 8px;
+}
+.na-theme-space *::-webkit-scrollbar-thumb:hover {
+  background: rgba(77, 177, 221, 0.45);
+}
+
+/* ============================================================
+   Fixes for colors hardcoded in globals.css (now inside the theme)
+   ============================================================ */
+
+/* Header surface + hairline instead of the light drop shadow */
+.na-theme-space .na-header {
+  background: linear-gradient(
+    180deg,
+    rgba(18, 35, 57, 0.92),
+    rgba(11, 23, 38, 0.78)
+  );
+  box-shadow: 0 1px 0 var(--na-line);
+  border-bottom: 1px solid var(--na-line);
+}
+
+/* Fallback text logo (BrandLockup lamp is a Lottie and is left untouched) */
+.na-theme-space .na-logo-text {
+  color: var(--na-text-on-light);
+}
+
+/* Brand wordmark + tagline: dark navy ink → cool near-white on dark.
+   The animated lamp (Lottie) keeps its own colors. */
+.na-theme-space .na-brand-lockup-title {
+  color: #eaf2fb;
+}
+.na-theme-space .na-brand-lockup-tagline {
+  color: var(--na-text-muted);
+}
+
+/* Primary CTA: dark ink on amber reads far better than white */
+.na-theme-space .na-btn--primary {
+  color: #1a1102;
+}
+.na-theme-space .na-btn--secondary:hover {
+  background: rgba(77, 177, 221, 0.12);
+}
+
+/* Back-link hover glow tuned to brand blue */
+.na-theme-space .na-back-link:hover {
+  text-shadow: 0 0 10px var(--na-glow-cold);
+}
+
+/* Modal backdrop + content on dark */
+.na-theme-space .na-modal {
+  background: rgba(4, 9, 16, 0.78);
+}
+.na-theme-space .na-modal-content {
+  background: var(--na-bg-surface);
+  border: 1px solid var(--na-line);
+  box-shadow: var(--na-shadow-soft);
+}
+
+/* Preloader: cosmic navy instead of the white gradient */
+.na-theme-space .na-preloader {
+  background:
+    radial-gradient(
+      circle at 30% 20%,
+      rgba(252, 169, 44, 0.18),
+      transparent 55%
+    ),
+    radial-gradient(
+      circle at 70% 80%,
+      rgba(77, 177, 221, 0.16),
+      transparent 60%
+    ),
+    linear-gradient(180deg, #0d1a2c 0%, #0b1726 100%);
+}
+
+/* The big footer brand lockup sits a touch brighter on dark, centered. */
+.na-theme-space .na-brand-logo {
+  opacity: 0.85;
+  justify-content: center;
+}
+
+/* Footer logo: larger on desktop (container has the room). Mobile keeps the
+   fluid lockup sizes so it never overflows. */
+@media (min-width: 901px) {
+  .na-theme-space .na-brand-logo .na-brand-lockup--lg {
+    --na-lockup-lamp: 208px;
+    --na-lockup-word: 88px;
+    --na-lockup-tag: 30px;
+    --na-lockup-gap: 26px;
+  }
+}
+
+/* Preloader carries the same starfield behind its lockup. */
+.na-theme-space .na-preloader__content {
+  position: relative;
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .na-theme-space * {
+    scroll-behavior: auto;
+  }
+}

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <!-- ДЕМО: фиксированный десктопный viewport (НЕ адаптив) — на телефоне ужмётся. -->
+  <meta name="viewport" content="width=1280" />
+  <title>Neil Avatar 3.0 — Role: Space (non-responsive demo)</title>
+  <link rel="stylesheet" href="assets/css/globals.css" />
+  <link rel="stylesheet" href="assets/css/theme-space.css" />
+  <link rel="stylesheet" href="assets/css/brand-lockup.css" />
+  <link rel="stylesheet" href="assets/css/space-background.css" />
+  <link rel="stylesheet" href="assets/css/role.css" />
+  <link rel="stylesheet" href="assets/css/avatar-stage.css" />
+  <link rel="stylesheet" href="assets/demo.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
+</head>
+<body>
+  <!-- SpaceBackground (фон + звёзды) -->
+  <div class="na-space-bg" aria-hidden="true">
+    <div class="na-space-bg__nebula"></div>
+    <div class="na-space-bg__grid"></div>
+    <canvas class="na-space-bg__stars"></canvas>
+  </div>
+
+  <div class="na-theme-space">
+    <header class="na-header">
+      <div class="na-container">
+        <div class="na-header-content">
+          <a href="index.html" class="na-logo-text" aria-label="Neil Avatar">Neil Avatar</a>
+          <a href="home.html" class="na-back-link">← Back to Roles</a>
+        </div>
+      </div>
+    </header>
+
+    <main class="na-container">
+      <div class="na-main-layout">
+        <div class="na-avatar-section">
+          <div class="na-avatar-container">
+            <div class="na-status-badge">
+              <span class="na-status-indicator idle"></span>
+              <span>Ready</span>
+            </div>
+
+            <div class="na-stage-actions">
+              <button type="button" class="na-stage-btn" aria-label="Mute microphone" title="Mute microphone">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+                  <path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8" />
+                </svg>
+              </button>
+              <button type="button" class="na-stage-btn" aria-label="Enter full screen" title="Enter full screen">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                </svg>
+              </button>
+            </div>
+
+            <!-- AvatarStage — idle-состояние (роль Space) -->
+            <div class="na-stage-wrapper" style="position:relative;width:100%;height:100%;overflow:hidden">
+              <video class="na-avatar-video na-layer-idle" autoplay loop muted playsinline
+                poster="https://clips-presenters.d-id.com/v2/auth0_693c4600c4ab848b13f728d0/jEe9iY7nE_/jvxGLZW11G/thumbnail.png"
+                src="https://agents-results.d-id.com/auth0|693c4600c4ab848b13f728d0/v2_agt_sTVYwQ3y/agent-default-idle_1771283209784.mp4?modified_at=2026-02-16T23%3A48%3A07.029Z"
+                style="opacity:1;position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:10"></video>
+
+              <div style="opacity:1;z-index:18;position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none">
+                <div class="na-avatar-overlay"></div>
+                <div class="na-role-header-overlay" id="roleHeaderOverlay">
+                  <h1 class="na-role-title">Space</h1>
+                  <p class="na-role-desc">Talk with Neil about space travel, rockets, airplanes, and his personal space stories.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="na-watermark">
+              <img src="assets/watermark.png" alt="watermark" />
+            </div>
+          </div>
+
+          <div class="na-controls">
+            <div class="na-control-group">
+              <select class="na-language-select">
+                <option>🇺🇸 English</option>
+                <option>🇮🇳 Hindi</option>
+                <option>🇮🇳 Marathi</option>
+                <option>🇪🇸 Spanish</option>
+                <option>🇫🇷 French</option>
+                <option>🇷🇺 Russian</option>
+                <option>🇮🇩 Indonesian</option>
+              </select>
+              <span class="na-control-hint">Tap &quot;English&quot; to switch language</span>
+            </div>
+
+            <div class="na-control-group">
+              <select class="na-language-select" disabled>
+                <option>🎨 Default Background</option>
+              </select>
+              <span class="na-control-hint">Background selection is not available for this role.</span>
+            </div>
+
+            <div class="na-control-group">
+              <button type="button" class="na-btn na-btn--primary" id="startBtn">🎤 Start Conversation</button>
+              <span class="na-control-hint">Click &quot;Start Conversation&quot; to begin a session</span>
+            </div>
+
+            <div class="na-control-group">
+              <button type="button" class="na-btn na-btn--interrupt" id="interruptBtn" disabled>⏸️ Interrupt Neil Avatar</button>
+              <span class="na-control-hint">Click Interrupt if you want to move to another topic.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="na-brand-logo" aria-hidden="true">
+        <div class="na-brand-lockup na-brand-lockup--lg">
+          <span class="na-brand-lockup-lamp" aria-hidden="true">
+            <div class="na-brand-lockup-lamp-anim"></div>
+          </span>
+          <div class="na-brand-lockup-text">
+            <span class="na-brand-lockup-title">Neil Avatar 3.0</span>
+            <span class="na-brand-lockup-tagline">Space. Travel. Sports. Politics.</span>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="assets/demo.js"></script>
+</body>
+</html>

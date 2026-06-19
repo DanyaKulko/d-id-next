@@ -236,11 +236,9 @@
    3.0 Space reskin — Home cards (scoped, additive, reversible)
    ============================================================ */
 
-/* Header subtitle: centered, sized to match the "Click on any image of
-   Avatars" hint (24px) at every width so the two read as one pair. Mobile
-   drops both to 20px in the media block above. */
+/* Header subtitle: 15% smaller, centered. */
 .na-theme-space .na-header-title .na-subtitle {
-  font-size: 24px;
+  font-size: 27px; /* 32px - 15% */
   text-align: center;
 }
 
