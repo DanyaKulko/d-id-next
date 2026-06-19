@@ -61,14 +61,6 @@ body {
   touch-action: manipulation;
 }
 
-/* Hide the floating "sample questions" hint while the avatar chat is in
-   pseudo-fullscreen (it's injected at the body level and would otherwise float
-   over the fullscreen view). Native fullscreen renders only the stage element,
-   so the hint is already out of view there. */
-body.na-body-pseudo-fullscreen #na-hints-root {
-  display: none !important;
-}
-
 /* Global focus-visible for accessibility (elderly audience) */
 :focus-visible {
   outline: 3px solid var(--na-accent-secondary);

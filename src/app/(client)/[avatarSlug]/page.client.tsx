@@ -1237,6 +1237,26 @@ export const AvatarPageClient = ({
                 onClose={() => setCarouselOpen(false)}
               />
             )}
+
+          {isFullscreen && connectionStatus === "connected" && (
+            <div className="na-fs-action-bar">
+              <button
+                type="button"
+                className="na-btn na-btn--primary na-fs-action-btn"
+                onClick={disconnect}
+              >
+                Stop
+              </button>
+              <button
+                type="button"
+                className="na-btn na-btn--interrupt na-fs-action-btn"
+                onClick={handleInterrupt}
+                disabled={agentStatus !== "speaking"}
+              >
+                ⏸️ Interrupt
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="na-controls">
@@ -1275,8 +1295,7 @@ export const AvatarPageClient = ({
               ))}
             </select>
             <span className="na-control-hint">
-              Click the &quot;English&quot; button to reveal other available
-              languages
+              Tap &quot;English&quot; to switch language
             </span>
             <EducationalTooltip
               anchorRef={languageSelectRef}

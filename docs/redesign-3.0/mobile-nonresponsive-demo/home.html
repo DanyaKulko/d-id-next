@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <!-- ДЕМО: фиксированный десктопный viewport. Это и есть суть демонстрации —
+       НЕ адаптив. На телефоне браузер впишет десктоп 1280px в экран → всё ужмётся. -->
+  <meta name="viewport" content="width=1280" />
+  <title>Neil Avatar 3.0 — Home (non-responsive demo)</title>
+  <link rel="stylesheet" href="assets/css/globals.css" />
+  <link rel="stylesheet" href="assets/css/theme-space.css" />
+  <link rel="stylesheet" href="assets/css/brand-lockup.css" />
+  <link rel="stylesheet" href="assets/css/space-background.css" />
+  <link rel="stylesheet" href="assets/css/home.css" />
+  <link rel="stylesheet" href="assets/demo.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
+</head>
+<body>
+  <!-- SpaceBackground (фон + звёзды), монтируется один раз в (client)/layout.tsx -->
+  <div class="na-space-bg" aria-hidden="true">
+    <div class="na-space-bg__nebula"></div>
+    <div class="na-space-bg__grid"></div>
+    <canvas class="na-space-bg__stars"></canvas>
+  </div>
+
+  <div class="na-theme-space">
+    <header class="na-header">
+      <div class="na-container">
+        <div class="na-header-content">
+          <!-- BrandLockup asLink -->
+          <div class="na-brand-lockup">
+            <span class="na-brand-lockup-lamp" aria-hidden="true">
+              <div class="na-brand-lockup-lamp-anim"></div>
+            </span>
+            <div class="na-brand-lockup-text">
+              <a href="index.html" class="na-brand-lockup-title" aria-label="Neil Avatar 3.0">Neil Avatar 3.0</a>
+              <span class="na-brand-lockup-tagline">Space. Travel. Sports. Politics.</span>
+            </div>
+          </div>
+          <div class="na-header-title na-header-title--centered">
+            <p class="na-subtitle">Choose a topic to start talking with Neil</p>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="na-container">
+      <p class="na-subtitle na-avatars-hint" style="text-align:center;margin-bottom:16px;color:#EBF2FC">
+        Click on any image of Avatars
+      </p>
+
+      <div class="na-roles-grid">
+        <!-- 1. Autobiography (full) -->
+        <a href="role.html" class="na-card na-card--full">
+          <video class="na-card-video" autoplay loop muted playsinline preload="auto"
+            poster="https://create-images-results.d-id.com/auth0|693c4600c4ab848b13f728d0/v2_private_auth0_693c4600c4ab848b13f728d0@M71Iafy80H/merged-bg-color-uBESY0t5-thumbnail.jpeg">
+            <source src="https://agents-results.d-id.com/auth0|693c4600c4ab848b13f728d0/v2_agt_qgQtm_Qd/idle_1771282667395.mp4?modified_at=2026-02-26T23%3A40%3A33.936Z" type="video/mp4">
+          </video>
+          <div class="na-card-overlay"></div>
+          <div class="na-card-content">
+            <h3 class="na-card-title">Autobiography</h3>
+            <p class="na-card-desc" data-marquee data-text="Talk with Neil about his family, background, education, and career."></p>
+          </div>
+        </a>
+
+        <!-- 2. Space (half) -->
+        <a href="role.html" class="na-card na-card--half">
+          <video class="na-card-video" autoplay loop muted playsinline preload="auto"
+            poster="https://clips-presenters.d-id.com/v2/auth0_693c4600c4ab848b13f728d0/jEe9iY7nE_/jvxGLZW11G/thumbnail.png">
+            <source src="https://agents-results.d-id.com/auth0|693c4600c4ab848b13f728d0/v2_agt_sTVYwQ3y/agent-default-idle_1771283209784.mp4?modified_at=2026-02-16T23%3A48%3A07.029Z" type="video/mp4">
+          </video>
+          <div class="na-card-overlay"></div>
+          <div class="na-card-content">
+            <h3 class="na-card-title">Space</h3>
+            <p class="na-card-desc" data-marquee data-text="Talk with Neil about space travel, rockets, airplanes, and his personal space stories."></p>
+          </div>
+        </a>
+
+        <!-- 3. Travel (half) -->
+        <a href="role.html" class="na-card na-card--half">
+          <video class="na-card-video" autoplay loop muted playsinline preload="auto"
+            poster="https://clips-presenters.d-id.com/v2/auth0_693c4600c4ab848b13f728d0/61SmN4xJX2/tLThRmiEGm/thumbnail.png">
+            <source src="https://agents-results.d-id.com/auth0|693c4600c4ab848b13f728d0/v2_agt_UuYrG_vh/agent-default-idle_1768418547304.mp4?modified_at=2026-02-16T23%3A44%3A06.814Z" type="video/mp4">
+          </video>
+          <div class="na-card-overlay"></div>
+          <div class="na-card-content">
+            <h3 class="na-card-title">Travel</h3>
+            <p class="na-card-desc" data-marquee data-text="Talk with Neil about his travels to 114 countries on all continents, their cultures, and his travel experiences."></p>
+          </div>
+        </a>
+
+        <!-- 4. Sports (half) -->
+        <a href="role.html" class="na-card na-card--half">
+          <video class="na-card-video" autoplay loop muted playsinline preload="auto"
+            poster="https://clips-presenters.d-id.com/v2/auth0_693c4600c4ab848b13f728d0/438AAD79r9/IfJLzgKy14/thumbnail.png">
+            <source src="https://agents-results.d-id.com/auth0|693c4600c4ab848b13f728d0/v2_agt_jN-xHg-j/agent-default-idle_1768418575594.mp4?modified_at=2026-03-07T01%3A55%3A03.341Z" type="video/mp4">
+          </video>
+          <div class="na-card-overlay"></div>
+          <div class="na-card-content">
+            <h3 class="na-card-title">Sports</h3>
+            <p class="na-card-desc" data-marquee data-text="Talk with Neil about baseball, football, soccer, golf, the Olympics, the World Cup, players, and his favorite sports experiences."></p>
+          </div>
+        </a>
+
+        <!-- 5. Politics (half) -->
+        <a href="role.html" class="na-card na-card--half">
+          <video class="na-card-video" autoplay loop muted playsinline preload="auto"
+            poster="https://clips-presenters.d-id.com/v2/auth0_67160548a1887b7d9e16679f/hRZkjnAfYf/VHDq9YHrIi/thumbnail.png">
+            <source src="https://agents-results.d-id.com/auth0|693c4600c4ab848b13f728d0/v2_agt_i3smXo2W/idle_1769262964373.mp4?modified_at=2026-02-16T15%3A20%3A41.018Z" type="video/mp4">
+          </video>
+          <div class="na-card-overlay"></div>
+          <div class="na-card-content">
+            <h3 class="na-card-title">Politics</h3>
+            <p class="na-card-desc" data-marquee data-text="Talk with Neil about his political beliefs, activities, and opinions."></p>
+          </div>
+        </a>
+      </div>
+
+      <!-- Footer brand lockup (size lg) -->
+      <div class="na-brand-logo" aria-hidden="true">
+        <div class="na-brand-lockup na-brand-lockup--lg">
+          <span class="na-brand-lockup-lamp" aria-hidden="true">
+            <div class="na-brand-lockup-lamp-anim"></div>
+          </span>
+          <div class="na-brand-lockup-text">
+            <span class="na-brand-lockup-title">Neil Avatar 3.0</span>
+            <span class="na-brand-lockup-tagline">Space. Travel. Sports. Politics.</span>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="assets/demo.js"></script>
+</body>
+</html>

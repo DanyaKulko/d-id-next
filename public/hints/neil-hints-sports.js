@@ -23,7 +23,7 @@
     "Do you like cycling?"
 ];
 
-  var TITLE_CLOSED = "Click here to open sample questions";
+  var TITLE_CLOSED = "Click to open sample questions";
   var TITLE_OPEN   = "Sample questions you can ask";
 
   /* === CSS === */
@@ -45,8 +45,8 @@
 
     #na-hints-card {
       pointer-events: all; width: 100%; max-width: 1200px; margin: 0 24px;
-      background: #FFFFFF; border-radius: 15px 15px 0 0;
-      box-shadow: 0 -8px 40px rgba(39,70,99,0.14); overflow: hidden;
+      background: #122339; border-radius: 15px 15px 0 0;
+      box-shadow: 0 -8px 40px rgba(0,0,0,0.5); overflow: hidden;
       transition: max-height 0.38s cubic-bezier(0.4,0,0.2,1);
       max-height: 52px;
     }
@@ -67,6 +67,11 @@
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
+    /* Tablet: title 10% smaller (mobile handled in the 600px block). */
+    @media (min-width: 601px) and (max-width: 1366px) {
+      .na-hints-header-title { font-size: 17.1px; }
+    }
+
     #na-hints-chevron {
       width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; margin-left: 12px;
       background: rgba(255,255,255,0.2); display: flex;
@@ -79,12 +84,12 @@
     #na-hints-chevron svg { display: block; }
 
     #na-hints-body {
-      padding: 10px 16px 12px; background: #FFFFFF;
+      padding: 10px 16px 12px; background: #122339;
       overflow-y: auto; max-height: 268px;
     }
     #na-hints-body::-webkit-scrollbar { width: 5px; }
-    #na-hints-body::-webkit-scrollbar-track { background: #FAFAFB; }
-    #na-hints-body::-webkit-scrollbar-thumb { background: #C9DAE3; border-radius: 4px; }
+    #na-hints-body::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); }
+    #na-hints-body::-webkit-scrollbar-thumb { background: rgba(77,177,221,0.35); border-radius: 4px; }
 
     /* Desktop list — 3 columns */
     #na-hints-list {
@@ -93,13 +98,13 @@
 
     .na-hints-q {
       display: flex; align-items: flex-start; gap: 8px;
-      background: #FAFAFB; border: 1.5px solid rgba(201,218,227,0.9);
+      background: rgba(255,255,255,0.04); border: 1.5px solid rgba(77,177,221,0.22);
       border-radius: 10px; padding: 7px 11px; cursor: default;
       transition: background 0.15s, border-color 0.15s, transform 0.15s;
       text-align: left;
     }
     .na-hints-q:hover {
-      background: #EEF5FA; border-color: #4A9CD0;
+      background: rgba(77,177,221,0.12); border-color: #4DB1DD;
       transform: translateY(-2px); box-shadow: 0 4px 14px rgba(74,156,208,0.18);
     }
     .na-hints-q-icon {
@@ -109,7 +114,7 @@
       justify-content: center; font-size: 11px; margin-top: 2px;
     }
     .na-hints-q-text {
-      font-size: 19px; font-weight: 600; color: #274663; line-height: 1.35;
+      font-size: 19px; font-weight: 600; color: #d8e3f2; line-height: 1.35;
     }
 
     /* Mobile carousel */
@@ -121,22 +126,22 @@
     #na-hints-mobile-carousel .na-hints-q:active { transform: scale(0.98); }
 
     #na-hints-footer {
-      margin-top: 8px; font-size: 19px; color: rgba(39,70,99,0.45); text-align: center;
+      margin-top: 8px; font-size: 19px; color: rgba(216,227,242,0.5); text-align: center;
     }
 
     /* === Mobile === */
     @media (max-width: 600px) {
-      #na-hints-card          { margin: 0 5px; border-radius: 12px 12px 0 0; max-height: calc(46px + env(safe-area-inset-bottom,0px)); padding-bottom: env(safe-area-inset-bottom,0px); }
+      #na-hints-card          { margin: 0 4px; border-radius: 12px 12px 0 0; max-height: calc(46px + env(safe-area-inset-bottom,0px)); padding-bottom: env(safe-area-inset-bottom,0px); }
       #na-hints-card.na-expanded { max-height: calc(33vh + env(safe-area-inset-bottom,0px)); }
       #na-hints-header        { padding: 0 12px; height: 46px; }
-      #na-hints-body          { max-height: calc(33vh - 46px); padding: 8px 10px 10px; }
-      .na-hints-header-title  { font-size: 17px; }
-      .na-hints-q             { padding: 6px 9px; gap: 7px; }
-      .na-hints-q-text        { font-size: 17px; }
-      .na-hints-q-icon        { width: 19px; height: 19px; font-size: 10px; }
-      #na-hints-footer        { font-size: 17px; margin-top: 6px; }
+      #na-hints-body          { max-height: calc(33vh - 46px); padding: 8px 8px 10px; }
+      .na-hints-header-title  { font-size: 15.3px; }
+      .na-hints-q             { padding: 6px 8px; gap: 0; }
+      .na-hints-q-text        { font-size: 15px; line-height: 1.25; }
+      .na-hints-q-icon        { display: none; }
+      #na-hints-footer        { font-size: 15px; margin-top: 6px; }
       #na-hints-list          { display: none; }
-      #na-hints-mobile-carousel { display: grid; }
+      #na-hints-mobile-carousel { display: grid; gap: 6px; }
 
 
     }
