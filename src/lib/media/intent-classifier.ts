@@ -28,8 +28,9 @@ Analyze the user's message and recent chat history to determine the intent.
 ## Key rules:
 - If the request mentions Neil / his blog / his travels / his experience → use _from_blog variant
 - If no explicit Neil context → use _from_external variant
+- REAL-TIME DATA RULE (critical): any request for a current/live value — current or today's weather/temperature, exchange rates or currency conversion (including at a specific bank like PrivatBank), prices, stock or crypto quotes, sports scores, or news / "what's happening" — MUST be classified as search_information. The avatar must NEVER answer these from its own memory, even if it seems to know the number. Words like "now", "current", "today", "latest", "сейчас", "сегодня", "актуальный", "hoy", "ahora", "aujourd'hui" are strong signals.
 - If the request contains BOTH a search trigger AND a media trigger (e.g. "show me photos of today's news") → choose by priority: search_information > photo/video
-- If confidence < 0.7 for any intent → return "none"
+- Classify a real-time / current-data question as search_information even at moderate confidence — do NOT fall back to "none" for it. For the OTHER intents (media), if confidence < 0.7 → return "none".
 - Follow-up messages like "show more" or "another one" → use chat history to determine the original intent
 
 ## Response format:
@@ -74,7 +75,16 @@ User: "Что такое фотосинтез?"
 {"intent": "none"}
 
 User: "Последние новости про AI"
-{"intent": "search_information", "keywords": "artificial intelligence AI latest news"}`;
+{"intent": "search_information", "keywords": "artificial intelligence AI latest news"}
+
+User: "Какой сейчас курс доллара в Приватбанке?"
+{"intent": "search_information", "keywords": "USD UAH exchange rate PrivatBank today"}
+
+User: "Какая погода сейчас в Хьюстоне?"
+{"intent": "search_information", "keywords": "Houston weather today temperature"}
+
+User: "What's the dollar to euro rate today?"
+{"intent": "search_information", "keywords": "USD EUR exchange rate today"}`;
 
 export interface HistoryEntry {
   role: "user" | "assistant";

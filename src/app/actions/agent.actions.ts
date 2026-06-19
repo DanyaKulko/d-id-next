@@ -349,9 +349,25 @@ export async function chatAction(
         })
       : [];
 
+    // Detect a mid-session language switch: if the previous user turn was in a
+    // different language than the one now selected, drop the prior history for
+    // THIS request. Old-language turns (especially the assistant's own past
+    // replies) are the strongest pull dragging a weak agent LLM back to the old
+    // language; removing them, plus the directive + per-message tag below,
+    // makes the switch stick on the very first turn. New-language history
+    // rebuilds naturally from here. DB history is never modified.
+    const currentLang = language?.trim() || null;
+    const userTurns = history.filter((m) => m.role === "USER");
+    const prevUserLang =
+      userTurns.length >= 2 ? userTurns[userTurns.length - 2].language : null;
+    const languageSwitched = Boolean(
+      currentLang && prevUserLang && prevUserLang !== currentLang,
+    );
+    const effectiveHistory = languageSwitched ? history.slice(-1) : history;
+
     const messagesPayload =
-      history.length > 0
-        ? history.map((message) => ({
+      effectiveHistory.length > 0
+        ? effectiveHistory.map((message) => ({
             role: message.role.toLowerCase() as "system" | "user" | "assistant",
             content:
               message.role === "ASSISTANT"

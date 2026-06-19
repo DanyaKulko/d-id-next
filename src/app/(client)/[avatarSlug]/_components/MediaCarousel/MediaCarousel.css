@@ -165,9 +165,16 @@
 }
 
 @media (max-width: 720px) {
+  /* Constrain the overlay to the VISIBLE viewport (dvh), not the layout
+     viewport (vh). With 100vh the layer extends behind the mobile address bar,
+     which pushed the top-right close button off-screen behind the chrome. */
+  .na-media-carousel {
+    height: 100dvh;
+  }
+
   .na-media-carousel__stage {
     width: 100vw;
-    height: 100vh;
+    height: 100dvh;
     gap: 10px;
   }
 

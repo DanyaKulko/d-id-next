@@ -481,8 +481,15 @@ export const AvatarPageClient = ({
             language: currentLanguage,
           });
           if (intentRes.success && intentRes.data.intent !== "none") {
-            setMediaResult(intentRes.data);
             handledByMedia = true;
+            // Only REPLACE the on-screen media when this request actually
+            // returned items. A search answer (items: []) or a "not found"
+            // media result must NOT wipe the photos/videos already shown — they
+            // persist until the ✕ button, a new result with items, or session
+            // end. This is what stops media vanishing on the next question.
+            if (intentRes.data.items.length > 0) {
+              setMediaResult(intentRes.data);
+            }
           }
         } catch (mediaError) {
           console.warn("Media intent resolution failed:", mediaError);
@@ -1251,7 +1258,9 @@ export const AvatarPageClient = ({
                 // same tick is already sent with the new language.
                 languageRef.current = nextLang;
                 setLanguage(nextLang);
-                setMediaResult(null);
+                // Keep any shown media on a language switch — it closes only
+                // via the ✕, a new media result, or session end. Just collapse
+                // the fullscreen viewer.
                 setCarouselOpen(false);
                 if (listening) {
                   stopListening(true);

@@ -3,9 +3,9 @@
   inset: 0;
   pointer-events: none;
   z-index: 22;
-  /* Top padding clears the "Speaking..." status pill so the top card
-     never overlaps it. */
-  padding: 80px 16px 16px;
+  /* Top padding pushes the whole column below the "Speaking…"/"Listening…"
+     status pill so the top card never sits under it. */
+  padding: 92px 16px 16px;
 }
 
 .na-media-overlay__grid {
@@ -19,6 +19,7 @@
 }
 
 .na-media-overlay__slot {
+  position: relative;
   pointer-events: auto;
   width: clamp(110px, 15%, 200px);
   aspect-ratio: 3 / 2;
@@ -99,14 +100,14 @@
   margin-left: 3px;
 }
 
-/* Round close button (×) — kills all media. */
+/* Round close button (×) on the top photo's corner — closes ALL media. */
 .na-media-overlay__close {
   pointer-events: auto;
   position: absolute;
-  top: 16px;
-  left: clamp(120px, 17%, 220px);
-  width: 36px;
-  height: 36px;
+  top: 6px;
+  right: 6px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   border: none;
   background: rgba(0, 0, 0, 0.62);
@@ -115,16 +116,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 3;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  z-index: 4;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
   transition:
     background 0.15s ease,
     transform 0.15s ease;
 }
 
 .na-media-overlay__close:hover {
-  background: rgba(0, 0, 0, 0.85);
-  transform: scale(1.06);
+  background: rgba(0, 0, 0, 0.88);
+  transform: scale(1.08);
 }
 
 .na-media-overlay__close:focus-visible {
@@ -170,13 +171,9 @@
     height: 13px;
   }
 
-  /* On mobile pin the close button to the top-right of the viewport
-     so it never sits under the photo grid. */
+  /* Slightly larger tap target on the top card's corner. */
   .na-media-overlay__close {
-    top: calc(env(safe-area-inset-top, 0px) + 12px);
-    right: calc(env(safe-area-inset-right, 0px) + 12px);
-    left: auto;
-    width: 44px;
-    height: 44px;
+    width: 32px;
+    height: 32px;
   }
 }

@@ -33,19 +33,6 @@ export const MediaOverlay = ({
       aria-live="polite"
       aria-label="Media results"
     >
-      <button
-        type="button"
-        className="na-media-overlay__close"
-        onClick={onClose}
-        aria-label="Close media"
-        title="Close"
-      >
-        {/* biome-ignore lint/a11y/noSvgWithoutTitle: decorative */}
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-          <path d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12 5.7 16.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.88a1 1 0 0 0 0-1.41z" />
-        </svg>
-      </button>
-
       <div className="na-media-overlay__grid">
         {items.slice(0, 4).map((item, index) => (
           <div
@@ -86,6 +73,30 @@ export const MediaOverlay = ({
                 </span>
               )}
             </button>
+
+            {/* Round close button on the top photo's corner — closes all media. */}
+            {index === 0 && (
+              <button
+                type="button"
+                className="na-media-overlay__close"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onClose();
+                }}
+                aria-label="Close media"
+                title="Close"
+              >
+                {/* biome-ignore lint/a11y/noSvgWithoutTitle: decorative */}
+                <svg
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="currentColor"
+                >
+                  <path d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12 5.7 16.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.88a1 1 0 0 0 0-1.41z" />
+                </svg>
+              </button>
+            )}
           </div>
         ))}
       </div>
